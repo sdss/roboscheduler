@@ -1,0 +1,8 @@
+[run]
+branch = true
+
+[report]
+omit =
+    python/roboscheduler/etc/*
+    python/roboscheduler/utils/*
+    python/roboscheduler/tests/*
