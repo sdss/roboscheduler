@@ -153,7 +153,7 @@ class Observer(SchedulerBase):
 
     observatoryfile : str
         Name of Yanny-format observatory file to read
-        (default $OBSERVESIM_DIR/data/observatories.par)
+        (default $ROBOSCHEDULER_DIR/data/observatories.par)
 
     Attributes:
     ----------
@@ -188,7 +188,7 @@ class Observer(SchedulerBase):
         super().__init__()
         self.observatory = observatory
         if(observatoryfile is None):
-            observatoryfile = os.path.join(os.getenv('OBSERVESIM_DIR'),
+            observatoryfile = os.path.join(os.getenv('ROBOSCHEDULER_DIR'),
                                            'data', 'observatories.par')
         self._file = observatoryfile
         self._data = yanny.yanny(self._file)
@@ -425,7 +425,7 @@ class Master(Observer):
     Parameters:
     ----------
     schedulefile : str
-        schedule file to use; default $OBSERVESIM_DIR/data/master_schedule.par
+        schedule file to use; default $ROBOSCHEDULER_DIR/data/master_schedule.par
 
     Attributes:
     ----------
@@ -455,7 +455,7 @@ class Master(Observer):
                          observatoryfile=observatoryfile)
         if(schedulefile is None):
             masterfile = 'master_schedule_{observatory}.par'.format(observatory=observatory)
-            schedulefile = os.path.join(os.getenv('OBSERVESIM_DIR'),
+            schedulefile = os.path.join(os.getenv('ROBOSCHEDULER_DIR'),
                                         'data', masterfile)
         self._schedulefile = schedulefile
         self.schedule = yanny.yanny(self._schedulefile)

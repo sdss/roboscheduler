@@ -1,8 +1,12 @@
 import numpy as np
-import itertools
 import fitsio
 from ortools.constraint_solver import pywrapcp
 
+
+# Outstanding items:
+#  - pack_targets() logic is repetitve with delta=-1s
+#  - delta=-1 case only works for single exposures
+#  - delta=-1 case doesn't check lunation
 
 # Class to define a singleton
 class CadenceSingleton(type):
@@ -70,6 +74,14 @@ class Cadence(object):
 
     Methods:
     -------
+
+    Notes:
+    -----
+
+    The first delta == 0 in all cadences.
+
+    The last epochs in the list may have delta = -1. These will be
+    treated as unconstrained. Only single epoch cadences will be allowed.
 """
     def __init__(self, nexposures=None, lunation=None, delta=None,
                  delta_min=None, delta_max=None, instrument=None):
@@ -92,6 +104,8 @@ class Cadence(object):
             self.requires_boss = 1
         else:
             self.requires_boss = 0
+        self.nexposures_pack = len(np.where(self.delta != -1)[0])
+        self.nepochs_pack = len(np.where(self.delta != -1)[0])
         return
 
     def __str__(self):
@@ -165,7 +179,7 @@ class Cadence(object):
         epoch_indx = [0]
         self.nepochs = 1
         for indx in np.arange(self.nexposures - 1) + 1:
-            if(self.delta[indx] > 0.):
+            if(self.delta[indx] != 0.):
                 epoch_indx.append(indx)
                 self.nepochs = self.nepochs + 1
         self.epoch_indx = np.array(epoch_indx, dtype=np.int32)
@@ -264,6 +278,12 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         instrument : list of str
             instrument for each exposure
+
+        Notes:
+        -----
+
+        The last epochs in the list may have delta = -1. These will be
+        treated as unconstrained. Only single epoch cadences will be allowed.
 """
         cadence = Cadence(*args, **kwargs)
         self.cadences[name] = cadence
@@ -287,15 +307,20 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         epoch_level : boolean
             compare sequences at epoch level not exposure level (default True)
+
+        Notes:
+        -----
+
+        If cadence one contains epochs with delta = -1 they will be ignored.
 """
         eps = 1.e-4  # generously deal with round-off
         nexp = len(indx2)
 
         if(sub1 is None):
             if(epoch_level):
-                sub1 = np.arange(self.cadences[one].nepochs)
+                sub1 = np.where(self.cadences[one].epoch_delta != -1)[0]
             else:
-                sub1 = np.arange(self.cadences[one].nexposures)
+                sub1 = np.where(self.cadences[one].delta != -1)[0]
 
         # Check number of exposures, if at epoch level
         if(epoch_level):
@@ -329,7 +354,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
                     return(False)
                 if(dhi1 <= dhi2 - eps):
                     return(False)
-            else:  # adjacent exposures
+            elif(delta1 == 0.):  # adjacent exposures
                 if(indx2[indx] > indx2[indx - 1] + 1):  # must be adjacent
                     return(False)
                 if(delta2 > 0.):  # must be adjacent
@@ -370,13 +395,16 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         A solution is a set of N_1 exposures within cadence 2, which
         satisfy the requirements for cadence 1.
+
+        The end of cadence #2 may have a set of epochs with delta = -1
+        at its end. These epochs will be ignored.
 """
         if(epoch_level):
             n1 = self.cadences[one].nepochs
-            n2 = self.cadences[two].nepochs
+            n2 = self.cadences[two].nepochs_pack
         else:
             n1 = self.cadences[one].nexposures
-            n2 = self.cadences[two].nexposures
+            n2 = self.cadences[two].nexposures_pack
 
         # Check which exposures you can start on
         possibles = []
@@ -457,12 +485,31 @@ class CadenceList(object, metaclass=CadenceSingleton):
         not observe partial cadences.
 """
         ntargets = len(target_cadences)
-        nepochs_field = self.cadences[field_cadence].nepochs
-        nexposures_field = self.cadences[field_cadence].nexposures
+        nepochs_field_full = self.cadences[field_cadence].nepochs
+        nexposures_field_full = self.cadences[field_cadence].nexposures
+        nepochs_field = self.cadences[field_cadence].nepochs_pack
+        nexposures_field = self.cadences[field_cadence].nexposures_pack
         if(value is None):
             value = np.ones(ntargets)
         else:
             value = np.array(value)
+
+        # Output arrays
+        epoch_targets = [np.zeros(0, dtype=np.int32)] * nepochs_field_full
+        exposure_targets = np.zeros(nexposures_field_full, dtype=np.int32) - 1
+
+        if(nepochs_field == 0):
+            nepochs = np.array([self.cadences[tc].nepochs
+                                for tc in target_cadences], dtype=np.int32)
+            isingle = np.where(nepochs == 1)[0]
+            if(len(isingle) == 0):
+                return(epoch_targets, exposure_targets)
+            isort = np.flip(np.argsort(value[isingle]), axis=0)
+            isort = isort[0:nepochs_field_full - nepochs_field]
+            for i in np.arange(len(isort), dtype=np.int32):
+                exposure_targets[i] = isingle[isort[i]]
+                epoch_targets[i] = np.array([isingle[isort[i]]],
+                                            dtype=np.int32)
 
         pack = []
         epochs = [0] * nepochs_field
@@ -509,9 +556,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
             packvar.append(targetvar)
 
         # Constraint for each solution that all or none of
-        # its epochs, and only those epochs, are used, and that
-        # each of the epochs has exactly the right number of
-        # exposures.
+        # its epochs, and only those epochs, are used.
         for target, targetvar, target_cadence in zip(pack, packvar,
                                                      target_cadences):
             for soln, solnvar in zip(target, targetvar):
@@ -571,7 +616,6 @@ class CadenceList(object, metaclass=CadenceSingleton):
             return(None)
 
         # Retrieve list of targets for each epoch
-        epoch_targets = [np.zeros(0, dtype=np.int32)] * nepochs_field
         if collector.SolutionCount() > 0:
             best_solution = collector.SolutionCount() - 1
             for itarget, targetvar in zip(range(ntargets), packvar):
@@ -581,11 +625,11 @@ class CadenceList(object, metaclass=CadenceSingleton):
                             epoch_targets[iepoch] = np.append(epoch_targets[iepoch], itarget)
 
         # Now convert into list of targets for each exposure
-        exposure_targets = np.zeros(nexposures_field, dtype=np.int32) - 1
         iexposure = 0
         target_epoch = np.zeros(len(target_cadences), dtype=np.int32)
         for iepoch in np.arange(nepochs_field, dtype=np.int32):
-            for itarget in np.arange(len(epoch_targets[iepoch]), dtype=np.int32):
+            for itarget in np.arange(len(epoch_targets[iepoch]),
+                                     dtype=np.int32):
                 ctarget = epoch_targets[iepoch][itarget]
                 ccadence = self.cadences[target_cadences[ctarget]]
                 nexposures = ccadence.epoch_nexposures[target_epoch[ctarget]]
@@ -593,6 +637,21 @@ class CadenceList(object, metaclass=CadenceSingleton):
                     exposure_targets[indx] = ctarget
                 iexposure = iexposure + nexposures
                 target_epoch[ctarget] = target_epoch[ctarget] + 1
+
+        if(nepochs_field_full > nepochs_field):
+            got_targets = np.zeros(len(target_cadences), dtype=np.int32)
+            got_targets[exposure_targets[0:nexposures_field]] = 1
+            nepochs = np.array([self.cadences[tc].nepochs
+                                for tc in target_cadences], dtype=np.int32)
+            isingle = np.where((nepochs == 1) & (got_targets == 0))[0]
+            if(len(isingle) == 0):
+                return(epoch_targets, exposure_targets)
+            isort = np.flip(np.argsort(value[isingle]), axis=0)
+            isort = isort[0:nepochs_field_full - nepochs_field]
+            for i in np.arange(len(isort), dtype=np.int32):
+                exposure_targets[nepochs_field + i] = isingle[isort[i]]
+                epoch_targets[nepochs_field + i] = np.array([isingle[isort[i]]],
+                                                            dtype=np.int32)
 
         return(epoch_targets, exposure_targets)
 
