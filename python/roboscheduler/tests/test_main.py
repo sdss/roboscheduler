@@ -10,11 +10,11 @@ from __future__ import unicode_literals
 
 from pytest import mark
 
-from roboscheduler.main import math
+from roboscheduler.cadence import cadence
 
 
-class TestMath(object):
-    """Tests for the ``math`` function in main.py."""
+class TestCadenceList(object):
+    """Tests for the CadenceList object in cadence.py."""
 
     @mark.parametrize(('arg1', 'arg2', 'operator', 'result'),
                       [(1, 2, '+', 3), (2, 2, '-', 0), (3, 5, '*', 15), (10, 2, '/', 5)])
