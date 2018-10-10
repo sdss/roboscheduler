@@ -9,6 +9,9 @@ try:
 except:
     _database = False
 
+# Definition to use when writing to ndarray
+fits_type = np.dtype('a40')
+
 
 # Class to define a singleton
 class CadenceSingleton(type):
@@ -245,14 +248,14 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
 """
     def __init__(self):
-        self.ncadences = 0
-        self.cadences = dict()
+        self.reset()
         return
 
     def reset(self):
         """Reset cadence list to be empty"""
         self.ncadences = 0
         self.cadences = dict()
+        self._cadence_consistency = dict()
         return
 
     def add_cadence(self, name=None, *args, **kwargs):
@@ -405,6 +408,11 @@ class CadenceList(object, metaclass=CadenceSingleton):
         The end of cadence #2 may have a set of epochs with delta = -1
         at its end. These epochs will be ignored.
 """
+        # Return cached results
+        cache_key = (one, two, epoch_level, return_solutions)
+        if(cache_key in self._cadence_consistency):
+            return(self._cadence_consistency[cache_key])
+
         if(epoch_level):
             n1 = self.cadences[one].nepochs
             n2 = self.cadences[two].nepochs_pack
@@ -419,9 +427,10 @@ class CadenceList(object, metaclass=CadenceSingleton):
             success = True
             possibles = [list(np.arange(n1))]
             if(return_solutions):
-                return(success, possibles)
+                self._cadence_consistency[cache_key] = (success, possibles)
             else:
-                return(success)
+                self._cadence_consistency[cache_key] = success
+            return(self._cadence_consistency[cache_key])
 
         # Special case for nexposures == 1, to check delta = -1 cases.
         if(self.cadences[one].nexposures == 1):
@@ -432,9 +441,10 @@ class CadenceList(object, metaclass=CadenceSingleton):
                     possibles.append([i2])
             success = len(possibles) > 0
             if(return_solutions):
-                return(success, possibles)
+                self._cadence_consistency[cache_key] = (success, possibles)
             else:
-                return(success)
+                self._cadence_consistency[cache_key] = success
+            return(self._cadence_consistency[cache_key])
 
         # Check which exposures you can start on
         for first in np.arange(n2 - n1 + 1):
@@ -445,9 +455,10 @@ class CadenceList(object, metaclass=CadenceSingleton):
         if(len(possibles) == 0):
             success = 0
             if(return_solutions):
-                return(success, possibles)
+                self._cadence_consistency[cache_key] = (success, possibles)
             else:
-                return(success)
+                self._cadence_consistency[cache_key] = success
+            return(self._cadence_consistency[cache_key])
 
         # Now find sequences starting from there
         for nsub1 in np.arange(n1 - 1) + 2:
@@ -472,15 +483,17 @@ class CadenceList(object, metaclass=CadenceSingleton):
             if(len(possibles) == 0):
                 success = 0
                 if(return_solutions):
-                    return(success, possibles)
+                    self._cadence_consistency[cache_key] = (success, possibles)
                 else:
-                    return(success)
+                    self._cadence_consistency[cache_key] = success
+                return(self._cadence_consistency[cache_key])
 
         success = len(possibles) > 0
         if(return_solutions):
-            return(success, possibles)
+            self._cadence_consistency[cache_key] = (success, possibles)
         else:
-            return(success)
+            self._cadence_consistency[cache_key] = success
+        return(self._cadence_consistency[cache_key])
 
     def pack_targets(self, target_cadences=None, field_cadence=None,
                      value=None):
@@ -654,7 +667,6 @@ class CadenceList(object, metaclass=CadenceSingleton):
         iexposure = 0
         target_epoch = np.zeros(len(target_cadences), dtype=np.int32)
         for iepoch in np.arange(nepochs_field_full, dtype=np.int32):
-            print(epoch_targets[iepoch])
             for itarget in np.arange(len(epoch_targets[iepoch]),
                                      dtype=np.int32):
                 ctarget = epoch_targets[iepoch][itarget]
@@ -784,6 +796,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         # Output arrays
         epoch_targets = [np.zeros(0, dtype=np.int32)] * nepochs_field_full
+        epoch_nexposures = np.zeros(nepochs_field_full)
         exposure_targets = np.zeros(nexposures_field_full, dtype=np.int32) - 1
 
         # Handle case where field only allows single-exposure with no
@@ -814,7 +827,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
                 available = np.ones(count, dtype=np.bool)
                 for indx in np.arange(count):
                     soln = solns[indx]
-                    ntaken = [len(et) for et in epoch_targets]
+                    ntaken = epoch_nexposures.copy()
                     for isoln in np.arange(len(soln)):
                         iepoch = soln[isoln]
                         nexp = self.cadences[target_cadence].epoch_nexposures[isoln]
@@ -827,31 +840,38 @@ class CadenceList(object, metaclass=CadenceSingleton):
                 # Approximates an opportunity cost to each solution
                 iavailable = np.where(available)[0]
                 if(len(iavailable) > 0):
-                    cost = np.zeros(len(iavailable), dtype=np.float32)
-                    epoch_indx = fcadence.epoch_indx
-                    for indx in np.arange(len(iavailable)):
-                        soln = solns[iavailable[indx]]
-                        exposure_cost = (
-                            1. / (fcadence.lunation[epoch_indx[soln]] + 0.05) +
-                            fcadence.epoch_nexposures[soln] / 10.)
-                        cost[indx] = exposure_cost.sum()
+                    if((fcadence.epoch_nexposures.min() !=
+                        fcadence.epoch_nexposures.max()) |
+                       (fcadence.lunation.min() !=
+                        fcadence.lunation.max())):
+                        cost = np.zeros(len(iavailable), dtype=np.float32)
+                        epoch_indx = fcadence.epoch_indx
+                        for indx in np.arange(len(iavailable)):
+                            soln = solns[iavailable[indx]]
+                            exposure_cost = (
+                                1. / (fcadence.lunation[epoch_indx[soln]] +
+                                      0.05) +
+                                fcadence.epoch_nexposures[soln] / 10.)
+                            cost[indx] = exposure_cost.sum()
 
-                    isort_cost = np.argsort(cost, axis=0)
-                    soln = solns[iavailable[isort_cost[0]]]
+                        isort_cost = np.argsort(cost, axis=0)
+                        soln = solns[iavailable[isort_cost[0]]]
+                    else:
+                        soln = solns[iavailable[0]]
 
                     # Add to list.
                     for isoln in np.arange(len(soln)):
                         iepoch = soln[isoln]
+                        epoch_targets[iepoch] = np.append(epoch_targets[iepoch],
+                                                          itarget)
                         nexp = self.cadences[target_cadence].epoch_nexposures[isoln]
-                        for iexp in np.arange(nexp):
-                            epoch_targets[iepoch] = np.append(epoch_targets[iepoch],
-                                                              itarget)
+                        epoch_nexposures[iepoch] = (epoch_nexposures[iepoch] +
+                                                    nexp)
 
         # Now convert into list of targets for each exposure
         iexposure = 0
         target_epoch = np.zeros(len(target_cadences), dtype=np.int32)
         for iepoch in np.arange(nepochs_field_full, dtype=np.int32):
-            print(epoch_targets[iepoch])
             for itarget in np.arange(len(epoch_targets[iepoch]),
                                      dtype=np.int32):
                 ctarget = epoch_targets[iepoch][itarget]
@@ -917,7 +937,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
 """
         nexps = np.array([c.nexposures for c in self.cadences.values()])
         max_nexp = nexps.max()
-        cadence0 = [('CADENCE', np.dtype('a40')),
+        cadence0 = [('CADENCE', fits_type),
                     ('NEXPOSURES', np.int32),
                     ('DELTA', np.float64, max_nexp),
                     ('LUNATION', np.float32, max_nexp),
@@ -948,7 +968,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
 """
         neps = np.array([c.nepochs for c in self.cadences.values()])
         max_nep = neps.max()
-        cadence0 = [('CADENCE', np.dtype('a40')),
+        cadence0 = [('CADENCE', fits_type),
                     ('NEPOCHS', np.int32),
                     ('NEXPOSURES', np.int32, max_nep),
                     ('DELTA', np.float64, max_nep),
@@ -991,7 +1011,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
                                            delta=delta, lunation=lunation,
                                            delta_min=delta_min,
                                            delta_max=delta_max).execute()
-            
+
     def fromdb(self):
         """Extract cadences into the targetdb
 
