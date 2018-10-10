@@ -234,11 +234,15 @@ class CadenceList(object, metaclass=CadenceSingleton):
     add_cadence() : add a new cadence
     check_exposures() : are two exposure sets consistent?
     cadence_consistency(): is cadence #1 consistent with cadence #2?
-    pack_targets(): find best way to pack targets into a cadence
+    pack_targets(): pack targets into a cadence optimally
+    pack_targets_single(): pack single-shot cadence targets
+    pack_targets_greedy(): pack targets into a cadence in a greedy way
     fromarray(): add to cadence list from an ndarray
     fromfits(): add to cadence list from a FITS file
     toarray(): return an ndarray with cadence list
     epoch_array(): return an ndarray with epoch-oriented list of cadences
+    todb(): insert cadences into the targetdb
+    fromdb(): extract cadences into the targetdb
 
     Notes:
     -----
@@ -246,6 +250,10 @@ class CadenceList(object, metaclass=CadenceSingleton):
     This is a singleton, so there can only be one CadenceList defined
     within any session.
 
+    The cadence_consistency() method stores results for any set of its
+    inputs in a dictionary for lookup later; note that if you alter or
+    replace a cadence without using reset() then the cached version of
+    the cadence consistencies may not be accurate.
 """
     def __init__(self):
         self.reset()
