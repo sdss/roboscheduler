@@ -301,7 +301,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
 """
         cadence = Cadence(*args, **kwargs)
         self.cadences[name] = cadence
-        self.ncadences = self.ncadences + 1
+        self.ncadences = len(self.cadences.keys())
 
     def check_exposures(self, one=None, two=None, indx2=None, sub1=None,
                         epoch_level=True):
