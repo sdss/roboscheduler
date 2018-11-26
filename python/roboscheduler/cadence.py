@@ -4,7 +4,7 @@ import fitsio
 from ortools.constraint_solver import pywrapcp
 
 try:
-    from observesim.db.peewee import targetdb
+    import sdssdb.peewee.sdss5db.targetdb as targetdb
     _database = True
 except:
     _database = False
@@ -1015,10 +1015,11 @@ class CadenceList(object, metaclass=CadenceSingleton):
             delta_min = [float(n) for n in self.cadences[cadence].delta_min]
             delta_max = [float(n) for n in self.cadences[cadence].delta_max]
             lunation = [float(n) for n in self.cadences[cadence].lunation]
-            targetdb.TargetCadence2.insert(pk=pk, name=cadence, nexposures=nexposures,
-                                           delta=delta, lunation=lunation,
-                                           delta_min=delta_min,
-                                           delta_max=delta_max).execute()
+            targetdb.TargetCadence.insert(pk=pk, name=cadence,
+                                          nexposures=nexposures,
+                                          delta=delta, lunation=lunation,
+                                          delta_min=delta_min,
+                                          delta_max=delta_max).execute()
 
     def fromdb(self):
         """Extract cadences into the targetdb
@@ -1029,9 +1030,10 @@ class CadenceList(object, metaclass=CadenceSingleton):
             print("No database available.")
             return()
 
-        cadences = targetdb.TargetCadence2.select().dicts()
+        cadences = targetdb.TargetCadence.select().dicts()
         for cadence in cadences:
-            self.add_cadence(nexposures=cadence['nexposures'],
+            self.add_cadence(name=cadence['name'],
+                             nexposures=cadence['nexposures'],
                              delta=np.array(cadence['delta']),
                              delta_min=np.array(cadence['delta_min']),
                              delta_max=np.array(cadence['delta_max']),

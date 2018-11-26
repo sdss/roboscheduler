@@ -1,6 +1,7 @@
 
 numpy
 PyAstronomy
+ortools
 # astropy
 pyyaml
 pygments
