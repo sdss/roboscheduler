@@ -2,6 +2,7 @@ import sys
 import numpy as np
 import fitsio
 from ortools.constraint_solver import pywrapcp
+#from ortools.sat.python import cp_model
 
 try:
     import sdssdb.peewee.sdss5db.targetdb as targetdb
@@ -533,6 +534,11 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         Designed to maximize total "value" of targets observed. Will
         not observe partial cadences.
+
+        The solution actually has a time limit. It will not search for 
+        solutions for any longer than about 0.1 sec. This gets triggered
+        for cases where there is a complicated cadence sequence but LOTS
+        of targets to choose from. Usually the solution is OK.
 """
         ntargets = len(target_cadences)
         nepochs_field_full = self.cadences[field_cadence].nepochs
@@ -657,8 +663,9 @@ class CadenceList(object, metaclass=CadenceSingleton):
         # Add the objective.
         collector.AddObjective(objective_expr)
 
-        success = solver.Solve(db, [objective, collector])
-        if(success is False):
+        tl = solver.TimeLimit(100)
+        status = solver.Solve(db, [objective, collector, tl])
+        if(status is False):
             print("Problem in solver.")
             return(None)
 
