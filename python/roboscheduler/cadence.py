@@ -535,7 +535,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
         Designed to maximize total "value" of targets observed. Will
         not observe partial cadences.
 
-        The solution actually has a time limit. It will not search for 
+        The solution actually has a time limit. It will not search for
         solutions for any longer than about 0.1 sec. This gets triggered
         for cases where there is a complicated cadence sequence but LOTS
         of targets to choose from. Usually the solution is OK.
@@ -548,7 +548,6 @@ class CadenceList(object, metaclass=CadenceSingleton):
             value = np.ones(ntargets)
         else:
             value = np.array(value)
-        eps = 1.e-4
 
         # Output arrays
         epoch_targets = [np.zeros(0, dtype=np.int32)] * nepochs_field_full
@@ -559,7 +558,9 @@ class CadenceList(object, metaclass=CadenceSingleton):
         # are only targets available
         nexposures = np.array([self.cadences[tc].nexposures
                                for tc in target_cadences], dtype=np.int32)
-        if((nepochs_field == 0) | (nexposures.max() == 1)):
+        if(((nepochs_field == 0) &
+            (nepochs_field_full == nexposures_field_full)) |
+           (nexposures.max() == 1)):
             return(self.pack_targets_single(target_cadences=target_cadences,
                                             field_cadence=field_cadence,
                                             value=value))
@@ -814,12 +815,14 @@ class CadenceList(object, metaclass=CadenceSingleton):
         epoch_nexposures = np.zeros(nepochs_field_full)
         exposure_targets = np.zeros(nexposures_field_full, dtype=np.int32) - 1
 
-        # Handle case where field only allows single-exposure with no
-        # cadence requirement (i.e. all deltas are -1) OR case where those
-        # are only targets available
+        # Handle case where field only allows single-exposure epochs
+        # with no cadence requirement (i.e. all deltas are -1) OR case
+        # where those are only targets available
         nexposures = np.array([self.cadences[tc].nexposures
                                for tc in target_cadences], dtype=np.int32)
-        if((nepochs_field == 0) | (nexposures.max() == 1)):
+        if(((nepochs_field == 0) &
+            (nepochs_field_full == nexposures_field_full)) |
+           (nexposures.max() == 1)):
             return(self.pack_targets_single(target_cadences=target_cadences,
                                             field_cadence=field_cadence,
                                             value=value))

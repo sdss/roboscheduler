@@ -129,6 +129,26 @@ class TestCadence(object):
         assert epoch_targets[1][1] == 3
         assert list(exposure_targets) == [2, 3, 0, 3]
 
+    def test_cadence_pack_epochs(self):
+        clist = cadence.CadenceList()
+        clist.reset()
+        clist.add_cadence(name='one', nexposures=1,
+                          lunation=[1.], delta=[-1.], delta_min=[-1.],
+                          delta_max=[-1.], instrument=['boss'])
+        clist.add_cadence(name='two', nexposures=2,
+                          lunation=[1., 1.],
+                          delta=[-1., 0.],
+                          delta_min=[-1., 0.],
+                          delta_max=[-1., 0.], instrument=['boss'])
+
+        (epoch_targets, exposure_targets) = (
+            clist.pack_targets(target_cadences=['two'],
+                               value=[1],
+                               field_cadence='two'))
+
+        assert epoch_targets[0] == 0
+        assert list(exposure_targets) == [0, 0]
+
     def test_cadence_pack_greedy(self):
         clist = cadence.CadenceList()
         clist.reset()
