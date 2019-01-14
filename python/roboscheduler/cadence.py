@@ -2,7 +2,6 @@ import sys
 import numpy as np
 import fitsio
 from ortools.constraint_solver import pywrapcp
-#from ortools.sat.python import cp_model
 
 try:
     import sdssdb.peewee.sdss5db.targetdb as targetdb
