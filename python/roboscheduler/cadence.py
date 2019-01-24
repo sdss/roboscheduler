@@ -1011,24 +1011,65 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
     def todb(self):
         """Insert all cadences into the targetdb
-
-        DOES NOT HANDLE INSTRUMENT RIGHT!!
 """
         if(_database is False):
             print("No database available.")
             return()
 
-        for cadence, pk in zip(self.cadences, range(len(self.cadences))):
+        # Create dictionary to look up spectrograph pk from instrument name
+        spectrographs = targetdb.Spectrograph.select().dicts()
+        spectrograph_pk = dict()
+        for spectrograph in spectrographs:
+            spectrograph_pk[spectrograph['label']] = spectrograph['pk']
+
+        pkdict = targetdb.TargetCadence.select(targetdb.TargetCadence.pk).dicts()
+        pks = np.array([p['pk'] for p in pkdict])
+        newpks = pks.max() + 1 + np.arange(len(self.cadences))
+
+        for cadence, pk in zip(self.cadences, newpks):
             nexposures = int(self.cadences[cadence].nexposures)
             delta = [float(n) for n in self.cadences[cadence].delta]
             delta_min = [float(n) for n in self.cadences[cadence].delta_min]
             delta_max = [float(n) for n in self.cadences[cadence].delta_max]
             lunation = [float(n) for n in self.cadences[cadence].lunation]
+            spectrograph = [spectrograph_pk[n]
+                            for n in self.cadences[cadence].instrument]
             targetdb.TargetCadence.insert(pk=pk, name=cadence,
                                           nexposures=nexposures,
                                           delta=delta, lunation=lunation,
                                           delta_min=delta_min,
-                                          delta_max=delta_max).execute()
+                                          delta_max=delta_max,
+                                          spectrograph_pk=spectrograph).execute()
+
+    def updatedb(self):
+        """Update the cadences in the targetdb by name
+"""
+        if(_database is False):
+            print("No database available.")
+            return()
+
+        # Create dictionary to look up spectrograph pk from instrument name
+        spectrographs = targetdb.Spectrograph.select().dicts()
+        spectrograph_pk = dict()
+        for spectrograph in spectrographs:
+            spectrograph_pk[spectrograph['label']] = spectrograph['pk']
+
+        for cadence in self.cadences:
+            update_dict = {targetdb.TargetCadence.nexposures:
+                           cadences[cadence].nexposures,
+                           targetdb.TargetCadence.delta:
+                           [float(n) for n in cadences[cadence].delta],
+                           targetdb.TargetCadence.delta_min:
+                           [float(n) for n in cadences[cadence].delta_min],
+                           targetdb.TargetCadence.delta_max:
+                           [float(n) for n in cadences[cadence].delta_max],
+                           targetdb.TargetCadence.lunation:
+                           [float(n) for n in cadences[cadence].lunation],
+                           targetdb.TargetCadence.spectrograph_pk:
+                           [spectrograph_pk[n] for n in cadences[cadence].instrument]}
+            targetdb.TargetCadence.update(update_dict). \
+                where(TargetCadence.name == cadence).execute()
+        return
 
     def fromdb(self):
         """Extract cadences into the targetdb
@@ -1039,12 +1080,23 @@ class CadenceList(object, metaclass=CadenceSingleton):
             print("No database available.")
             return()
 
+        # Create dictionary to look up spectrograph pk from instrument name
+        spectrographs = targetdb.Spectrograph.select().dicts()
+        instrument = dict()
+        for spectrograph in spectrographs:
+            instrument[spectrograph['pk']] = spectrograph['label']
+
         cadences = targetdb.TargetCadence.select().dicts()
         for cadence in cadences:
+            instruments = np.array([instrument[pk]
+                                    for pk in cadence['spectrograph_pk']])
+            if(len(instruments) == 0):
+                print("No instruments, defaulting to APOGEE")
+                instruments = ['APOGEE'] * cadence['nexposures']
             self.add_cadence(name=cadence['name'],
                              nexposures=cadence['nexposures'],
                              delta=np.array(cadence['delta']),
                              delta_min=np.array(cadence['delta_min']),
                              delta_max=np.array(cadence['delta_max']),
                              lunation=np.array(cadence['lunation']),
-                             instrument=['APOGEE'] * cadence['nexposures'])
+                             instrument=instruments)
