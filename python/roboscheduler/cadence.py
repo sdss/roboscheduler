@@ -1056,19 +1056,22 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         for cadence in self.cadences:
             update_dict = {targetdb.TargetCadence.nexposures:
-                           cadences[cadence].nexposures,
+                           self.cadences[cadence].nexposures,
                            targetdb.TargetCadence.delta:
-                           [float(n) for n in cadences[cadence].delta],
+                           [float(n) for n in self.cadences[cadence].delta],
                            targetdb.TargetCadence.delta_min:
-                           [float(n) for n in cadences[cadence].delta_min],
+                           [float(n)
+                            for n in self.cadences[cadence].delta_min],
                            targetdb.TargetCadence.delta_max:
-                           [float(n) for n in cadences[cadence].delta_max],
+                           [float(n)
+                            for n in self.cadences[cadence].delta_max],
                            targetdb.TargetCadence.lunation:
-                           [float(n) for n in cadences[cadence].lunation],
+                           [float(n) for n in self.cadences[cadence].lunation],
                            targetdb.TargetCadence.spectrograph_pk:
-                           [spectrograph_pk[n] for n in cadences[cadence].instrument]}
+                           [spectrograph_pk[n]
+                            for n in self.cadences[cadence].instrument]}
             targetdb.TargetCadence.update(update_dict). \
-                where(TargetCadence.name == cadence).execute()
+                where(targetdb.TargetCadence.name == cadence).execute()
         return
 
     def fromdb(self):
