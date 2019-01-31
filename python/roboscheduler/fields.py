@@ -75,8 +75,7 @@ class Fields(object, metaclass=FieldsSingleton):
         cadence = self.cadencelist.cadences[self.cadence[fieldid]]
         if(self.icadence[fieldid] < cadence.nexposures):
             self.nextmjd[fieldid] = (mjd +
-                                     cadence.delta[self.icadence[fieldid]] -
-                                     cadence.softness[self.icadence[fieldid]])
+                                     cadence.delta_min[self.icadence[fieldid]])
         else:
             self.nextmjd[fieldid] = 100000.
         return

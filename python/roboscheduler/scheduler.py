@@ -627,7 +627,21 @@ class Scheduler(Master):
             indxs = np.where(self.fields.nextmjd <= mjd)[0]
             for indx in indxs:
                 if(observable[indx]):
-                    cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
+                    # this is cludgy and should never happen
+                    # but for now....
+                    try:
+                        cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
+                    except KeyError as e:
+                        key = e.args[0]
+                        print("caught bad candence '{}'; casting as dummy".format(key))
+                        dummyN = 9999
+                        self.cadencelist.add_cadence(nexposures=dummyN,
+                                                              lunation=np.ones(dummyN),
+                                                              delta=np.zeros(dummyN),
+                                                              delta_min=np.zeros(dummyN),
+                                                              delta_max=np.ones(dummyN) * 9999.0,
+                                                              name=key,
+                                                              instrument=[b'APOGEE    ' for n in range(dummyN)])
                     iobservations = self.fields.observations[indx]
                     mjd_past = self.observations.mjd[iobservations]
                     observable[indx] = cadence.evaluate_next(mjd_past=mjd_past,
@@ -653,17 +667,32 @@ class Scheduler(Master):
         pick_fieldid : ndarray of np.int32
             fieldid
 """
+        # old copy, for ease of use
+        # lst = self.lst(mjd)
+        # ha = self.ralst2ha(ra=self.fields.racen[fieldid], lst=lst)
+        # iha = np.int32(np.floor(np.abs(ha) / 5.))
+        # minha = iha.min()
+        # iminha = np.where(iha == minha)[0]
+        # dec = self.fields.deccen[fieldid[iminha]]
+        # if(self.observatory == 'apo'):
+        #     ipick = np.argmin(dec)
+        # else:
+        #     ipick = np.argmax(dec)
+        # pick_fieldid = fieldid[iminha[ipick]]
+
+        priority = np.ones(len(fieldid))*100
+
         lst = self.lst(mjd)
         ha = self.ralst2ha(ra=self.fields.racen[fieldid], lst=lst)
-        iha = np.int32(np.floor(np.abs(ha) / 5.))
-        minha = iha.min()
-        iminha = np.where(iha == minha)[0]
-        dec = self.fields.deccen[fieldid[iminha]]
-        if(self.observatory == 'apo'):
-            ipick = np.argmin(dec)
-        else:
-            ipick = np.argmax(dec)
-        pick_fieldid = fieldid[iminha[ipick]]
+        dec = self.fields.deccen[fieldid]
+        # gaussian weight, mean already 0, use 1 hr = 15 deg std
+        priority += 100 * np.exp( -(ha)**2 / (2 * 15**2))
+        # gaussian weight, mean = obs lat, use 20 deg std
+        priority -= 100 * np.exp( -(dec - self.latitude)**2 / (2 * 20**2))
+
+        ipick = np.argmax(priority)
+        pick_fieldid = fieldid[ipick]
+        
         return(pick_fieldid)
 
     def nextfield(self, mjd=None):
