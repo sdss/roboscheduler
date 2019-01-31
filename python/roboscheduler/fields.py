@@ -49,8 +49,12 @@ class Fields(object, metaclass=FieldsSingleton):
         self.nextmjd = np.zeros(0, dtype=np.float64)
         self.cadence = []
         self.observations = []
+        self.slots = []
         self.cadencelist = roboscheduler.cadence.CadenceList()
+        self._obsPlan = None
+        self._lstPlan = None
         return
+
 
     def fromarray(self, fields_array=None):
         self.nfields = len(fields_array)
@@ -58,15 +62,18 @@ class Fields(object, metaclass=FieldsSingleton):
         self.deccen = fields_array['deccen']
         self.fieldid = np.arange(self.nfields, dtype=np.int32)
         self.cadence = [c.decode().strip() for c in fields_array['cadence']]
+        self.slots = fields_array['slots']
         self.observations = [np.zeros(0, dtype=np.int32)] * self.nfields
         self.icadence = np.zeros(self.nfields, dtype=np.int32)
         self.nextmjd = np.zeros(self.nfields, dtype=np.float64)
         return
 
+
     def fromfits(self, filename=None):
         self.fields_fits = fitsio.read(filename)
         self.fromarray(self.fields_fits)
         return
+
 
     def add_observations(self, mjd=None, fieldid=None, iobs=None):
         self.observations[fieldid] = np.append(self.observations[fieldid],
@@ -79,6 +86,29 @@ class Fields(object, metaclass=FieldsSingleton):
         else:
             self.nextmjd[fieldid] = 100000.
         return
+
+    @property
+    def obsPlan(self):
+        """Slots specify when the field should be observed
+        make that information useful.
+
+        Returns:
+        -------
+
+        obsPlan : list
+            a list containing lst and lunation for each field
+        """
+        if self._obsPlan is None:
+            self._obsPlan = [np.where(s > 0)  for s in self.slots]
+        return self._obsPlan
+
+
+    @property
+    def lstPlan(self):
+        if self._lstPlan is None:
+            self._lstPlan = np.array([np.mean(p[0]) for p in self.obsPlan])
+        return self._lstPlan
+
 
     def toarray(self):
         """Return cadences as a record array

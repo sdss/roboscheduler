@@ -683,12 +683,20 @@ class Scheduler(Master):
         priority = np.ones(len(fieldid))*100
 
         lst = self.lst(mjd)
+
+        lstHrs = lst/15
+
+        lstDiffs = lstDiff(self.fields.lstPlan[fieldid], np.ones(len(fieldid))*lstHrs)
+
         ha = self.ralst2ha(ra=self.fields.racen[fieldid], lst=lst)
         dec = self.fields.deccen[fieldid]
+
+        # gaussian weight, mean already 0, use 1 hr  std
+        priority *= np.exp( -(lstDiffs)**2 / (2 * 1**2))
         # gaussian weight, mean already 0, use 1 hr = 15 deg std
-        priority += 100 * np.exp( -(ha)**2 / (2 * 15**2))
+        priority += 50 * np.exp( -(ha)**2 / (2 * 15**2))
         # gaussian weight, mean = obs lat, use 20 deg std
-        priority -= 100 * np.exp( -(dec - self.latitude)**2 / (2 * 20**2))
+        priority -= 50 * np.exp( -(dec - self.latitude)**2 / (2 * 20**2))
 
         ipick = np.argmax(priority)
         pick_fieldid = fieldid[ipick]
@@ -749,3 +757,59 @@ class Scheduler(Master):
                                      lst=lst)
         self.fields.add_observations(result['mjd'], fieldid, iobs)
         return
+
+
+def lstDiffSingle(a, b):
+    """Intelligently find difference in 2 lsts
+
+    Parameters:
+    -----------
+
+    a : np.float32, float
+        first lst in hours
+    b : np.float32, float
+        second lst in hours
+
+    Returns:
+    --------
+
+    diff: float
+        the absolute difference
+
+    Comments:
+    ---------
+
+    """
+
+    if a < b:
+        return min(b - a, (a + 24) - b)
+
+    else:
+        # a must be bigger
+        return min(a - b, (b + 24) - a)
+
+def lstDiff(a, b):
+    """wrap lst math to handle arrays
+
+    Parameters:
+    -----------
+
+    a : ndarray or list of float32
+        first lst in hours
+    b : ndarray or list of float32
+        second lst in hours
+
+    Returns:
+    --------
+
+    diff: ndarray of float32
+        the absolute differences
+
+    Comments:
+    ---------
+
+    """
+
+    assert len(a) == len(b), "can't compare arrays of different size!"
+
+    return np.array([lstDiffSingle(i, j) for i, j in zip(a, b)])
