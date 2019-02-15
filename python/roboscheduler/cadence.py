@@ -100,12 +100,12 @@ class Cadence(object):
         self.delta_max = (np.zeros(self.nexposures, dtype=np.float32) +
                           delta_max)
         self._create_epochs()
-        iapogee = np.where(self.instrument == 'apogee')[0]
+        iapogee = np.where(self.instrument == 'APOGEE')[0]
         if(len(iapogee) > 0):
             self.requires_apogee = 1
         else:
             self.requires_apogee = 0
-        iboss = np.where(self.instrument == 'boss')[0]
+        iboss = np.where(self.instrument == 'BOSS')[0]
         if(len(iboss) > 0):
             self.requires_boss = 1
         else:
