@@ -100,12 +100,12 @@ class Cadence(object):
         self.delta_max = (np.zeros(self.nexposures, dtype=np.float32) +
                           delta_max)
         self._create_epochs()
-        iapogee = np.where(self.instrument == 'apogee')[0]
+        iapogee = np.where(self.instrument == 'APOGEE')[0]
         if(len(iapogee) > 0):
             self.requires_apogee = 1
         else:
             self.requires_apogee = 0
-        iboss = np.where(self.instrument == 'boss')[0]
+        iboss = np.where(self.instrument == 'BOSS')[0]
         if(len(iboss) > 0):
             self.requires_boss = 1
         else:
@@ -461,7 +461,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
             if(ok):
                 possibles.append([first])
         if(len(possibles) == 0):
-            success = 0
+            success = False
             if(return_solutions):
                 self._cadence_consistency[cache_key] = (success, possibles)
             else:
@@ -489,7 +489,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
                         if(ok):
                             possibles.append(try_possible)
             if(len(possibles) == 0):
-                success = 0
+                success = False
                 if(return_solutions):
                     self._cadence_consistency[cache_key] = (success, possibles)
                 else:
@@ -552,14 +552,10 @@ class CadenceList(object, metaclass=CadenceSingleton):
         epoch_targets = [np.zeros(0, dtype=np.int32)] * nepochs_field_full
         exposure_targets = np.zeros(nexposures_field_full, dtype=np.int32) - 1
 
-        # Handle case where field only allows single-exposure with no
-        # cadence requirement (i.e. all deltas are -1) OR case where those
-        # are only targets available
+        # Handle when single-exposure targets are only targets available
         nexposures = np.array([self.cadences[tc].nexposures
                                for tc in target_cadences], dtype=np.int32)
-        if(((nepochs_field == 0) &
-            (nepochs_field_full == nexposures_field_full)) |
-           (nexposures.max() == 1)):
+        if(nexposures.max() == 1):
             return(self.pack_targets_single(target_cadences=target_cadences,
                                             field_cadence=field_cadence,
                                             value=value))
@@ -739,7 +735,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
         epoch_targets = [np.zeros(0, dtype=np.int32)] * nepochs_field_full
         exposure_targets = np.zeros(nexposures_field_full, dtype=np.int32) - 1
 
-        # Handle case where field only allows single-exposure with no
+        # Handle only case where field only allows single-exposure with no
         # cadence requirement (i.e. all deltas are -1) OR case where those
         # are only targets available
         nexposures = np.array([self.cadences[tc].nexposures
@@ -814,14 +810,10 @@ class CadenceList(object, metaclass=CadenceSingleton):
         epoch_nexposures = np.zeros(nepochs_field_full)
         exposure_targets = np.zeros(nexposures_field_full, dtype=np.int32) - 1
 
-        # Handle case where field only allows single-exposure epochs
-        # with no cadence requirement (i.e. all deltas are -1) OR case
-        # where those are only targets available
+        # Handle when single-exposure targets are only targets available
         nexposures = np.array([self.cadences[tc].nexposures
                                for tc in target_cadences], dtype=np.int32)
-        if(((nepochs_field == 0) &
-            (nepochs_field_full == nexposures_field_full)) |
-           (nexposures.max() == 1)):
+        if(nexposures.max() == 1):
             return(self.pack_targets_single(target_cadences=target_cadences,
                                             field_cadence=field_cadence,
                                             value=value))
@@ -901,7 +893,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         return(epoch_targets, exposure_targets)
 
-    def fromarray(self, cadences_array=None):
+    def fromarray(self, cadences_array=None, nathan=False):
         """Add cadences to ccadence list from an array
 
         Parameters:
@@ -910,20 +902,52 @@ class CadenceList(object, metaclass=CadenceSingleton):
         cadences_array : ndarray
             ndarray with columns 'NEXPOSURES', 'LUNATION', 'DELTA',
             'DELTA_MIN', 'DELTA_MAX', 'CADENCE', 'INSTRUMENT'
+
+        nathan : bool
+            False if normal format, True if Nathan De Lee format
 """
+        col = {'NEXPOSURES': 'NEXPOSURES',
+               'LUNATION': 'LUNATION',
+               'DELTA': 'DELTA',
+               'DELTA_MIN': 'DELTA_MIN',
+               'DELTA_MAX': 'DELTA_MAX',
+               'INSTRUMENT': 'INSTRUMENT',
+               'CADENCE': 'CADENCE'}
+        if(nathan is True):
+            for k in col.keys():
+                col[k] = col[k].lower()
+            col['NEXPOSURES'] = 'nepochs'
+            for indx in np.arange(len(cadences_array), dtype=np.int32):
+                if(cadences_array[indx][col['NEXPOSURES']] > 1):
+                    iz = np.where(cadences_array[indx][col['DELTA']] == 0.)[0]
+                    cadences_array[indx][col['DELTA_MIN']][iz] = 0.
+                    cadences_array[indx][col['DELTA_MAX']][iz] = 0.
+
         for ccadence in cadences_array:
-            nexp = ccadence['NEXPOSURES']
-            instruments = [ii.decode().strip() for ii in ccadence['INSTRUMENT'][0:nexp]]
-            self.add_cadence(nexposures=ccadence['NEXPOSURES'],
-                             lunation=ccadence['LUNATION'][0:nexp],
-                             delta=ccadence['DELTA'][0:nexp],
-                             delta_min=ccadence['DELTA_MIN'][0:nexp],
-                             delta_max=ccadence['DELTA_MAX'][0:nexp],
-                             name=ccadence['CADENCE'].decode().strip(),
-                             instrument=instruments)
+            nexp = ccadence[col['NEXPOSURES']]
+            if(isinstance(ccadence[col['LUNATION']],
+                          type(np.zeros(0, dtype=np.float32)))):
+                instruments = np.array([ii.decode().strip()
+                                        for ii in ccadence[col['INSTRUMENT']][0:nexp]])
+                self.add_cadence(nexposures=ccadence[col['NEXPOSURES']],
+                                 lunation=ccadence[col['LUNATION']][0:nexp],
+                                 delta=ccadence[col['DELTA']][0:nexp],
+                                 delta_min=ccadence[col['DELTA_MIN']][0:nexp],
+                                 delta_max=ccadence[col['DELTA_MAX']][0:nexp],
+                                 name=ccadence[col['CADENCE']].decode().strip(),
+                                 instrument=instruments)
+            else:
+                instruments = np.array([ccadence[col['INSTRUMENT']].decode().strip()])
+                self.add_cadence(nexposures=ccadence[col['NEXPOSURES']],
+                                 lunation=ccadence[col['LUNATION']],
+                                 delta=ccadence[col['DELTA']],
+                                 delta_min=ccadence[col['DELTA_MIN']],
+                                 delta_max=ccadence[col['DELTA_MAX']],
+                                 name=ccadence[col['CADENCE']].decode().strip(),
+                                 instrument=instruments)
         return
 
-    def fromfits(self, filename=None):
+    def fromfits(self, filename=None, nathan=False):
         """Add cadences to ccadence list from a FITS file
 
         Parameters:
@@ -940,7 +964,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
             'INSTRUMENT'
 """
         self.cadences_fits = fitsio.read(filename)
-        self.fromarray(self.cadences_fits)
+        self.fromarray(self.cadences_fits, nathan=nathan)
         return
 
     def toarray(self):
