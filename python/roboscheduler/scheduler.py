@@ -192,10 +192,10 @@ class Observer(SchedulerBase):
                                            'data', 'observatories.par')
         self._file = observatoryfile
         self._data = yanny.yanny(self._file)
-        observatories = np.array([observatory.decode()
-                                  for observatory in
+        observatories = np.array([obs.decode()
+                                  for obs in
                                   self._data['OBSERVATORY']['observatory']])
-        indx = np.where(observatories == self.observatory)[0][0]
+        indx = np.where(observatories == self.observatory)[0]
         self.latitude = self._data['OBSERVATORY']['latitude'][indx]
         self.longitude = self._data['OBSERVATORY']['longitude'][indx]
 
