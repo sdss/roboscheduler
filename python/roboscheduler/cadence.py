@@ -86,6 +86,11 @@ class Cadence(object):
 
     The first delta == 0 in all cadences.
 
+    delta == 0 for any exposure except the first means to "bundle" the
+    exposure with the previous exposure into a single epoch. delta_min
+    and delta_max for such exposures are automatically set to zero on
+    input.
+
     The last epochs in the list may have delta = -1. These will be
     treated as unconstrained. Only single epoch cadences will be allowed.
 """
@@ -99,6 +104,9 @@ class Cadence(object):
                           delta_min)
         self.delta_max = (np.zeros(self.nexposures, dtype=np.float32) +
                           delta_max)
+        izero = np.where(self.delta == 0.)[0]
+        self.delta_min[izero] = 0.
+        self.delta_max[izero] = 0.
         self._create_epochs()
         iapogee = np.where(self.instrument == 'APOGEE')[0]
         if(len(iapogee) > 0):
@@ -257,6 +265,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
 """
     def __init__(self):
         self.reset()
+        self.max_nsolns = 100
         return
 
     def reset(self):
@@ -304,7 +313,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
         self.ncadences = len(self.cadences.keys())
 
     def check_exposures(self, one=None, two=None, indx2=None, sub1=None,
-                        epoch_level=True):
+                        epoch_level=True, details=False):
         """Is exposure set in cadence two consistent with cadence one?
 
         Parameters:
@@ -318,9 +327,24 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         indx2 : ndarray of np.int32
             exposures in cadence #2
+        
+        sub1 : ndarray of np.int32
+            sequence to compare in cadence #1
 
         epoch_level : boolean
             compare sequences at epoch level not exposure level (default True)
+
+        details : boolean
+            if True, output details on failure (default False)
+
+        Returns:
+        -------
+
+        ok : boolean
+            exposure sequences are compatible
+
+        details : str
+            details on result if failure
 
         Notes:
         -----
@@ -341,7 +365,10 @@ class CadenceList(object, metaclass=CadenceSingleton):
             for indx in np.arange(nexp):
                 if(self.cadences[one].epoch_nexposures[sub1[indx]] >
                    self.cadences[two].epoch_nexposures[indx2[indx]]):
-                    return(False)
+                    if(details):
+                        return(False, "not_enough_exposures")
+                    else:
+                        return(False)
 
         # For the subsequent checks, convert to exposure index if we
         # are at the epoch level
@@ -353,7 +380,10 @@ class CadenceList(object, metaclass=CadenceSingleton):
         for indx in np.arange(nexp):
             if(self.cadences[one].lunation[sub1[indx]] <
                self.cadences[two].lunation[indx2[indx]] - eps):
-                return(False)
+                if(details):
+                    return(False, "lunation")
+                else:
+                    return(False)
 
         # Check deltas
         for indx in np.arange(nexp - 1) + 1:
@@ -368,16 +398,31 @@ class CadenceList(object, metaclass=CadenceSingleton):
                                                 indx2[indx] + 1].sum()
             if(delta1 > 0.):  # normal case
                 if(dlo1 >= dlo2 + eps):
-                    return(False)
+                    if(details):
+                        return(False, "delta_too_soon")
+                    else:
+                        return(False)
                 if(dhi1 <= dhi2 - eps):
-                    return(False)
+                    if(details):
+                        return(False, "delta_too_late")
+                    else:
+                        return(False)
             elif(delta1 == 0.):  # adjacent exposures
                 if(indx2[indx] > indx2[indx - 1] + 1):  # must be adjacent
-                    return(False)
+                    if(details):
+                        return(False, "exposures_not_adjacent")
+                    else:
+                        return(False)
                 if(delta2 > 0.):  # must be adjacent
-                    return(False)
+                    if(details):
+                        return(False, "exposures_not_adjacent")
+                    else:
+                        return(False)
 
-        return(True)
+        if(details):
+            return(True, "")
+        else:
+            return(True)
 
     def cadence_consistency(self, one, two, return_solutions=True,
                             epoch_level=True):
@@ -440,7 +485,6 @@ class CadenceList(object, metaclass=CadenceSingleton):
                 self._cadence_consistency[cache_key] = success
             return(self._cadence_consistency[cache_key])
 
-        # Special case for nexposures == 1, to check delta = -1 cases.
         if(self.cadences[one].nexposures == 1):
             for i2 in np.arange(self.cadences[two].nepochs):
                 ok = self.check_exposures(one=one, two=two, indx2=[i2],
@@ -476,18 +520,22 @@ class CadenceList(object, metaclass=CadenceSingleton):
                 possible = current_possibles[indx]
                 remaining_start = possible[-1] + 1
                 nremaining = n2 - possible[-1] - 1
-                ok = 1
+                ok = True
                 if(nremaining >= n1 - len(possible)):
                     for next_possible in (remaining_start +
                                           np.arange(nremaining)):
                         try_possible = possible.copy()
                         try_possible.append(next_possible)
-                        ok = self.check_exposures(one=one, two=two,
-                                                  indx2=try_possible,
-                                                  sub1=np.arange(nsub1),
-                                                  epoch_level=epoch_level)
+                        ok, details = self.check_exposures(one=one, two=two,
+                                                           indx2=try_possible,
+                                                           sub1=np.arange(nsub1),
+                                                           epoch_level=epoch_level,
+                                                           details=True)
                         if(ok):
                             possibles.append(try_possible)
+                        elif('delta_too_late' in details):
+                            break
+                            
             if(len(possibles) == 0):
                 success = False
                 if(return_solutions):
@@ -542,7 +590,6 @@ class CadenceList(object, metaclass=CadenceSingleton):
         ntargets = len(target_cadences)
         nepochs_field_full = self.cadences[field_cadence].nepochs
         nexposures_field_full = self.cadences[field_cadence].nexposures
-        nepochs_field = self.cadences[field_cadence].nepochs_pack
         if(value is None):
             value = np.ones(ntargets)
         else:
@@ -570,6 +617,12 @@ class CadenceList(object, metaclass=CadenceSingleton):
                                                     return_solutions=True,
                                                     epoch_level=True)
             target = []
+
+            if(len(solns) > self.max_nsolns):
+                solns = np.array(solns)
+                np.random.shuffle(solns)
+                solns = solns[0:self.max_nsolns, :]
+
             for isoln in solns:
                 soln_epochs = epochs.copy()
                 for i in isoln:
@@ -663,6 +716,9 @@ class CadenceList(object, metaclass=CadenceSingleton):
         status = solver.Solve(db, [objective, collector, tl])
         if(status is False):
             print("Problem in solver.")
+            print(target_cadences)
+            print(field_cadence)
+            print(value)
             return(None)
 
         # Retrieve list of targets for each epoch
@@ -999,7 +1055,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
         return(cads)
 
     def epoch_array(self):
-        """Return cadence epoches as a record array
+        """Return cadence epochs as a record array
 
         Returns:
         -------
@@ -1100,8 +1156,6 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
     def fromdb(self):
         """Extract cadences into the targetdb
-
-        DOES NOT HANDLE INSTRUMENT RIGHT!!
 """
         if(_database is False):
             print("No database available.")
