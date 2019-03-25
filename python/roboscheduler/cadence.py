@@ -702,6 +702,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
             for nsub1 in np.arange(npack1 - 1) + 2:
                 current_possibles = possibles
                 possibles = []
+                sub1 = np.arange(nsub1)
                 for indx in range(len(current_possibles)):
                     possible = current_possibles[indx]
                     remaining_start = possible[-1] + 1
@@ -713,8 +714,8 @@ class CadenceList(object, metaclass=CadenceSingleton):
                             try_possible = possible.copy()
                             try_possible.append(next_possible)
                             ok = self.check_exposures(one=one, two=two,
-                                                      indx2=try_possible,
-                                                      sub1=np.arange(nsub1),
+                                                      indx2=try_possible[-2:],
+                                                      sub1=sub1[-2:],
                                                       epoch_level=epoch_level)
                             if(ok):
                                 possibles.append(try_possible)
