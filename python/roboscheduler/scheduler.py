@@ -607,7 +607,8 @@ class Scheduler(Master):
         self.observations = roboscheduler.observations.Observations(observatory=self.observatory)
         return
 
-    def observable(self, mjd=None, check_lunation=True, check_cadence=True):
+    def observable(self, mjd=None, maxExp=None, check_lunation=True,
+                   check_cadence=True, verbose=False):
         """Return array of fields observable
 
         Parameters:
@@ -615,44 +616,53 @@ class Scheduler(Master):
 
         mjd : np.float64
             current MJD
-"""
+        """
+
         (alt, az) = self.radec2altaz(mjd=mjd, ra=self.fields.racen,
                                      dec=self.fields.deccen)
         airmass = self.alt2airmass(alt)
         lunation = self.lunation(mjd)
-        observable = (alt > 0.) & (airmass < self.airmass_limit)
+        # valid cadence checks against "none" cadence issue
+        observable = (alt > 0.) & (airmass < self.airmass_limit) & self.fields.validCadence
+        nexp = np.ones(len(observable), dtype=int)
         if(check_cadence):
             indxs = np.where(self.fields.nextmjd > mjd)[0]
             observable[indxs] = False
             indxs = np.where(self.fields.nextmjd <= mjd)[0]
             for indx in indxs:
                 if(observable[indx]):
-                    # this is cludgy and should never happen
-                    # but for now....
-                    try:
-                        cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
-                    except KeyError as e:
-                        key = e.args[0]
-                        print("caught bad candence '{}'; casting as dummy".format(key))
-                        dummyN = 9999
-                        self.cadencelist.add_cadence(nexposures=dummyN,
-                                                              lunation=np.ones(dummyN),
-                                                              delta=np.zeros(dummyN),
-                                                              delta_min=np.zeros(dummyN),
-                                                              delta_max=np.ones(dummyN) * 9999.0,
-                                                              name=key,
-                                                              instrument=[b'APOGEE    ' for n in range(dummyN)])
+                    cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
                     iobservations = self.fields.observations[indx]
                     mjd_past = self.observations.mjd[iobservations]
+                    nexp[indx] = cadence.next_epoch_nexp(mjd_past)
                     observable[indx] = cadence.evaluate_next(mjd_past=mjd_past,
                                                              mjd_next=mjd,
                                                              lunation_next=lunation,
                                                              check_lunation=check_lunation)
+                    if nexp[indx] > maxExp:
+                        observable[indx] = False
+        else:
+            rejected = 0
+            # print("lunation: ", lunation)
+            iobservable = np.where(observable)[0]
+            for indx in iobservable:
+                if(observable[indx]):
+                    cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
+                    iobservations = self.fields.observations[indx]
+                    mjd_past = self.observations.mjd[iobservations]
+                    nexp[indx] = cadence.next_epoch_nexp(mjd_past)
+                    lunation_ok = cadence.lunation_check(mjd_past, lunation)
+                    if nexp[indx] > maxExp or not lunation_ok:
+                        rejected += 1
+                        observable[indx] = False
+
+            print("{} rejected {} for time/moon".format(mjd, rejected))
 
         iobservable = np.where(observable)[0]
-        return self.fields.fieldid[iobservable]
+        return self.fields.fieldid[iobservable], nexp[iobservable]
 
-    def pick(self, mjd=None, fieldid=None):
+
+    def pick(self, mjd=None, fieldid=None, nexp=None):
         """Return the fieldid to pick from using heuristic strategy
 
         Parameters:
@@ -661,32 +671,27 @@ class Scheduler(Master):
         fieldid : ndarray  of np.int32
             array of available fieldid values
 
+        nexp: ndarray  of np.int32, len of fieldid
+            array of nexp if field is chosen
+
         Returns:
         -------
 
         pick_fieldid : ndarray of np.int32
             fieldid
-"""
-        # old copy, for ease of use
-        # lst = self.lst(mjd)
-        # ha = self.ralst2ha(ra=self.fields.racen[fieldid], lst=lst)
-        # iha = np.int32(np.floor(np.abs(ha) / 5.))
-        # minha = iha.min()
-        # iminha = np.where(iha == minha)[0]
-        # dec = self.fields.deccen[fieldid[iminha]]
-        # if(self.observatory == 'apo'):
-        #     ipick = np.argmin(dec)
-        # else:
-        #     ipick = np.argmax(dec)
-        # pick_fieldid = fieldid[iminha[ipick]]
+        """
 
         priority = np.ones(len(fieldid))*100
+
+        priority += 5*nexp
 
         lst = self.lst(mjd)
 
         lstHrs = lst/15
 
-        lstDiffs = lstDiff(self.fields.lstPlan[fieldid], np.ones(len(fieldid))*lstHrs)
+        # lstDiffs = lstDiff(self.fields.lstPlan[fieldid], np.ones(len(fieldid))*lstHrs)
+
+        lstDiffs = self.fields.lstWeight(lstHrs, fieldid)
 
         ha = self.ralst2ha(ra=self.fields.racen[fieldid], lst=lst)
         dec = self.fields.deccen[fieldid]
@@ -700,10 +705,12 @@ class Scheduler(Master):
 
         ipick = np.argmax(priority)
         pick_fieldid = fieldid[ipick]
-        
-        return(pick_fieldid)
+        pick_exp = nexp[ipick]
 
-    def nextfield(self, mjd=None):
+        return(pick_fieldid, pick_exp)
+
+
+    def nextfield(self, mjd=None, maxExp=None):
         """Picks the next field to observe
 
         Parameters:
@@ -712,19 +719,25 @@ class Scheduler(Master):
         mjd : np.float64
             Current MJD (days)
 
+        maxExp : int
+            maximum number of full exposures before next event
+
         Returns:
         --------
 
         fieldid : np.int32, int
             ID of field to observe
-"""
-        observable_fieldid = self.observable(mjd=mjd)
+        """
+        observable_fieldid, nexp = self.observable(mjd=mjd, maxExp=maxExp)
         if(len(observable_fieldid) == 0):
             # print("Nothing observable")
-            observable_fieldid = self.observable(mjd=mjd,
-                                                 check_cadence=False)
-        fieldid = self.pick(fieldid=observable_fieldid, mjd=mjd)
-        return(fieldid)
+            observable_fieldid, nexp = self.observable(mjd=mjd, maxExp=maxExp,
+                                                       check_cadence=False)
+        if len(observable_fieldid) == 0:
+            # print("D: D:")
+            return None, -1
+        fieldid, next_exp = self.pick(fieldid=observable_fieldid, mjd=mjd, nexp=nexp)
+        return(fieldid, next_exp)
 
     def update(self, fieldid=None, result=None):
         """Update the observation list with result of observations
@@ -755,7 +768,7 @@ class Scheduler(Master):
                                      lunation=lunation,
                                      airmass=airmass,
                                      lst=lst)
-        self.fields.add_observations(result['mjd'], fieldid, iobs)
+        self.fields.add_observations(result['mjd'], fieldid, iobs, lst)
         return
 
 

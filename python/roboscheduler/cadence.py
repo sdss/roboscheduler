@@ -196,19 +196,48 @@ class Cadence(object):
         self.epoch_nexposures[-1] = self.nexposures - self.epoch_indx[-1]
         return
 
-    def evaluate_next(self, mjd_past=None, mjd_next=None,
-                      lunation_next=None, check_lunation=True):
-        """Evaluate next choice of observation (not well-tested)"""
+    def next_epoch_nexp(self, mjd_past):
+        """get number of exposures for elligible epoch"""
         nexposures_past = len(mjd_past)
         if(nexposures_past >= self.nexposures):
-            return(False)
-        ok_lunation = ((lunation_next < self.lunation[nexposures_past]) |
+            return 1
+        epoch_indx = np.where(self.epoch_indx == nexposures_past)[0]
+        nexposures_next = self.epoch_nexposures[epoch_indx]
+        assert len(nexposures_next) == 1, "epoch selection failed"
+
+        return nexposures_next
+
+    def lunation_check(self, mjd_past, lunation_next):
+        """check lunation for mjd_past against lunation_next"""
+        nexposures_past = len(mjd_past)
+        if(nexposures_past >= self.nexposures):
+            return lunation_next < self.lunation[-1]
+        return lunation_next < self.lunation[nexposures_past]
+
+
+    def evaluate_next(self, mjd_past=None, mjd_next=None,
+                      lunation_next=None, check_lunation=True):
+        """Evaluate next choice of observation (not well-tested)
+
+           Returns whether cadence is ok AND how many exposures this
+           epoch needs
+        """
+        nexposures_past = len(mjd_past)
+        if(nexposures_past >= self.nexposures):
+            print("done!")
+            return(False, 0)
+
+        ok_lunation = ( self.lunation_check(mjd_past, lunation_next)|
                        (check_lunation is False))
         if(nexposures_past == 0):
             return(ok_lunation)
+
         delta = mjd_next - mjd_past[nexposures_past - 1]
         dlo = self.delta_min[nexposures_past]
         dhi = self.delta_max[nexposures_past]
+        if(dlo == -1):
+            return(ok_lunation)
+        # print("delta {} dhi {} dlo {}".format(delta, dhi, dlo))
         return(ok_lunation & (delta >= dlo) & (delta <= dhi))
 
 
@@ -298,7 +327,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         The last epochs in the list may have delta = -1. These will be
         treated as unconstrained. Only single epoch cadences will be allowed.
-"""
+        """
         cadence = Cadence(*args, **kwargs)
         self.cadences[name] = cadence
         self.ncadences = len(self.cadences.keys())
@@ -326,7 +355,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
         -----
 
         If cadence one contains epochs with delta = -1 they will be ignored.
-"""
+        """
         eps = 1.e-3  # generously deal with round-off
         nexp = len(indx2)
 
@@ -415,7 +444,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         The end of cadence #2 may have a set of epochs with delta = -1
         at its end. These epochs will be ignored.
-"""
+        """
         # Return cached results
         cache_key = (one, two, epoch_level, return_solutions)
         if(cache_key in self._cadence_consistency):
@@ -538,7 +567,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
         solutions for any longer than about 0.1 sec. This gets triggered
         for cases where there is a complicated cadence sequence but LOTS
         of targets to choose from. Usually the solution is OK.
-"""
+    """
         ntargets = len(target_cadences)
         nepochs_field_full = self.cadences[field_cadence].nepochs
         nexposures_field_full = self.cadences[field_cadence].nexposures
@@ -724,7 +753,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         Only handles cases where field cadence has no actual cadence
         requirements OR target cadences have no cadence requirements
-"""
+        """
         ntargets = len(target_cadences)
         nepochs_field_full = self.cadences[field_cadence].nepochs
         nexposures_field_full = self.cadences[field_cadence].nexposures
@@ -799,7 +828,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         Starts with highest "value" targets, and assigns in a greedy fashion.
         Will not observe partial cadences.
-"""
+        """
         ntargets = len(target_cadences)
         nepochs_field_full = self.cadences[field_cadence].nepochs
         nexposures_field_full = self.cadences[field_cadence].nexposures
@@ -910,7 +939,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
         cadences_array : ndarray
             ndarray with columns 'NEXPOSURES', 'LUNATION', 'DELTA',
             'DELTA_MIN', 'DELTA_MAX', 'CADENCE', 'INSTRUMENT'
-"""
+        """
         for ccadence in cadences_array:
             nexp = ccadence['NEXPOSURES']
             instruments = [ii.decode().strip() for ii in ccadence['INSTRUMENT'][0:nexp]]
@@ -938,7 +967,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
         Expects a valid FITS file with columns 'NEXPOSURES',
             'LUNATION', 'DELTA', 'DELTA_MIN', 'DELTA_MAX', 'CADENCE',
             'INSTRUMENT'
-"""
+        """
         self.cadences_fits = fitsio.read(filename)
         self.fromarray(self.cadences_fits)
         return
@@ -951,7 +980,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         cadences : ndarray
             information on each cadence
-"""
+        """
         nexps = np.array([c.nexposures for c in self.cadences.values()])
         max_nexp = nexps.max()
         cadence0 = [('CADENCE', fits_type),
@@ -982,7 +1011,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         cadences : ndarray
             information on each cadence
-"""
+        """
         neps = np.array([c.nepochs for c in self.cadences.values()])
         max_nep = neps.max()
         cadence0 = [('CADENCE', fits_type),
@@ -1013,7 +1042,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
         """Insert all cadences into the targetdb
 
         DOES NOT HANDLE INSTRUMENT RIGHT!!
-"""
+        """
         if(_database is False):
             print("No database available.")
             return()
