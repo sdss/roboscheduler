@@ -244,7 +244,7 @@ class Packing(object):
     check_target() : check if a new target solution is allowed
 """
     def __init__(self, field_cadence=None):
-        import roboscheduler.cadence2 as cadence
+        import roboscheduler.cadence as cadence
         self.field_cadence = field_cadence
         self.clist = cadence.CadenceList()
         if(self.field_cadence not in self.clist.cadences):
@@ -327,7 +327,8 @@ class Packing(object):
             n = n + len(et)
         return
 
-    def add_target(self, target_id=None, target_cadence=None):
+    def add_target(self, target_id=None, target_cadence=None,
+                   reset_exposures=True):
         ok, pack_soln, fill_epoch_targets = self.check_target(target_cadence=target_cadence)
         if(ok is False):
             return(False)
@@ -345,7 +346,8 @@ class Packing(object):
             self.epoch_targets[epoch][n:n + nfill] = target_id
             self.epoch_nused[epoch] = n + nfill
 
-        self.set_exposures()
+        if(reset_exposures):
+            self.set_exposures()
 
         return(True)
 
@@ -386,7 +388,8 @@ class Packing(object):
         isort = np.flip(np.argsort(value), axis=0)
         for i in isort:
             self.add_target(target_id=target_ids[i],
-                            target_cadence=target_cadences[i])
+                            target_cadence=target_cadences[i],
+                            reset_exposures=False)
 
         self.set_exposures()
 
