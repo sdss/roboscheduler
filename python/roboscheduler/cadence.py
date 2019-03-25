@@ -212,6 +212,179 @@ class Cadence(object):
         return(ok_lunation & (delta >= dlo) & (delta <= dhi))
 
 
+class Packing(object):
+    """Packing of observations into a cadence
+
+    Parameters:
+    ----------
+
+    field_cadence : str
+        name of cadence to be packing in to
+
+    Attributes:
+    ----------
+
+    epoch_targets : list of ndarray of np.int32
+        target indices for each epoch
+
+    exposure_targets : array of target indices for each exposure
+
+    Methods:
+    -------
+
+    add_target() : add a new cadence
+    check_target() : check if a new target solution is allowed
+"""
+    def __init__(self, field_cadence=None):
+        import roboscheduler.cadence2 as cadence
+        self.field_cadence = field_cadence
+        self.clist = cadence.CadenceList()
+        if(self.field_cadence not in self.clist.cadences):
+            print("No cadence {fc}.".format(fc=self.field_cadence))
+            return
+        self.reset()
+        return
+
+    def __str__(self):
+        return(self.text())
+
+    def text(self):
+        out = "Packing of {fc}\n".format(fc=self.field_cadence)
+        out = out + " navailable = "
+        for i in np.arange(self.nepochs):
+            out = out + " {l}".format(l=self.epoch_nexposures[i])
+        out = out + "\n"
+        out = out + " nused = "
+        for i in np.arange(self.nepochs):
+            out = out + " {l}".format(l=self.epoch_nused[i])
+        out = out + "\n"
+        for i in np.arange(self.nepochs):
+            out = out + "Epoch #{i}: ".format(i=i + 1)
+            for j in np.arange(self.epoch_nexposures[i]):
+                out = out + " {x} ".format(x=self.epoch_targets[i][j])
+            out = out + "\n"
+
+        return(out)
+
+    def reset(self):
+        c = self.clist.cadences[self.field_cadence]
+        self.nepochs = c.nepochs
+        self.epoch_targets = [np.zeros(x, dtype=np.int32) - 1
+                              for x in c.epoch_nexposures]
+        self.epoch_nexposures = c.epoch_nexposures
+        self.epoch_nused = np.zeros(self.nepochs, dtype=np.int32)
+        self.set_exposures()
+        return
+
+    def check_target(self, target_cadence=None):
+        ok, solns = self.clist.cadence_consistency(target_cadence,
+                                                   self.field_cadence,
+                                                   return_solutions=True,
+                                                   epoch_level=True)
+        if(ok is False):
+            return(False, [], [])
+
+        for soln in solns:
+            pack_soln = soln[0].copy()
+            fill_grid = soln[1]
+            navail = self.epoch_nexposures - self.epoch_nused
+            nneed = self.clist.cadences[target_cadence].epoch_nexposures.copy()
+            soln_ok = True
+            for indx in np.arange(len(pack_soln), dtype=np.int32):
+                pack_epoch = pack_soln[indx]
+                if(navail[pack_epoch] < nneed[indx]):
+                    soln_ok = False
+                    break
+                else:
+                    navail[indx] = navail[indx] - nneed[indx]
+            if(soln_ok):
+                if(fill_grid is not None):
+                    nexp1 = nneed[self.clist.cadences[target_cadence].nepochs_pack:]
+                    nexp2 = navail
+                    ok, fill_epoch_targets = self.clist.fill_grid(fill_grid,
+                                                                  nexp1=nexp1,
+                                                                  nexp2=nexp2)
+                    if(ok):
+                        return(True, pack_soln, fill_epoch_targets)
+                else:
+                    return(True, pack_soln, [])
+
+        return(False, [], [])
+
+    def set_exposures(self):
+        self.exposures = np.zeros(0, dtype=np.int32)
+        n = 0
+        for et in self.epoch_targets:
+            self.exposures = np.append(self.exposures, et)
+            n = n + len(et)
+        return
+
+    def add_target(self, target_id=None, target_cadence=None):
+        ok, pack_soln, fill_epoch_targets = self.check_target(target_cadence=target_cadence)
+        if(ok is False):
+            return(False)
+
+        for indx in np.arange(self.clist.cadences[target_cadence].nepochs_pack):
+            epoch = pack_soln[indx]
+            n = self.epoch_nused[epoch]
+            nneed = self.clist.cadences[target_cadence].epoch_nexposures[indx]
+            self.epoch_targets[epoch][n:n + nneed] = target_id
+            self.epoch_nused[epoch] = n + nneed
+
+        for epoch in np.arange(len(fill_epoch_targets)):
+            n = self.epoch_nused[epoch]
+            nfill = len(fill_epoch_targets[epoch])
+            self.epoch_targets[epoch][n:n + nfill] = target_id
+            self.epoch_nused[epoch] = n + nfill
+
+        self.set_exposures()
+
+        return(True)
+
+    def pack_targets_greedy(self, target_ids=None, target_cadences=None,
+                            value=None):
+        """Pack targets into a cadence greedily.
+
+        Parameters:
+        ----------
+
+        target_ids : ndarray of np.int32
+            target ID numbers (default np.arange(len(target_cadences)))
+
+        target_cadences : list of strings
+            names of the target cadences
+
+        value : ndarray of np.float32
+            value for each target (default all 1s)
+
+        Notes:
+        -----
+
+        Starts with highest "value" targets, and assigns in a greedy fashion.
+        Will not observe partial cadences.
+"""
+        ntargets = len(target_cadences)
+
+        if(value is None):
+            value = np.ones(ntargets)
+        else:
+            value = np.array(value)
+
+        if(target_ids is None):
+            target_ids = np.arange(ntargets, dtype=np.int32)
+        else:
+            target_ids = np.array(target_ids)
+
+        isort = np.flip(np.argsort(value), axis=0)
+        for i in isort:
+            self.add_target(target_id=target_ids[i],
+                            target_cadence=target_cadences[i])
+
+        self.set_exposures()
+
+        return
+
+
 class CadenceList(object, metaclass=CadenceSingleton):
     """List of cadences available (singleton)
 
@@ -405,16 +578,21 @@ class CadenceList(object, metaclass=CadenceSingleton):
             1 if there is a solution, 0 otherwise
 
         solutions : list (if return_solutions is True)
-            list of lists of indices into cadence #2
+            list of solutions, see below.
 
         Notes:
         -----
 
-        A solution is a set of N_1 exposures within cadence 2, which
-        satisfy the requirements for cadence 1.
+        Each cadence may have a set of epochs with delta = -1.
+        There are nexposures_pack_1 epochs with delta >= 0 in one
+        There are nexposures_fill_1 epochs with delta == -1 in one
+        There are nexposures_pack_2 epochs with delta >= 0 in two
+        There are nexposures_fill_2 epochs with delta == -1 in two
 
-        The end of cadence #2 may have a set of epochs with delta = -1
-        at its end. These epochs will be ignored.
+        A solution is a tuple, with
+           solns - an array of nexposures_pack_1 exposures within cadence 2
+           fill - a 2-d array (nexposures_fill_1, nexposures_2) expressing
+                  which exposures can be filled into for this solution
 """
         # Return cached results
         cache_key = (one, two, epoch_level, return_solutions)
@@ -422,79 +600,116 @@ class CadenceList(object, metaclass=CadenceSingleton):
             return(self._cadence_consistency[cache_key])
 
         if(epoch_level):
-            n1 = self.cadences[one].nepochs
-            n2 = self.cadences[two].nepochs_pack
+            npack1 = self.cadences[one].nepochs_pack
+            npack2 = self.cadences[two].nepochs_pack
+            nfill1 = self.cadences[one].nepochs - npack1
+            nfill2 = self.cadences[two].nepochs - npack2
         else:
-            n1 = self.cadences[one].nexposures
-            n2 = self.cadences[two].nexposures_pack
+            npack1 = self.cadences[one].nexposures_pack
+            npack2 = self.cadences[two].nexposures_pack
+            nfill1 = self.cadences[one].nexposures - npack1
+            nfill2 = self.cadences[two].nexposures - npack2
 
         possibles = []
 
         # Special case if same cadence
         if(one == two):
             success = True
-            possibles = [list(np.arange(n1))]
+            possibles = list(np.arange(npack1))
+            ifill1 = np.arange(nfill1)
+            ifill2 = np.arange(nfill2)
+            fill = np.zeros((nfill1, npack2 + nfill2), dtype=np.bool)
+            for i1 in ifill1:
+                for i2 in ifill2:
+                    fill[i1, npack2 + i2] = self.check_exposures(one=one, two=two,
+                                                                 indx2=[npack2 + i2],
+                                                                 sub1=[npack1 + i1],
+                                                                 epoch_level=epoch_level)
             if(return_solutions):
-                self._cadence_consistency[cache_key] = (success, possibles)
+                self._cadence_consistency[cache_key] = (success,
+                                                        [(possibles, fill)])
             else:
                 self._cadence_consistency[cache_key] = success
             return(self._cadence_consistency[cache_key])
 
-        # Special case for nexposures == 1, to check delta = -1 cases.
-        if(self.cadences[one].nexposures == 1):
-            for i2 in np.arange(self.cadences[two].nepochs):
-                ok = self.check_exposures(one=one, two=two, indx2=[i2],
+        if(npack1 == 0):
+            possibles = [[]]
+        else:
+            # Check which exposures you can start on
+            for first in np.arange(npack2 - npack1 + 1):
+                ok = self.check_exposures(one=one, two=two, indx2=[first],
                                           sub1=[0], epoch_level=epoch_level)
                 if(ok):
-                    possibles.append([i2])
-            success = len(possibles) > 0
-            if(return_solutions):
-                self._cadence_consistency[cache_key] = (success, possibles)
-            else:
-                self._cadence_consistency[cache_key] = success
-            return(self._cadence_consistency[cache_key])
+                    possibles.append([first])
+                if(len(possibles) == 0):
+                    success = False
+                    if(return_solutions):
+                        self._cadence_consistency[cache_key] = (success,
+                                                                possibles)
+                    else:
+                        self._cadence_consistency[cache_key] = success
+                    return(self._cadence_consistency[cache_key])
 
-        # Check which exposures you can start on
-        for first in np.arange(n2 - n1 + 1):
-            ok = self.check_exposures(one=one, two=two, indx2=[first],
-                                      sub1=[0], epoch_level=epoch_level)
-            if(ok):
-                possibles.append([first])
-        if(len(possibles) == 0):
-            success = False
-            if(return_solutions):
-                self._cadence_consistency[cache_key] = (success, possibles)
-            else:
-                self._cadence_consistency[cache_key] = success
-            return(self._cadence_consistency[cache_key])
+            # Now find sequences starting from there
+            for nsub1 in np.arange(npack1 - 1) + 2:
+                current_possibles = possibles
+                possibles = []
+                for indx in range(len(current_possibles)):
+                    possible = current_possibles[indx]
+                    remaining_start = possible[-1] + 1
+                    nremaining = npack2 - possible[-1] - 1
+                    ok = 1
+                    if(nremaining >= npack1 - len(possible)):
+                        for next_possible in (remaining_start +
+                                              np.arange(nremaining)):
+                            try_possible = possible.copy()
+                            try_possible.append(next_possible)
+                            ok = self.check_exposures(one=one, two=two,
+                                                      indx2=try_possible,
+                                                      sub1=np.arange(nsub1),
+                                                      epoch_level=epoch_level)
+                            if(ok):
+                                possibles.append(try_possible)
 
-        # Now find sequences starting from there
-        for nsub1 in np.arange(n1 - 1) + 2:
-            current_possibles = possibles
+                if(len(possibles) == 0):
+                    success = False
+                    if(return_solutions):
+                        self._cadence_consistency[cache_key] = (success,
+                                                                possibles)
+                    else:
+                        self._cadence_consistency[cache_key] = success
+                    return(self._cadence_consistency[cache_key])
+
+        if((len(possibles) > 0) & (nfill1 > 0)):
+            pack_possibles = possibles.copy()
             possibles = []
-            for indx in range(len(current_possibles)):
-                possible = current_possibles[indx]
-                remaining_start = possible[-1] + 1
-                nremaining = n2 - possible[-1] - 1
-                ok = 1
-                if(nremaining >= n1 - len(possible)):
-                    for next_possible in (remaining_start +
-                                          np.arange(nremaining)):
-                        try_possible = possible.copy()
-                        try_possible.append(next_possible)
-                        ok = self.check_exposures(one=one, two=two,
-                                                  indx2=try_possible,
-                                                  sub1=np.arange(nsub1),
-                                                  epoch_level=epoch_level)
-                        if(ok):
-                            possibles.append(try_possible)
-            if(len(possibles) == 0):
-                success = False
-                if(return_solutions):
-                    self._cadence_consistency[cache_key] = (success, possibles)
+            for pack_possible in pack_possibles:
+                fill = np.zeros((nfill1, npack2 + nfill2), dtype=np.bool)
+                ifill1 = np.arange(nfill1)
+                ifill2 = np.arange(npack2 + nfill2)
+                for i1 in ifill1:
+                    for i2 in np.arange(npack2 + nfill2, dtype=np.int32):
+                        if(i2 not in pack_possible):
+                            fill[i1, i2] = self.check_exposures(one=one,
+                                                                two=two,
+                                                                indx2=[i2],
+                                                                sub1=[i1 + npack1],
+                                                                epoch_level=epoch_level)
+                if(epoch_level):
+                    nexp1 = self.cadences[one].epoch_nexposures[ifill1]
+                    nexp2 = self.cadences[two].epoch_nexposures[ifill2]
                 else:
-                    self._cadence_consistency[cache_key] = success
-                return(self._cadence_consistency[cache_key])
+                    nexp1 = self.cadences[one].nexposures[ifill1]
+                    nexp2 = self.cadences[two].nexposures[ifill2]
+
+                ok = self.fill_grid(fill=fill, nexp1=nexp1, nexp2=nexp2)
+                if(ok):
+                    possibles.append((pack_possible, fill))
+        else:
+            pack_possibles = possibles.copy()
+            possibles = []
+            for pack_possible in pack_possibles:
+                possibles.append((pack_possible, None))
 
         success = len(possibles) > 0
         if(return_solutions):
@@ -503,395 +718,84 @@ class CadenceList(object, metaclass=CadenceSingleton):
             self._cadence_consistency[cache_key] = success
         return(self._cadence_consistency[cache_key])
 
-    def pack_targets(self, target_cadences=None, field_cadence=None,
-                     value=None):
-        """Find best way to pack targets into a cadence
+    def fill_grid(self, fill=None, nexp1=None, nexp2=None):
+        """Checks if a grid can be filled
 
         Parameters:
         ----------
 
-        target_cadences : list of strings
-            names of the target cadences
+        fill : 2-D ndarray of bool
+            whether epoch of second dimension can satisfy epoch of first
 
-        field_cadence : string
-            name of field cadence
+        nexp1 : ndarray of np.int32
+            number of exposures in first dimension
 
-        value : ndarray of np.float32
-            value for each target
+        nexp2 : ndarray of np.int32
+            number of exposures in second dimension
 
         Returns:
         -------
 
-        epoch_targets : list of ndarray of np.int32
-            for each epoch, list of target indices
-
-        exposure_targets : ndarray of np.int32
-            for each epoch, target index
-
-        Notes:
-        -----
-
-        Designed to maximize total "value" of targets observed. Will
-        not observe partial cadences.
-
-        The solution actually has a time limit. It will not search for
-        solutions for any longer than about 0.1 sec. This gets triggered
-        for cases where there is a complicated cadence sequence but LOTS
-        of targets to choose from. Usually the solution is OK.
+        ok : bool
+            True if the grid can be filled, False if not
 """
-        ntargets = len(target_cadences)
-        nepochs_field_full = self.cadences[field_cadence].nepochs
-        nexposures_field_full = self.cadences[field_cadence].nexposures
-        nepochs_field = self.cadences[field_cadence].nepochs_pack
-        if(value is None):
-            value = np.ones(ntargets)
-        else:
-            value = np.array(value)
+        n1 = fill.shape[0]
+        n2 = fill.shape[1]
 
-        # Output arrays
-        epoch_targets = [np.zeros(0, dtype=np.int32)] * nepochs_field_full
-        exposure_targets = np.zeros(nexposures_field_full, dtype=np.int32) - 1
+        solver = pywrapcp.Solver("fill_grid")
 
-        # Handle when single-exposure targets are only targets available
-        nexposures = np.array([self.cadences[tc].nexposures
-                               for tc in target_cadences], dtype=np.int32)
-        if(nexposures.max() == 1):
-            return(self.pack_targets_single(target_cadences=target_cadences,
-                                            field_cadence=field_cadence,
-                                            value=value))
+        gridvars = []
+        for indx1 in np.arange(n1):
+            indx1vars = []
+            for indx2 in np.arange(n2):
+                nfill = int(0)
+                if(fill[indx1, indx2]):
+                    nfill = int(nexp2[indx2])
+                name = "{indx1}-{indx2}".format(indx1=indx1, indx2=indx2)
+                tmpvar = solver.IntVar(0, nfill, name)
+                indx1vars.append(tmpvar)
+            gridvars.append(indx1vars)
 
-        pack = []
-        epochs = [0] * nepochs_field_full
+        for indx1 in np.arange(n1):
+            indx1vars = gridvars[indx1]
+            solver.Add(solver.Sum(indx1vars) == int(nexp1[indx1]))
 
-        # Find solutions for each target
-        for target_cadence in target_cadences:
-            count, solns = self.cadence_consistency(target_cadence,
-                                                    field_cadence,
-                                                    return_solutions=True,
-                                                    epoch_level=True)
-            target = []
-            for isoln in solns:
-                soln_epochs = epochs.copy()
-                for i in isoln:
-                    soln_epochs[i] = 1
-                target.append(soln_epochs)
-            pack.append(target)
+        for indx2 in np.arange(n2):
+            indx2vars = [x[indx2] for x in gridvars]
+            solver.Add(solver.Sum(indx2vars) <= int(nexp2[indx2]))
 
-        solver = pywrapcp.Solver("pack_targets")
-
-        # Create variables for each epoch of each solution of each target
-        packvar = []
-        indxt = 0
-        for target, target_cadence in zip(pack, target_cadences):
-            indxs = 0
-            targetvar = []
-            for soln in target:
-                indxe = 0
-                solnvar = []
-                target_indx = 0
-                for epoch in soln:
-                    name = "{t}-{s}-{e}".format(t=indxt, s=indxt, e=indxe)
-                    if(epoch):
-                        nexposures = int(self.cadences[target_cadence].epoch_nexposures[target_indx])
-                        epochvar = solver.IntVar([0, nexposures], name)
-                        target_indx = target_indx + 1
-                    else:
-                        epochvar = solver.IntVar([0], name)
-                    solnvar.append(epochvar)
-                    indxe = indxe + 1
-                indxs = indxs + 1
-                targetvar.append(solnvar)
-            indxt = indxt + 1
-            packvar.append(targetvar)
-
-        # Constraint for each solution that all or none of
-        # its epochs, and only those epochs, are used.
-        for target, targetvar, target_cadence in zip(pack, packvar,
-                                                     target_cadences):
-            for soln, solnvar in zip(target, targetvar):
-                firstvar = None
-                for epoch, epochvar in zip(soln, solnvar):
-                    if(epoch):
-                        if(firstvar):
-                            solver.Add((epochvar > 0) == (firstvar > 0))
-                        else:
-                            firstvar = epochvar
-                    else:
-                        solver.Add(epochvar == 0)
-
-        # Constraint for each epoch that no more than
-        # the total number of available exposures is taken
-        for iepoch in range(nepochs_field_full):
-            e = [solnvar[iepoch] for targetvar in packvar
-                 for solnvar in targetvar]
-            solver.Add(solver.Sum(e) <=
-                       int(self.cadences[field_cadence].epoch_nexposures[iepoch]))
-
-        # Constraint that only one solution for each target
-        # is taken.
-        target_valvars = []
-        for val, targetvar in zip(value, packvar):
-            solnused = []
-            for solnvar in targetvar:
-                solnused.append(solver.Sum(solnvar) > 0)
-            target_got = solver.Sum(solnused)
-            target_valvar = target_got * int(val)
-            target_valvars.append(target_valvar)
-            solver.Add(target_got <= 1)
-
-        allvars = [epochvar for targetvar in packvar
-                   for solnvar in targetvar for epochvar in solnvar]
-
-        objective_expr = solver.IntVar(0, int(value.sum()), "value")
-        solver.Add(objective_expr == solver.Sum(target_valvars))
-        objective = solver.Maximize(objective_expr, 1)
+        allvars = [var for indx1vars in gridvars
+                   for var in indx1vars]
 
         db = solver.Phase(allvars, solver.CHOOSE_FIRST_UNBOUND,
                           solver.ASSIGN_MIN_VALUE)
 
         # Create a solution collector.
-        collector = solver.LastSolutionCollector()
+        collector = solver.FirstSolutionCollector()
 
         # Add the decision variables.
         for allvar in allvars:
             collector.Add(allvar)
 
-        # Add the objective.
-        collector.AddObjective(objective_expr)
-
         tl = solver.TimeLimit(100)
-        status = solver.Solve(db, [objective, collector, tl])
+        status = solver.Solve(db, [collector, tl])
         if(status is False):
-            print("Problem in solver.")
-            return(None)
+            return(False, [])
 
         # Retrieve list of targets for each epoch
         if collector.SolutionCount() > 0:
-            best_solution = collector.SolutionCount() - 1
-            for itarget, targetvar in zip(range(ntargets), packvar):
-                for solnvar in targetvar:
-                    for iepoch, epochvar in zip(range(nepochs_field_full), solnvar):
-                        if(collector.Value(best_solution, epochvar)):
-                            epoch_targets[iepoch] = np.append(epoch_targets[iepoch], itarget)
-
-        # Now convert into list of targets for each exposure
-        iexposure = 0
-        target_epoch = np.zeros(len(target_cadences), dtype=np.int32)
-        for iepoch in np.arange(nepochs_field_full, dtype=np.int32):
-            for itarget in np.arange(len(epoch_targets[iepoch]),
-                                     dtype=np.int32):
-                ctarget = epoch_targets[iepoch][itarget]
-                ccadence = self.cadences[target_cadences[ctarget]]
-                nexposures = ccadence.epoch_nexposures[target_epoch[ctarget]]
-                for indx in iexposure + np.arange(nexposures):
-                    exposure_targets[indx] = ctarget
-                iexposure = iexposure + nexposures
-                target_epoch[ctarget] = target_epoch[ctarget] + 1
-
-        return(epoch_targets, exposure_targets)
-
-    def pack_targets_single(self, target_cadences=None, field_cadence=None,
-                            value=None):
-        """Pack single targets into a cadence greedily.
-
-        Parameters:
-        ----------
-
-        target_cadences : list of strings
-            names of the target cadences
-
-        field_cadence : string
-            name of field cadence
-
-        value : ndarray of np.float32
-            value for each target
-
-        Returns:
-        -------
-
-        epoch_targets : list of ndarray of np.int32
-            for each epoch, list of target indices
-
-        exposure_targets : ndarray of np.int32
-            for each epoch, target index
-
-        Notes:
-        -----
-
-        Only handles cases where field cadence has no actual cadence
-        requirements OR target cadences have no cadence requirements
-"""
-        ntargets = len(target_cadences)
-        nepochs_field_full = self.cadences[field_cadence].nepochs
-        nexposures_field_full = self.cadences[field_cadence].nexposures
-        nepochs_field = self.cadences[field_cadence].nepochs_pack
-        if(value is None):
-            value = np.ones(ntargets)
+            epoch_targets = [np.zeros(0, dtype=np.int32)] * n2
+            for indx1 in np.arange(n1):
+                indx1vars = gridvars[indx1]
+                for i2 in range(len(indx1vars)):
+                    var = indx1vars[i2]
+                    if(collector.Value(0, var)):
+                        for i in np.arange(nexp1[indx1]):
+                            epoch_targets[i2] = np.append(epoch_targets[i2],
+                                                          np.int32(indx1))
+            return(True, epoch_targets)
         else:
-            value = np.array(value)
-        eps = 1.e-4
-
-        # Output arrays
-        epoch_targets = [np.zeros(0, dtype=np.int32)] * nepochs_field_full
-        exposure_targets = np.zeros(nexposures_field_full, dtype=np.int32) - 1
-
-        # Handle only case where field only allows single-exposure with no
-        # cadence requirement (i.e. all deltas are -1) OR case where those
-        # are only targets available
-        nexposures = np.array([self.cadences[tc].nexposures
-                               for tc in target_cadences], dtype=np.int32)
-        if((nepochs_field != 0) & (nexposures.max() > 1)):
-            print("Should not have reached here.")
-            sys.exit()
-
-        isingle = np.where(nexposures == 1)[0]
-        if(len(isingle) == 0):
-            return(epoch_targets, exposure_targets)
-        isort = np.flip(np.argsort(value[isingle]), axis=0)
-        for i in np.arange(len(isort), dtype=np.int32):
-            tcadence = self.cadences[target_cadences[isort[i]]]
-            fcadence = self.cadences[field_cadence]
-            iavailable = np.where((exposure_targets == -1) &
-                                  (tcadence.lunation[0] >=
-                                   fcadence.lunation - eps))[0]
-            if(len(iavailable) > 0):
-                ifill = iavailable.min()
-                exposure_targets[ifill] = isingle[isort[i]]
-        for i in np.arange(nepochs_field_full):
-            itargets = exposure_targets[fcadence.epoch_indx[i]:
-                                        fcadence.epoch_indx[i] +
-                                        fcadence.epoch_nexposures[i]]
-            epoch_targets[i] = np.array(itargets[itargets >= 0],
-                                        dtype=np.int32)
-        return(epoch_targets, exposure_targets)
-
-    def pack_targets_greedy(self, target_cadences=None, field_cadence=None,
-                            value=None):
-        """Pack targets into a cadence greedily.
-
-        Parameters:
-        ----------
-
-        target_cadences : list of strings
-            names of the target cadences
-
-        field_cadence : string
-            name of field cadence
-
-        value : ndarray of np.float32
-            value for each target
-
-        Returns:
-        -------
-
-        epoch_targets : list of ndarray of np.int32
-            for each epoch, list of target indices
-
-        exposure_targets : ndarray of np.int32
-            for each epoch, target index
-
-        Notes:
-        -----
-
-        Starts with highest "value" targets, and assigns in a greedy fashion.
-        Will not observe partial cadences.
-"""
-        ntargets = len(target_cadences)
-        nepochs_field_full = self.cadences[field_cadence].nepochs
-        nexposures_field_full = self.cadences[field_cadence].nexposures
-        nepochs_field = self.cadences[field_cadence].nepochs_pack
-        if(value is None):
-            value = np.ones(ntargets)
-        else:
-            value = np.array(value)
-
-        # Output arrays
-        epoch_targets = [np.zeros(0, dtype=np.int32)] * nepochs_field_full
-        epoch_nexposures = np.zeros(nepochs_field_full)
-        exposure_targets = np.zeros(nexposures_field_full, dtype=np.int32) - 1
-
-        # Handle when single-exposure targets are only targets available
-        nexposures = np.array([self.cadences[tc].nexposures
-                               for tc in target_cadences], dtype=np.int32)
-        if(nexposures.max() == 1):
-            return(self.pack_targets_single(target_cadences=target_cadences,
-                                            field_cadence=field_cadence,
-                                            value=value))
-
-        isort = np.flip(np.argsort(value), axis=0)
-
-        # Find solutions for each target
-        fcadence = self.cadences[field_cadence]
-        for itarget in isort:
-            target_cadence = target_cadences[itarget]
-            ok, solns = self.cadence_consistency(target_cadence,
-                                                 field_cadence,
-                                                 return_solutions=True,
-                                                 epoch_level=True)
-
-            if(ok):
-
-                # Check which are still available
-                count = len(solns)
-                available = np.ones(count, dtype=np.bool)
-                for indx in np.arange(count):
-                    soln = solns[indx]
-                    ntaken = epoch_nexposures.copy()
-                    for isoln in np.arange(len(soln)):
-                        iepoch = soln[isoln]
-                        nexp = self.cadences[target_cadence].epoch_nexposures[isoln]
-                        if(ntaken[iepoch] + nexp >
-                           fcadence.epoch_nexposures[iepoch]):
-                            available[indx] = False
-                        else:
-                            ntaken[iepoch] = ntaken[iepoch] + nexp
-
-                # Approximates an opportunity cost to each solution
-                iavailable = np.where(available)[0]
-                if(len(iavailable) > 0):
-                    if((fcadence.epoch_nexposures.min() !=
-                        fcadence.epoch_nexposures.max()) |
-                       (fcadence.lunation.min() !=
-                        fcadence.lunation.max())):
-                        cost = np.zeros(len(iavailable), dtype=np.float32)
-                        epoch_indx = fcadence.epoch_indx
-                        for indx in np.arange(len(iavailable)):
-                            soln = solns[iavailable[indx]]
-                            exposure_cost = (
-                                1. / (fcadence.lunation[epoch_indx[soln]] +
-                                      0.05) +
-                                fcadence.epoch_nexposures[soln] / 10.)
-                            cost[indx] = exposure_cost.sum()
-
-                        isort_cost = np.argsort(cost, axis=0)
-                        soln = solns[iavailable[isort_cost[0]]]
-                    else:
-                        soln = solns[iavailable[0]]
-
-                    # Add to list.
-                    for isoln in np.arange(len(soln)):
-                        iepoch = soln[isoln]
-                        epoch_targets[iepoch] = np.append(epoch_targets[iepoch],
-                                                          itarget)
-                        nexp = self.cadences[target_cadence].epoch_nexposures[isoln]
-                        epoch_nexposures[iepoch] = (epoch_nexposures[iepoch] +
-                                                    nexp)
-
-        # Now convert into list of targets for each exposure
-        iexposure = 0
-        target_epoch = np.zeros(len(target_cadences), dtype=np.int32)
-        for iepoch in np.arange(nepochs_field_full, dtype=np.int32):
-            for itarget in np.arange(len(epoch_targets[iepoch]),
-                                     dtype=np.int32):
-                ctarget = epoch_targets[iepoch][itarget]
-                ccadence = self.cadences[target_cadences[ctarget]]
-                nexposures = ccadence.epoch_nexposures[target_epoch[ctarget]]
-                for indx in iexposure + np.arange(nexposures):
-                    exposure_targets[indx] = ctarget
-                iexposure = iexposure + nexposures
-                target_epoch[ctarget] = target_epoch[ctarget] + 1
-
-        return(epoch_targets, exposure_targets)
+            return(False, [])
 
     def fromarray(self, cadences_array=None, nathan=False):
         """Add cadences to ccadence list from an array
@@ -1100,8 +1004,6 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
     def fromdb(self):
         """Extract cadences into the targetdb
-
-        DOES NOT HANDLE INSTRUMENT RIGHT!!
 """
         if(_database is False):
             print("No database available.")
