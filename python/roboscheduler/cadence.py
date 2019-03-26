@@ -644,6 +644,8 @@ class CadenceList(object, metaclass=CadenceSingleton):
 """
         # Return cached results
         cache_key = (one, two, epoch_level, return_solutions)
+        print(cache_key)
+        print(self._cadence_consistency.keys())
         if(cache_key in self._cadence_consistency):
             return(self._cadence_consistency[cache_key])
 
@@ -751,7 +753,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
                     nexp1 = self.cadences[one].nexposures[ifill1]
                     nexp2 = self.cadences[two].nexposures[ifill2]
 
-                ok = self.fill_grid(fill=fill, nexp1=nexp1, nexp2=nexp2)
+                ok, et = self.fill_grid(fill=fill, nexp1=nexp1, nexp2=nexp2)
                 if(ok):
                     possibles.append((pack_possible, fill))
         else:
