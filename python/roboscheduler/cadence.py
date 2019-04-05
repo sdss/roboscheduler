@@ -323,7 +323,7 @@ class Packing(object):
         -----
 
         Picks one solution which is essentially random. Usually fills
-        from later epochs to earlier.
+        from earlier epochs to later.
 """
         out = dict()
         out['ok'] = False
@@ -879,7 +879,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
                           solver.ASSIGN_MIN_VALUE)
 
         # Create a solution collector.
-        collector = solver.FirstSolutionCollector()
+        collector = solver.LastSolutionCollector()
 
         # Add the decision variables.
         for allvar in allvars:
