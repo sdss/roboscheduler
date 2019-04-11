@@ -363,6 +363,30 @@ class Observer(SchedulerBase):
         else:
             return(self.moon_illumination(mjd=mjd))
 
+    def skybrightness(self, mjd=None):
+        """Return a sky brightness related number"
+
+        Parameters:
+        ----------
+
+        mjd : np.float64
+            Modified Julian Day (days)
+
+        Returns:
+        -------
+
+        skybrightness : np.float32
+            sky brightness related number between 0 and 1
+
+        Notes:
+        -----
+"""
+        (moon_alt, moon_az) = self.moon_altaz(mjd=mjd)
+        if(moon_alt < 0):
+            return(0.)
+        else:
+            return(self.moon_illumination(mjd=mjd))
+
     def _twilight_function(self, mjd=None, twilight=-8.):
         """Utility function for root-finding to get twilight times"""
         (alt, az) = self.sun_altaz(mjd=mjd)
