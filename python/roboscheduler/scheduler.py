@@ -183,7 +183,8 @@ class Observer(SchedulerBase):
     evening_twilight(mjd=): return evening twilight on MJD
     morning_twilight(mjd=): return morning twilight on MJD
 """
-    def __init__(self, observatory='apo', observatoryfile=None):
+    def __init__(self, observatory='apo', observatoryfile=None,
+                 dark_twilight=-15., bright_twilight=-8.):
         """Create Observer object"""
         super().__init__()
         self.observatory = observatory
@@ -198,6 +199,9 @@ class Observer(SchedulerBase):
         indx = np.where(observatories == self.observatory)[0]
         self.latitude = self._data['OBSERVATORY']['latitude'][indx]
         self.longitude = self._data['OBSERVATORY']['longitude'][indx]
+        self.dark_twilight = np.float32(dark_twilight)
+        self.bright_twilight = np.float32(bright_twilight)
+        return
 
     def lst(self, mjd=None):
         """Return LST (degrees) given MJD for observer
@@ -380,19 +384,26 @@ class Observer(SchedulerBase):
 
         Notes:
         -----
+
+        If the Sun is above Scheduler.dark_twilight, then the
+        skybright is one. Otherwise the skybrightness is equal to the
+        lunation, which if the Moon is above the horizon, is its
+        fractional illumination, and if the Moon is below the horizon,
+        is zero.
 """
         (moon_alt, moon_az) = self.moon_altaz(mjd=mjd)
-        if(moon_alt < 0):
-            return(0.)
+        (sun_alt, sun_az) = self.sun_altaz(mjd=mjd)
+        if(sun_alt > self.dark_twilight):
+            return(1.)
         else:
-            return(self.moon_illumination(mjd=mjd))
+            return(self.lunation(mjd=mjd))
 
     def _twilight_function(self, mjd=None, twilight=-8.):
         """Utility function for root-finding to get twilight times"""
         (alt, az) = self.sun_altaz(mjd=mjd)
         return (alt - twilight)
 
-    def evening_twilight(self, mjd=None, twilight=-8.):
+    def evening_twilight(self, mjd=None):
         """Return MJD (days) of evening twilight for MJD
 
         Parameters:
@@ -414,10 +425,10 @@ class Observer(SchedulerBase):
         midnight_ish = noon_ish + 0.5
         twi = optimize.brenth(self._twilight_function,
                               noon_ish, midnight_ish,
-                              args=(twilight))
+                              args=(self.bright_twilight))
         return(np.float64(twi))
 
-    def morning_twilight(self, mjd=None, twilight=-8.):
+    def morning_twilight(self, mjd=None):
         """Return MJD (days) of morning twilight for MJD
 
         Parameters:
@@ -439,7 +450,7 @@ class Observer(SchedulerBase):
         nextnoon_ish = midnight_ish + 0.5
         twi = optimize.brenth(self._twilight_function,
                               midnight_ish, nextnoon_ish,
-                              args=(twilight))
+                              args=(self.bright_twilight))
         return(np.float64(twi))
 
 
@@ -494,6 +505,8 @@ class Master(Observer):
         self.start = self._start()
         self.end = self._end()
         self.mjds = self._mjds()
+        self.dark_twilight = np.float32(self.schedule['dark_twilight'])
+        self.bright_twilight = np.float32(self.schedule['bright_twilight'])
         return
 
     def _dateandtime2mjd(self):
@@ -631,7 +644,8 @@ class Scheduler(Master):
         self.observations = roboscheduler.observations.Observations(observatory=self.observatory)
         return
 
-    def observable(self, mjd=None, check_lunation=True, check_cadence=True):
+    def observable(self, mjd=None, check_skybrightness=True,
+                   check_cadence=True):
         """Return array of fields observable
 
         Parameters:
@@ -643,7 +657,7 @@ class Scheduler(Master):
         (alt, az) = self.radec2altaz(mjd=mjd, ra=self.fields.racen,
                                      dec=self.fields.deccen)
         airmass = self.alt2airmass(alt)
-        lunation = self.lunation(mjd)
+        skybrightness = self.skybrightness(mjd)
         observable = (alt > 0.) & (airmass < self.airmass_limit)
         if(check_cadence):
             indxs = np.where(self.fields.nextmjd > mjd)[0]
@@ -656,8 +670,8 @@ class Scheduler(Master):
                     mjd_past = self.observations.mjd[iobservations]
                     observable[indx] = cadence.evaluate_next(mjd_past=mjd_past,
                                                              mjd_next=mjd,
-                                                             lunation_next=lunation,
-                                                             check_lunation=check_lunation)
+                                                             skybrightness_next=skybrightness,
+                                                             check_skybrightness=check_skybrightness)
 
         iobservable = np.where(observable)[0]
         return self.fields.fieldid[iobservable]
@@ -733,13 +747,13 @@ class Scheduler(Master):
                                      ra=self.fields.racen[fieldid],
                                      dec=self.fields.deccen[fieldid])
         airmass = self.alt2airmass(alt)
-        lunation = self.lunation(result['mjd'])
+        skybrightness = self.skybrightness(result['mjd'])
         lst = self.lst(result['mjd'])
         iobs = self.observations.add(fieldid=fieldid,
                                      mjd=result['mjd'],
                                      duration=result['duration'],
                                      sn2=result['sn2'],
-                                     lunation=lunation,
+                                     skybrightness=skybrightness,
                                      airmass=airmass,
                                      lst=lst)
         self.fields.add_observations(result['mjd'], fieldid, iobs)

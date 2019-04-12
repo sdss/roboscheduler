@@ -21,7 +21,7 @@ class TestCadence(object):
         clist = cadence.CadenceList()
         clist.reset()
         clist.add_cadence(name='one', nexposures=4,
-                          lunation=[1., 1., 1., 1.],
+                          skybrightness=[1., 1., 1., 1.],
                           delta=[0., 0., 1., 0.],
                           delta_min=[0., 0., 0.5, 0.],
                           delta_max=[0., 0., 1.5, 0.],
@@ -34,10 +34,10 @@ class TestCadence(object):
         clist = cadence.CadenceList()
         clist.reset()
         clist.add_cadence(name='one', nexposures=1,
-                          lunation=[1.], delta=[-1.], delta_min=[-1.],
+                          skybrightness=[1.], delta=[-1.], delta_min=[-1.],
                           delta_max=[-1.], instrument=['boss'])
         clist.add_cadence(name='two', nexposures=1,
-                          lunation=[0.35], delta=[-1.], delta_min=[-1.],
+                          skybrightness=[0.35], delta=[-1.], delta_min=[-1.],
                           delta_max=[-1.], instrument=['boss'])
         assert clist.cadence_consistency('one', 'two', return_solutions=False) == True
 
@@ -45,27 +45,27 @@ class TestCadence(object):
         clist = cadence.CadenceList()
         clist.reset()
         clist.add_cadence(name='one', nexposures=1,
-                          lunation=[1.], delta=[-1.], delta_min=[-1.],
+                          skybrightness=[1.], delta=[-1.], delta_min=[-1.],
                           delta_max=[-1.], instrument=['boss'])
         clist.add_cadence(name='two', nexposures=2,
-                          lunation=[0.35, 0.35], delta=[0., 30.],
+                          skybrightness=[0.35, 0.35], delta=[0., 30.],
                           delta_min=[0., 20.],
                           delta_max=[0., 40.],
                           instrument=['boss', 'boss'])
         assert clist.cadence_consistency('one', 'two', return_solutions=False) == True
         assert clist.cadence_consistency('two', 'one', return_solutions=False) == False
 
-    def test_cadence_single_double_lunation(self):
+    def test_cadence_single_double_skybrightness(self):
         clist = cadence.CadenceList()
         clist.reset()
         clist.add_cadence(name='bright', nexposures=1,
-                          lunation=[1.], delta=[-1.], delta_min=[-1.],
+                          skybrightness=[1.], delta=[-1.], delta_min=[-1.],
                           delta_max=[-1.], instrument=['boss'])
         clist.add_cadence(name='dark', nexposures=1,
-                          lunation=[0.35], delta=[-1.], delta_min=[-1.],
+                          skybrightness=[0.35], delta=[-1.], delta_min=[-1.],
                           delta_max=[-1.], instrument=['boss'])
         clist.add_cadence(name='two', nexposures=2,
-                          lunation=[1., 1.], delta=[0., 30.],
+                          skybrightness=[1., 1.], delta=[0., 30.],
                           delta_min=[0., 20.],
                           delta_max=[0., 40.],
                           instrument=['boss', 'boss'])
@@ -78,12 +78,12 @@ class TestCadence(object):
         clist = cadence.CadenceList()
         clist.reset()
         clist.add_cadence(name='one', nexposures=2,
-                          lunation=[0.35, 0.35], delta=[0., 30.],
+                          skybrightness=[0.35, 0.35], delta=[0., 30.],
                           delta_min=[0., 19.],
                           delta_max=[0., 41.],
                           instrument=['boss', 'boss'])
         clist.add_cadence(name='two', nexposures=2,
-                          lunation=[0.35, 0.35], delta=[0., 30.],
+                          skybrightness=[0.35, 0.35], delta=[0., 30.],
                           delta_min=[0., 20.],
                           delta_max=[0., 40.],
                           instrument=['boss', 'boss'])

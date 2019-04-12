@@ -33,8 +33,8 @@ class Cadence(object):
     nexposures : np.int32
         number of exposures
 
-    lunation : ndarray of np.float32
-        maximum lunation for each exposure
+    skybrightness : ndarray of np.float32
+        maximum sky brightness for each exposure
 
     delta : ndarray of np.float32
         desired offset for each exposure from previous (days)
@@ -54,8 +54,8 @@ class Cadence(object):
     nexposures : np.int32
         number of exposures
 
-    lunation : ndarray of np.float32
-        maximum lunation for each exposure
+    skybrightness : ndarray of np.float32
+        maximum sky brightness for each exposure
 
     delta : ndarray of np.float32
         desired offset for each exposure from previous (days)
@@ -94,10 +94,11 @@ class Cadence(object):
     The last epochs in the list may have delta = -1. These will be
     treated as unconstrained. Only single epoch cadences will be allowed.
 """
-    def __init__(self, nexposures=None, lunation=None, delta=None,
+    def __init__(self, nexposures=None, skybrightness=None, delta=None,
                  delta_min=None, delta_max=None, instrument=None):
         self.nexposures = np.int32(nexposures)
-        self.lunation = np.zeros(self.nexposures, dtype=np.float32) + lunation
+        self.skybrightness = np.zeros(self.nexposures,
+                                      dtype=np.float32) + skybrightness
         self.instrument = np.array(instrument)
         self.delta = np.zeros(self.nexposures, dtype=np.float32) + delta
         self.delta_min = (np.zeros(self.nexposures, dtype=np.float32) +
@@ -128,9 +129,9 @@ class Cadence(object):
     def exposure_text(self):
         """Display list of exposures as text"""
         out = "nexposures={nexposures}\n".format(nexposures=self.nexposures)
-        out = out + " lunation = "
+        out = out + " skybrightness = "
         for i in np.arange(self.nexposures):
-            out = out + " {l:.3f}".format(l=self.lunation[i])
+            out = out + " {l:.3f}".format(l=self.skybrightness[i])
         out = out + "\n"
         out = out + " delta = "
         for i in np.arange(self.nexposures):
@@ -158,9 +159,9 @@ class Cadence(object):
         for i in np.arange(self.nepochs):
             out = out + " {l}".format(l=self.epoch_nexposures[i])
         out = out + "\n"
-        out = out + " lunation = "
+        out = out + " skybrightness = "
         for i in np.arange(self.nepochs):
-            out = out + " {l:.3f}".format(l=self.lunation[epoch_indx[i]])
+            out = out + " {l:.3f}".format(l=self.skybrightness[epoch_indx[i]])
         out = out + "\n"
         out = out + " delta = "
         for i in np.arange(self.nepochs):
@@ -205,19 +206,20 @@ class Cadence(object):
         return
 
     def evaluate_next(self, mjd_past=None, mjd_next=None,
-                      lunation_next=None, check_lunation=True):
+                      skybrightness_next=None, check_skybrightness=True):
         """Evaluate next choice of observation (not well-tested)"""
         nexposures_past = len(mjd_past)
         if(nexposures_past >= self.nexposures):
             return(False)
-        ok_lunation = ((lunation_next < self.lunation[nexposures_past]) |
-                       (check_lunation is False))
+        ok_skybrightness = ((skybrightness_next <
+                             self.skybrightness[nexposures_past]) |
+                            (check_skybrightness is False))
         if(nexposures_past == 0):
-            return(ok_lunation)
+            return(ok_skybrightness)
         delta = mjd_next - mjd_past[nexposures_past - 1]
         dlo = self.delta_min[nexposures_past]
         dhi = self.delta_max[nexposures_past]
-        return(ok_lunation & (delta >= dlo) & (delta <= dhi))
+        return(ok_skybrightness & (delta >= dlo) & (delta <= dhi))
 
 
 class Packing(object):
@@ -530,8 +532,8 @@ class CadenceList(object, metaclass=CadenceSingleton):
         nexposures : np.int32
             number of exposures (default 1)
 
-        lunation : ndarray of np.float32
-            maximum lunation for each exposure (default [1.])
+        skybrightness : ndarray of np.float32
+            maximum sky brightness for each exposure (default [1.])
 
         delta : ndarray of np.float32
             day for exposure (default [0.])
@@ -584,7 +586,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
             status string; 'ok' if everything checks out
                 'toolate' if an exposure in indx2 is too far
                 'toosoon' if the indx2 exposure is allowed to be too soon
-                'toobright' if lunation files
+                'toobright' if skybrightness fails
                 'toofew' if not enough exposures in cadence two
 
         Notes:
@@ -617,25 +619,25 @@ class CadenceList(object, metaclass=CadenceSingleton):
             delta2full = ctwo.delta[eindx2]
             delta_max2full = ctwo.delta_max[eindx2]
             delta_min2full = ctwo.delta_min[eindx2]
-            lunation2 = ctwo.lunation[eindx2]
+            skybrightness2 = ctwo.skybrightness[eindx2]
             eindx1 = cone.epoch_indx
             delta1 = cone.delta[eindx1]
             delta_max1 = cone.delta_max[eindx1]
             delta_min1 = cone.delta_min[eindx1]
-            lunation1 = cone.lunation[eindx1]
+            skybrightness1 = cone.skybrightness[eindx1]
         else:
             delta2full = ctwo.delta
             delta_max2full = ctwo.delta_max
             delta_min2full = ctwo.delta_min
-            lunation2 = ctwo.lunation
+            skybrightness2 = ctwo.skybrightness
             delta1 = cone.delta
             delta_max1 = cone.delta_max
             delta_min1 = cone.delta_min
-            lunation1 = cone.lunation
+            skybrightness1 = cone.skybrightness
 
-        # Check lunations
+        # Check skybrightnesss
         for indx in np.arange(nexp):
-            if(lunation1[sub1[indx]] < lunation2[indx2[indx]] - eps):
+            if(skybrightness1[sub1[indx]] < skybrightness2[indx2[indx]] - eps):
                 return('toobright')
 
         # Check deltas
@@ -905,26 +907,30 @@ class CadenceList(object, metaclass=CadenceSingleton):
         else:
             return(False, [])
 
-    def fromarray(self, cadences_array=None, nathan=False):
+    def fromarray(self, cadences_array=None, nathan=False, lunation=False):
         """Add cadences to ccadence list from an array
 
         Parameters:
         -----------
 
         cadences_array : ndarray
-            ndarray with columns 'NEXPOSURES', 'LUNATION', 'DELTA',
+            ndarray with columns 'NEXPOSURES', 'SKYBRIGHTNESS', 'DELTA',
             'DELTA_MIN', 'DELTA_MAX', 'CADENCE', 'INSTRUMENT'
 
         nathan : bool
             False if normal format, True if Nathan De Lee format
 """
         col = {'NEXPOSURES': 'NEXPOSURES',
-               'LUNATION': 'LUNATION',
+               'SKYBRIGHTNESS': 'SKYBRIGHTNESS',
                'DELTA': 'DELTA',
                'DELTA_MIN': 'DELTA_MIN',
                'DELTA_MAX': 'DELTA_MAX',
                'INSTRUMENT': 'INSTRUMENT',
                'CADENCE': 'CADENCE'}
+
+        if(lunation is True):
+            col['SKYBRIGHTNESS'] = 'LUNATION'
+
         if(nathan is True):
             for k in col.keys():
                 col[k] = col[k].lower()
@@ -937,12 +943,12 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         for ccadence in cadences_array:
             nexp = ccadence[col['NEXPOSURES']]
-            if(isinstance(ccadence[col['LUNATION']],
+            if(isinstance(ccadence[col['SKYBRIGHTNESS']],
                           type(np.zeros(0, dtype=np.float32)))):
                 instruments = np.array([ii.decode().strip()
                                         for ii in ccadence[col['INSTRUMENT']][0:nexp]])
                 self.add_cadence(nexposures=ccadence[col['NEXPOSURES']],
-                                 lunation=ccadence[col['LUNATION']][0:nexp],
+                                 skybrightness=ccadence[col['SKYBRIGHTNESS']][0:nexp],
                                  delta=ccadence[col['DELTA']][0:nexp],
                                  delta_min=ccadence[col['DELTA_MIN']][0:nexp],
                                  delta_max=ccadence[col['DELTA_MAX']][0:nexp],
@@ -951,7 +957,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
             else:
                 instruments = np.array([ccadence[col['INSTRUMENT']].decode().strip()])
                 self.add_cadence(nexposures=ccadence[col['NEXPOSURES']],
-                                 lunation=ccadence[col['LUNATION']],
+                                 skybrightness=ccadence[col['SKYBRIGHTNESS']],
                                  delta=ccadence[col['DELTA']],
                                  delta_min=ccadence[col['DELTA_MIN']],
                                  delta_max=ccadence[col['DELTA_MAX']],
@@ -959,7 +965,8 @@ class CadenceList(object, metaclass=CadenceSingleton):
                                  instrument=instruments)
         return
 
-    def fromfits(self, filename=None, nathan=False, unpickle=False):
+    def fromfits(self, filename=None, nathan=False, lunation=False,
+                 unpickle=False):
         """Add cadences to ccadence list from a FITS file
 
         Parameters:
@@ -972,11 +979,11 @@ class CadenceList(object, metaclass=CadenceSingleton):
         -----
 
         Expects a valid FITS file with columns 'NEXPOSURES',
-            'LUNATION', 'DELTA', 'DELTA_MIN', 'DELTA_MAX', 'CADENCE',
+            'SKYBRIGHTNESS', 'DELTA', 'DELTA_MIN', 'DELTA_MAX', 'CADENCE',
             'INSTRUMENT'
 """
         self.cadences_fits = fitsio.read(filename)
-        self.fromarray(self.cadences_fits, nathan=nathan)
+        self.fromarray(self.cadences_fits, nathan=nathan, lunation=lunation)
         if(unpickle):
             fp = open(filename + '.pkl', 'rb')
             cc = pickle.load(fp)
@@ -998,7 +1005,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
         cadence0 = [('CADENCE', fits_type),
                     ('NEXPOSURES', np.int32),
                     ('DELTA', np.float64, max_nexp),
-                    ('LUNATION', np.float32, max_nexp),
+                    ('SKYBRIGHTNESS', np.float32, max_nexp),
                     ('DELTA_MAX', np.float32, max_nexp),
                     ('DELTA_MIN', np.float32, max_nexp),
                     ('INSTRUMENT', np.dtype('a10'), max_nexp)]
@@ -1011,7 +1018,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
             cads['DELTA'][indx, 0:nexp] = self.cadences[name].delta
             cads['DELTA_MIN'][indx, 0:nexp] = self.cadences[name].delta_min
             cads['DELTA_MAX'][indx, 0:nexp] = self.cadences[name].delta_max
-            cads['LUNATION'][indx, 0:nexp] = self.cadences[name].lunation
+            cads['SKYBRIGHTNESS'][indx, 0:nexp] = self.cadences[name].skybrightness
             cads['INSTRUMENT'][indx, 0:nexp] = self.cadences[name].instrument
         return(cads)
 
@@ -1030,7 +1037,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
                     ('NEPOCHS', np.int32),
                     ('NEXPOSURES', np.int32, max_nep),
                     ('DELTA', np.float64, max_nep),
-                    ('LUNATION', np.float32, max_nep),
+                    ('SKYBRIGHTNESS', np.float32, max_nep),
                     ('DELTA_MAX', np.float32, max_nep),
                     ('DELTA_MIN', np.float32, max_nep),
                     ('INSTRUMENT', np.dtype('a10'), max_nep)]
@@ -1045,7 +1052,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
             cads['DELTA'][indx, 0:nep] = self.cadences[name].delta[epoch_indx]
             cads['DELTA_MIN'][indx, 0:nep] = self.cadences[name].delta_min[epoch_indx]
             cads['DELTA_MAX'][indx, 0:nep] = self.cadences[name].delta_max[epoch_indx]
-            cads['LUNATION'][indx, 0:nep] = self.cadences[name].lunation[epoch_indx]
+            cads['SKYBRIGHTNESS'][indx, 0:nep] = self.cadences[name].skybrightness[epoch_indx]
             instruments = [self.cadences[name].instrument[i] for i in epoch_indx]
             cads['INSTRUMENT'][indx][0:nep] = instruments
         return(cads)
@@ -1072,12 +1079,12 @@ class CadenceList(object, metaclass=CadenceSingleton):
             delta = [float(n) for n in self.cadences[cadence].delta]
             delta_min = [float(n) for n in self.cadences[cadence].delta_min]
             delta_max = [float(n) for n in self.cadences[cadence].delta_max]
-            lunation = [float(n) for n in self.cadences[cadence].lunation]
+            skybrightness = [float(n) for n in self.cadences[cadence].skybrightness]
             spectrograph = [spectrograph_pk[n]
                             for n in self.cadences[cadence].instrument]
             targetdb.TargetCadence.insert(pk=pk, name=cadence,
                                           nexposures=nexposures,
-                                          delta=delta, lunation=lunation,
+                                          delta=delta, skybrightness=skybrightness,
                                           delta_min=delta_min,
                                           delta_max=delta_max,
                                           spectrograph_pk=spectrograph).execute()
@@ -1106,8 +1113,8 @@ class CadenceList(object, metaclass=CadenceSingleton):
                            targetdb.TargetCadence.delta_max:
                            [float(n)
                             for n in self.cadences[cadence].delta_max],
-                           targetdb.TargetCadence.lunation:
-                           [float(n) for n in self.cadences[cadence].lunation],
+                           targetdb.TargetCadence.skybrightness:
+                           [float(n) for n in self.cadences[cadence].skybrightness],
                            targetdb.TargetCadence.spectrograph_pk:
                            [spectrograph_pk[n]
                             for n in self.cadences[cadence].instrument]}
@@ -1140,5 +1147,5 @@ class CadenceList(object, metaclass=CadenceSingleton):
                              delta=np.array(cadence['delta']),
                              delta_min=np.array(cadence['delta_min']),
                              delta_max=np.array(cadence['delta_max']),
-                             lunation=np.array(cadence['lunation']),
+                             skybrightness=np.array(cadence['skybrightness']),
                              instrument=instruments)

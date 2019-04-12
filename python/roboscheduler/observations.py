@@ -40,9 +40,9 @@ class Observations(object):
     airmass : ndarray of np.float32
         airmass of observation
 
-    lunation : ndarray of np.float32
-        lunation of observation (Moon illumination fraction, or zero if
-        below horizon)
+    skybrightness : ndarray of np.float32
+        sky brightness of observation (Moon illumination fraction, or zero if
+        below horizon, or one if in bright twilight)
 
     lst : ndarray of np.float32
         LST of observation
@@ -62,12 +62,12 @@ class Observations(object):
         self.duration = np.zeros(0, dtype=np.float64)
         self.sn2 = np.zeros(0, dtype=np.float32)
         self.airmass = np.zeros(0, dtype=np.float32)
-        self.lunation = np.zeros(0, dtype=np.float32)
+        self.skybrightness = np.zeros(0, dtype=np.float32)
         self.lst = np.zeros(0, dtype=np.float32)
         return
 
     def add(self, fieldid=None, mjd=None, duration=None, sn2=None,
-            lunation=None, airmass=None, lst=None):
+            skybrightness=None, airmass=None, lst=None):
         self.fieldid = np.append(self.fieldid,
                                  np.array([np.float64(fieldid)]))
         self.mjd = np.append(self.mjd,
@@ -76,8 +76,8 @@ class Observations(object):
                                   np.array([np.float64(duration)]))
         self.sn2 = np.append(self.sn2,
                              np.array([np.float32(sn2)]))
-        self.lunation = np.append(self.lunation,
-                                  np.array([np.float32(lunation)]))
+        self.skybrightness = np.append(self.skybrightness,
+                                       np.array([np.float32(skybrightness)]))
         self.airmass = np.append(self.airmass,
                                  np.array([np.float32(airmass)]))
         self.lst = np.append(self.lst,
@@ -110,7 +110,7 @@ class Observations(object):
                 ('duration', np.float64),
                 ('sn2', np.float32),
                 ('airmass', np.float32),
-                ('lunation', np.float32),
+                ('skybrightness', np.float32),
                 ('lst', np.float32)]
         if(indx is None):
             indx = np.arange(self.nobservations)
@@ -122,6 +122,6 @@ class Observations(object):
             obs['duration'] = self.duration[indx]
             obs['sn2'] = self.sn2[indx]
             obs['airmass'] = self.airmass[indx]
-            obs['lunation'] = self.lunation[indx]
+            obs['skybrightness'] = self.skybrightness[indx]
             obs['lst'] = self.lst[indx]
         return(obs)

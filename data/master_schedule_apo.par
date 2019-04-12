@@ -2,6 +2,10 @@
 # (i.e. Greenwich time)
 to_tai 7  # Mountain Standard Time
 
+# Degrees twilight to use
+dark_twilight -15.
+bright_twilight -8.
+
 # Whether events start ("on") or stop ("off") observing
 START_SURVEY on
 END_SURVEY off

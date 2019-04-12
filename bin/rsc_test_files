@@ -23,34 +23,35 @@ if __name__ == '__main__':
     clist = cadence.CadenceList()
 
     names = ['bright', 'faint']
-    lunations = [1., 0.35]
+    skybrightnesses = [1., 0.35]
 
-    for name, lunation in zip(names, lunations):
+    for name, skybrightness in zip(names, skybrightnesses):
         if(name is 'bright'):
             instrument = 'APOGEE'
         else:
             instrument = 'BOSS'
 
         clist.add_cadence(name='{name}_1x1'.format(name=name), nexposures=1,
-                          lunation=[lunation], delta=[-1.], delta_min=[-1.],
-                          delta_max=[-1.], instrument=[instrument])
+                          skybrightness=[skybrightness], delta=[-1.],
+                          delta_min=[-1.], delta_max=[-1.],
+                          instrument=[instrument])
 
         clist.add_cadence(name='{name}_1x4'.format(name=name), nexposures=4,
-                          lunation=[lunation] * 4,
+                          skybrightness=[skybrightness] * 4,
                           delta=[-1., 0., 0., 0.],
                           delta_min=[-1., 0., 0., 0.],
                           delta_max=[-1., 0., 0., 0.],
                           instrument=[instrument] * 4)
 
         clist.add_cadence(name='{name}_2x4'.format(name=name), nexposures=8,
-                          lunation=[lunation] * 8,
+                          skybrightness=[skybrightness] * 8,
                           delta=[-1., 0., 0., 0., -1., 0., 0., 0.],
                           delta_min=[-1., 0., 0., 0., -1., 0., 0., 0.],
                           delta_max=[-1., 0., 0., 0., -1., 0., 0., 0.],
                           instrument=[instrument] * 8)
 
         clist.add_cadence(name='{name}_2x2'.format(name=name), nexposures=4,
-                          lunation=[lunation] * 4,
+                          skybrightness=[skybrightness] * 4,
                           delta=[-1., 0., -1., 0.],
                           delta_min=[-1., 0., -1., 0.],
                           delta_max=[-1., 0., -1., 0.],
@@ -58,7 +59,7 @@ if __name__ == '__main__':
 
         clist.add_cadence(name='{name}_month_2x2'.format(name=name),
                           nexposures=4,
-                          lunation=[lunation] * 4,
+                          skybrightness=[skybrightness] * 4,
                           delta=[0., 0., 30., 0.],
                           delta_min=[0., 0., 20., 0.],
                           delta_max=[0., 0., 40., 0.],
@@ -66,7 +67,7 @@ if __name__ == '__main__':
 
         clist.add_cadence(name='{name}_month_4x2'.format(name=name),
                           nexposures=8,
-                          lunation=[lunation] * 8,
+                          skybrightness=[skybrightness] * 8,
                           delta=[0., 0., 30., 0., 30., 0., 30., 0.],
                           delta_min=[0., 0., 20., 0., 20., 0., 20., 0.],
                           delta_max=[0., 0., 40., 0., 40., 0., 40., 0.],

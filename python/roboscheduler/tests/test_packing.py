@@ -105,5 +105,3 @@ class TestPacking(object):
         assert(packing.epoch_nused.max() == 4)
         assert(packing.exposures.min() == 1)
         assert(packing.exposures.max() == 1)
-
-    def test_pack_greedy(self):
