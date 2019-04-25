@@ -483,15 +483,16 @@ class Master(Observer):
     -------
     on() : is the survey on
 """
-    def __init__(self, schedulefile=None, observatory='apo',
+    def __init__(self, schedule='normal', observatory='apo',
                  observatoryfile=None):
         """Create Master object for schedule"""
         super().__init__(observatory=observatory,
                          observatoryfile=observatoryfile)
-        if(schedulefile is None):
-            masterfile = 'master_schedule_{observatory}.par'.format(observatory=observatory)
-            schedulefile = os.path.join(os.getenv('ROBOSCHEDULER_DIR'),
-                                        'data', masterfile)
+        masterfile = 'master_schedule_{o}_{s}.par'.format(o=observatory,
+                                                          s=schedule)
+        schedulefile = os.path.join(os.getenv('ROBOSCHEDULER_DIR'),
+                                    'data', masterfile)
+        print(schedulefile)
         self._schedulefile = schedulefile
         self.schedule = yanny.yanny(self._schedulefile)
         self._validate()
@@ -623,10 +624,10 @@ class Scheduler(Master):
 
     """
     def __init__(self, airmass_limit=2.,
-                 schedulefile=None, observatory='apo', observatoryfile=None):
+                 schedule='normal', observatory='apo', observatoryfile=None):
         """Return Scheduler object
         """
-        super().__init__(schedulefile=schedulefile, observatory=observatory,
+        super().__init__(schedule=schedule, observatory=observatory,
                          observatoryfile=observatoryfile)
         self.airmass_limit = airmass_limit
         return
