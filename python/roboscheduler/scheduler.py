@@ -656,7 +656,7 @@ class Scheduler(Master):
                         rejected += 1
                         observable[indx] = False
 
-            print("{} rejected {} for time/moon".format(mjd, rejected))
+            print("{} rejected {} of {} for time/moon".format(mjd, rejected, len(iobservable)))
 
         iobservable = np.where(observable)[0]
         return self.fields.fieldid[iobservable], nexp[iobservable]
