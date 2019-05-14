@@ -13,6 +13,10 @@ except:
 fits_type = np.dtype('a40')
 
 
+def basename(cadence):
+    return("_".join(cadence.split('-')[0].split('_')[0:-1]))
+
+
 # Class to define a singleton
 class CadenceSingleton(type):
     _instances = {}
