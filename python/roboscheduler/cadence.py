@@ -1,4 +1,4 @@
-import sys
+import pickle
 import numpy as np
 import fitsio
 from ortools.constraint_solver import pywrapcp
@@ -11,6 +11,10 @@ except:
 
 # Definition to use when writing to ndarray
 fits_type = np.dtype('a40')
+
+
+def basename(cadence):
+    return("_".join(cadence.split('-')[0].split('_')[0:-1]))
 
 
 # Class to define a singleton
@@ -33,8 +37,8 @@ class Cadence(object):
     nexposures : np.int32
         number of exposures
 
-    lunation : ndarray of np.float32
-        maximum lunation for each exposure
+    skybrightness : ndarray of np.float32
+        maximum sky brightness for each exposure
 
     delta : ndarray of np.float32
         desired offset for each exposure from previous (days)
@@ -54,8 +58,8 @@ class Cadence(object):
     nexposures : np.int32
         number of exposures
 
-    lunation : ndarray of np.float32
-        maximum lunation for each exposure
+    skybrightness : ndarray of np.float32
+        maximum sky brightness for each exposure
 
     delta : ndarray of np.float32
         desired offset for each exposure from previous (days)
@@ -86,19 +90,28 @@ class Cadence(object):
 
     The first delta == 0 in all cadences.
 
+    delta == 0 for any exposure except the first means to "bundle" the
+    exposure with the previous exposure into a single epoch. delta_min
+    and delta_max for such exposures are automatically set to zero on
+    input.
+
     The last epochs in the list may have delta = -1. These will be
     treated as unconstrained. Only single epoch cadences will be allowed.
 """
-    def __init__(self, nexposures=None, lunation=None, delta=None,
+    def __init__(self, nexposures=None, skybrightness=None, delta=None,
                  delta_min=None, delta_max=None, instrument=None):
         self.nexposures = np.int32(nexposures)
-        self.lunation = np.zeros(self.nexposures, dtype=np.float32) + lunation
+        self.skybrightness = np.zeros(self.nexposures,
+                                      dtype=np.float32) + skybrightness
         self.instrument = np.array(instrument)
         self.delta = np.zeros(self.nexposures, dtype=np.float32) + delta
         self.delta_min = (np.zeros(self.nexposures, dtype=np.float32) +
                           delta_min)
         self.delta_max = (np.zeros(self.nexposures, dtype=np.float32) +
                           delta_max)
+        izero = np.where(self.delta == 0.)[0]
+        self.delta_min[izero] = 0.
+        self.delta_max[izero] = 0.
         self._create_epochs()
         iapogee = np.where(self.instrument == 'APOGEE')[0]
         if(len(iapogee) > 0):
@@ -120,9 +133,9 @@ class Cadence(object):
     def exposure_text(self):
         """Display list of exposures as text"""
         out = "nexposures={nexposures}\n".format(nexposures=self.nexposures)
-        out = out + " lunation = "
+        out = out + " skybrightness = "
         for i in np.arange(self.nexposures):
-            out = out + " {l:.3f}".format(l=self.lunation[i])
+            out = out + " {l:.3f}".format(l=self.skybrightness[i])
         out = out + "\n"
         out = out + " delta = "
         for i in np.arange(self.nexposures):
@@ -150,9 +163,9 @@ class Cadence(object):
         for i in np.arange(self.nepochs):
             out = out + " {l}".format(l=self.epoch_nexposures[i])
         out = out + "\n"
-        out = out + " lunation = "
+        out = out + " skybrightness = "
         for i in np.arange(self.nepochs):
-            out = out + " {l:.3f}".format(l=self.lunation[epoch_indx[i]])
+            out = out + " {l:.3f}".format(l=self.skybrightness[epoch_indx[i]])
         out = out + "\n"
         out = out + " delta = "
         for i in np.arange(self.nepochs):
@@ -207,16 +220,16 @@ class Cadence(object):
 
         return nexposures_next
 
-    def lunation_check(self, mjd_past, lunation_next):
+    def skybrightness_check(self, mjd_past, skybrightness_next):
         """check lunation for mjd_past against lunation_next"""
         nexposures_past = len(mjd_past)
         if(nexposures_past >= self.nexposures):
-            return lunation_next < self.lunation[-1]
-        return lunation_next < self.lunation[nexposures_past]
+            return skybrightness_next < self.skybrightness[-1]
+        return skybrightness_next < self.skybrightness[nexposures_past]
 
 
     def evaluate_next(self, mjd_past=None, mjd_next=None,
-                      lunation_next=None, check_lunation=True):
+                      skybrightness_next=None, check_skybrightness=True):
         """Evaluate next choice of observation (not well-tested)
 
            Returns whether cadence is ok AND how many exposures this
@@ -227,18 +240,18 @@ class Cadence(object):
             print("done!")
             return(False, 0)
 
-        ok_lunation = ( self.lunation_check(mjd_past, lunation_next)|
-                       (check_lunation is False))
+        ok_skybrightness = ( self.skybrightness_check(mjd_past, skybrightness_next)|
+                       (check_skybrightness is False))
         if(nexposures_past == 0):
-            return(ok_lunation)
+            return(ok_skybrightness)
 
         delta = mjd_next - mjd_past[nexposures_past - 1]
         dlo = self.delta_min[nexposures_past]
         dhi = self.delta_max[nexposures_past]
         if(dlo == -1):
-            return(ok_lunation)
+            return(ok_skybrightness)
         # print("delta {} dhi {} dlo {}".format(delta, dhi, dlo))
-        return(ok_lunation & (delta >= dlo) & (delta <= dhi))
+        return(ok_skybrightness & (delta >= dlo) & (delta <= dhi))
 
 
 class Packing(object):
@@ -253,19 +266,33 @@ class Packing(object):
     Attributes:
     ----------
 
-    epoch_targets : list of ndarray of np.int32
-        target indices for each epoch
+    nepochs : np.int32
+        number of epochs in cadence to pack into
 
-    exposure_targets : array of target indices for each exposure
+    epoch_targets : list of ndarray of np.int32
+        target IDs for each epoch
+
+    epoch_nexposures : ndarray of np.int32
+        number of exposures in each epoch
+
+    epoch_nused : ndarray of np.int32
+        number of exposures actually used so far in each epoch
+
+    exposures : ndarray of np.int32
+        target IDs from epoch_targets flattened into one list
 
     Methods:
     -------
 
-    add_target() : add a new cadence
-    check_target() : check if a new target solution is allowed
+    add_target() : add a new target (updating epoch_used, epoch_targets,
+                   and exposures)
+    pack_targets_greedy() : pack multiple targets in (updating epoch_used,
+                            epoch_targets, and exposures)
+    check_target() : check if a new target is allowed (without adding)
+    set_exposures() : reset exposure list
 """
     def __init__(self, field_cadence=None):
-        import roboscheduler.cadence2 as cadence
+        import roboscheduler.cadence as cadence
         self.field_cadence = field_cadence
         self.clist = cadence.CadenceList()
         if(self.field_cadence not in self.clist.cadences):
@@ -296,6 +323,7 @@ class Packing(object):
         return(out)
 
     def reset(self):
+        """Reset packing"""
         c = self.clist.cadences[self.field_cadence]
         self.nepochs = c.nepochs
         self.epoch_targets = [np.zeros(x, dtype=np.int32) - 1
@@ -306,12 +334,42 @@ class Packing(object):
         return
 
     def check_target(self, target_cadence=None):
+        """Check if target fits into a packing and return a solution
+
+        Parameters:
+        ----------
+
+        target_cadence : str
+            name of cadence for target to check
+
+        Returns:
+        -------
+
+        soln : dictionary
+            information about packing check:
+             'ok' : boolean indicating whether it fits
+             'pack' : list of field cadence epochs for packed part of
+                      target cadence
+             'fill' : list of all field cadence epochs, with target
+                      cadence epochs to add for each
+
+        Notes:
+        -----
+
+        Picks one solution which is essentially random. Usually fills
+        from earlier epochs to later.
+"""
+        out = dict()
+        out['ok'] = False
+        out['pack'] = []
+        out['fill'] = []
+
         ok, solns = self.clist.cadence_consistency(target_cadence,
                                                    self.field_cadence,
                                                    return_solutions=True,
                                                    epoch_level=True)
         if(ok is False):
-            return(False, [], [])
+            return(out)
 
         for soln in solns:
             pack_soln = soln[0].copy()
@@ -334,13 +392,20 @@ class Packing(object):
                                                                   nexp1=nexp1,
                                                                   nexp2=nexp2)
                     if(ok):
-                        return(True, pack_soln, fill_epoch_targets)
+                        out['ok'] = True
+                        out['pack'] = pack_soln
+                        out['fill'] = fill_epoch_targets
+                        return(out)
                 else:
-                    return(True, pack_soln, [])
+                    out['ok'] = True
+                    out['pack'] = pack_soln
+                    out['fill'] = []
+                    return(out)
 
-        return(False, [], [])
+        return(out)
 
     def set_exposures(self):
+        """Set exposures attribute, as concatenation of epoch_targets"""
         self.exposures = np.zeros(0, dtype=np.int32)
         n = 0
         for et in self.epoch_targets:
@@ -348,25 +413,45 @@ class Packing(object):
             n = n + len(et)
         return
 
-    def add_target(self, target_id=None, target_cadence=None):
-        ok, pack_soln, fill_epoch_targets = self.check_target(target_cadence=target_cadence)
-        if(ok is False):
+    def add_target(self, target_id=None, target_cadence=None,
+                   reset_exposures=True):
+        """Add a target to packing
+
+        Parameters:
+        ----------
+
+        target_id : np.int32
+            ID number for target (0 or greater)
+
+        target_cadence : str
+            name of cadence for target to check
+
+        Returns:
+        -------
+
+        ok : bool
+            True if successful, false if no space available
+
+"""
+        soln = self.check_target(target_cadence=target_cadence)
+        if(soln['ok'] is False):
             return(False)
 
         for indx in np.arange(self.clist.cadences[target_cadence].nepochs_pack):
-            epoch = pack_soln[indx]
+            epoch = soln['pack'][indx]
             n = self.epoch_nused[epoch]
             nneed = self.clist.cadences[target_cadence].epoch_nexposures[indx]
             self.epoch_targets[epoch][n:n + nneed] = target_id
             self.epoch_nused[epoch] = n + nneed
 
-        for epoch in np.arange(len(fill_epoch_targets)):
+        for epoch in np.arange(len(soln['fill'])):
             n = self.epoch_nused[epoch]
-            nfill = len(fill_epoch_targets[epoch])
+            nfill = len(soln['fill'][epoch])
             self.epoch_targets[epoch][n:n + nfill] = target_id
             self.epoch_nused[epoch] = n + nfill
 
-        self.set_exposures()
+        if(reset_exposures):
+            self.set_exposures()
 
         return(True)
 
@@ -407,7 +492,8 @@ class Packing(object):
         isort = np.flip(np.argsort(value), axis=0)
         for i in isort:
             self.add_target(target_id=target_ids[i],
-                            target_cadence=target_cadences[i])
+                            target_cadence=target_cadences[i],
+                            reset_exposures=False)
 
         self.set_exposures()
 
@@ -436,9 +522,6 @@ class CadenceList(object, metaclass=CadenceSingleton):
     add_cadence() : add a new cadence
     check_exposures() : are two exposure sets consistent?
     cadence_consistency(): is cadence #1 consistent with cadence #2?
-    pack_targets(): pack targets into a cadence optimally
-    pack_targets_single(): pack single-shot cadence targets
-    pack_targets_greedy(): pack targets into a cadence in a greedy way
     fromarray(): add to cadence list from an ndarray
     fromfits(): add to cadence list from a FITS file
     toarray(): return an ndarray with cadence list
@@ -459,6 +542,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
 """
     def __init__(self):
         self.reset()
+        self.max_nsolns = 100
         return
 
     def reset(self):
@@ -480,8 +564,8 @@ class CadenceList(object, metaclass=CadenceSingleton):
         nexposures : np.int32
             number of exposures (default 1)
 
-        lunation : ndarray of np.float32
-            maximum lunation for each exposure (default [1.])
+        skybrightness : ndarray of np.float32
+            maximum sky brightness for each exposure (default [1.])
 
         delta : ndarray of np.float32
             day for exposure (default [0.])
@@ -506,7 +590,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
         self.ncadences = len(self.cadences.keys())
 
     def check_exposures(self, one=None, two=None, indx2=None, sub1=None,
-                        epoch_level=True):
+                        epoch_level=True, details=False):
         """Is exposure set in cadence two consistent with cadence one?
 
         Parameters:
@@ -520,9 +604,22 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         indx2 : ndarray of np.int32
             exposures in cadence #2
+        
+        sub1 : ndarray of np.int32
+            sequence to compare in cadence #1
 
         epoch_level : boolean
             compare sequences at epoch level not exposure level (default True)
+
+        Returns:
+        -------
+
+        status : str
+            status string; 'ok' if everything checks out
+                'toolate' if an exposure in indx2 is too far
+                'toosoon' if the indx2 exposure is allowed to be too soon
+                'toobright' if skybrightness fails
+                'toofew' if not enough exposures in cadence two
 
         Notes:
         -----
@@ -531,6 +628,8 @@ class CadenceList(object, metaclass=CadenceSingleton):
         """
         eps = 1.e-3  # generously deal with round-off
         nexp = len(indx2)
+        cone = self.cadences[one]
+        ctwo = self.cadences[two]
 
         if(sub1 is None):
             if(epoch_level):
@@ -540,46 +639,56 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         # Check number of exposures, if at epoch level
         if(epoch_level):
-            for indx in np.arange(nexp):
-                if(self.cadences[one].epoch_nexposures[sub1[indx]] >
-                   self.cadences[two].epoch_nexposures[indx2[indx]]):
-                    return(False)
+            toofew = (cone.epoch_nexposures[sub1] >
+                      ctwo.epoch_nexposures[indx2])
+            if(np.any(toofew)):
+                return('toofew')
 
         # For the subsequent checks, convert to exposure index if we
         # are at the epoch level
         if(epoch_level):
-            indx2 = self.cadences[two].epoch_indx[indx2]
-            sub1 = self.cadences[one].epoch_indx[sub1]
+            eindx2 = ctwo.epoch_indx
+            delta2full = ctwo.delta[eindx2]
+            delta_max2full = ctwo.delta_max[eindx2]
+            delta_min2full = ctwo.delta_min[eindx2]
+            skybrightness2 = ctwo.skybrightness[eindx2]
+            eindx1 = cone.epoch_indx
+            delta1 = cone.delta[eindx1]
+            delta_max1 = cone.delta_max[eindx1]
+            delta_min1 = cone.delta_min[eindx1]
+            skybrightness1 = cone.skybrightness[eindx1]
+        else:
+            delta2full = ctwo.delta
+            delta_max2full = ctwo.delta_max
+            delta_min2full = ctwo.delta_min
+            skybrightness2 = ctwo.skybrightness
+            delta1 = cone.delta
+            delta_max1 = cone.delta_max
+            delta_min1 = cone.delta_min
+            skybrightness1 = cone.skybrightness
 
-        # Check lunations
+        # Check skybrightnesss
         for indx in np.arange(nexp):
-            if(self.cadences[one].lunation[sub1[indx]] <
-               self.cadences[two].lunation[indx2[indx]] - eps):
-                return(False)
+            if(skybrightness1[sub1[indx]] < skybrightness2[indx2[indx]] - eps):
+                return('toobright')
 
         # Check deltas
         for indx in np.arange(nexp - 1) + 1:
-            delta1 = self.cadences[one].delta[sub1[indx]]
-            dlo1 = self.cadences[one].delta_min[sub1[indx]]
-            dhi1 = self.cadences[one].delta_max[sub1[indx]]
-            delta2 = self.cadences[two].delta[indx2[indx - 1] + 1:
-                                              indx2[indx] + 1].sum()
-            dlo2 = self.cadences[two].delta_min[indx2[indx - 1] + 1:
-                                                indx2[indx] + 1].sum()
-            dhi2 = self.cadences[two].delta_max[indx2[indx - 1] + 1:
-                                                indx2[indx] + 1].sum()
-            if(delta1 > 0.):  # normal case
-                if(dlo1 >= dlo2 + eps):
-                    return(False)
-                if(dhi1 <= dhi2 - eps):
-                    return(False)
-            elif(delta1 == 0.):  # adjacent exposures
+            delta2 = delta2full[indx2[indx - 1] + 1: indx2[indx] + 1].sum()
+            dlo2 = delta_min2full[indx2[indx - 1] + 1: indx2[indx] + 1].sum()
+            dhi2 = delta_max2full[indx2[indx - 1] + 1: indx2[indx] + 1].sum()
+            if(delta1[sub1[indx]] > 0.):  # normal case
+                if(delta_min1[sub1[indx]] >= dlo2 + eps):
+                    return('toosoon')
+                if(delta_max1[sub1[indx]] <= dhi2 - eps):
+                    return('toolate')
+            elif(delta1[sub1[indx]] == 0.):  # adjacent exposures
                 if(indx2[indx] > indx2[indx - 1] + 1):  # must be adjacent
-                    return(False)
+                    return('notadjacent')
                 if(delta2 > 0.):  # must be adjacent
-                    return(False)
+                    return('notadjacent')
 
-        return(True)
+        return('ok')
 
     def cadence_consistency(self, one, two, return_solutions=True,
                             epoch_level=True):
@@ -650,10 +759,12 @@ class CadenceList(object, metaclass=CadenceSingleton):
             fill = np.zeros((nfill1, npack2 + nfill2), dtype=np.bool)
             for i1 in ifill1:
                 for i2 in ifill2:
-                    fill[i1, npack2 + i2] = self.check_exposures(one=one, two=two,
-                                                                 indx2=[npack2 + i2],
-                                                                 sub1=[npack1 + i1],
-                                                                 epoch_level=epoch_level)
+                    s = self.check_exposures(one=one, two=two,
+                                             indx2=[npack2 + i2],
+                                             sub1=[npack1 + i1],
+                                             epoch_level=epoch_level)
+                    fill[i1, npack2 + i2] = (s == 'ok')
+
             if(return_solutions):
                 self._cadence_consistency[cache_key] = (success,
                                                         [(possibles, fill)])
@@ -666,9 +777,9 @@ class CadenceList(object, metaclass=CadenceSingleton):
         else:
             # Check which exposures you can start on
             for first in np.arange(npack2 - npack1 + 1):
-                ok = self.check_exposures(one=one, two=two, indx2=[first],
-                                          sub1=[0], epoch_level=epoch_level)
-                if(ok):
+                s = self.check_exposures(one=one, two=two, indx2=[first],
+                                         sub1=[0], epoch_level=epoch_level)
+                if(s == 'ok'):
                     possibles.append([first])
                 if(len(possibles) == 0):
                     success = False
@@ -688,18 +799,19 @@ class CadenceList(object, metaclass=CadenceSingleton):
                     possible = current_possibles[indx]
                     remaining_start = possible[-1] + 1
                     nremaining = npack2 - possible[-1] - 1
-                    ok = 1
                     if(nremaining >= npack1 - len(possible)):
                         for next_possible in (remaining_start +
                                               np.arange(nremaining)):
                             try_possible = possible.copy()
                             try_possible.append(next_possible)
-                            ok = self.check_exposures(one=one, two=two,
-                                                      indx2=try_possible[-2:],
-                                                      sub1=sub1[-2:],
-                                                      epoch_level=epoch_level)
-                            if(ok):
+                            s = self.check_exposures(one=one, two=two,
+                                                     indx2=try_possible[-2:],
+                                                     sub1=sub1[-2:],
+                                                     epoch_level=epoch_level)
+                            if(s == 'ok'):
                                 possibles.append(try_possible)
+                            elif(s == 'toolate'):
+                                break
 
                 if(len(possibles) == 0):
                     success = False
@@ -720,11 +832,11 @@ class CadenceList(object, metaclass=CadenceSingleton):
                 for i1 in ifill1:
                     for i2 in np.arange(npack2 + nfill2, dtype=np.int32):
                         if(i2 not in pack_possible):
-                            fill[i1, i2] = self.check_exposures(one=one,
-                                                                two=two,
-                                                                indx2=[i2],
-                                                                sub1=[i1 + npack1],
-                                                                epoch_level=epoch_level)
+                            s = self.check_exposures(one=one, two=two,
+                                                     indx2=[i2],
+                                                     sub1=[i1 + npack1],
+                                                     epoch_level=epoch_level)
+                            fill[i1, i2] = (s == 'ok')
                 if(epoch_level):
                     nexp1 = self.cadences[one].epoch_nexposures[ifill1]
                     nexp2 = self.cadences[two].epoch_nexposures[ifill2]
@@ -732,7 +844,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
                     nexp1 = self.cadences[one].nexposures[ifill1]
                     nexp2 = self.cadences[two].nexposures[ifill2]
 
-                ok = self.fill_grid(fill=fill, nexp1=nexp1, nexp2=nexp2)
+                ok, et = self.fill_grid(fill=fill, nexp1=nexp1, nexp2=nexp2)
                 if(ok):
                     possibles.append((pack_possible, fill))
         else:
@@ -801,7 +913,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
                           solver.ASSIGN_MIN_VALUE)
 
         # Create a solution collector.
-        collector = solver.FirstSolutionCollector()
+        collector = solver.LastSolutionCollector()
 
         # Add the decision variables.
         for allvar in allvars:
@@ -827,26 +939,30 @@ class CadenceList(object, metaclass=CadenceSingleton):
         else:
             return(False, [])
 
-    def fromarray(self, cadences_array=None, nathan=False):
+    def fromarray(self, cadences_array=None, nathan=False, lunation=False):
         """Add cadences to ccadence list from an array
 
         Parameters:
         -----------
 
         cadences_array : ndarray
-            ndarray with columns 'NEXPOSURES', 'LUNATION', 'DELTA',
+            ndarray with columns 'NEXPOSURES', 'SKYBRIGHTNESS', 'DELTA',
             'DELTA_MIN', 'DELTA_MAX', 'CADENCE', 'INSTRUMENT'
 
         nathan : bool
             False if normal format, True if Nathan De Lee format
 """
         col = {'NEXPOSURES': 'NEXPOSURES',
-               'LUNATION': 'LUNATION',
+               'SKYBRIGHTNESS': 'SKYBRIGHTNESS',
                'DELTA': 'DELTA',
                'DELTA_MIN': 'DELTA_MIN',
                'DELTA_MAX': 'DELTA_MAX',
                'INSTRUMENT': 'INSTRUMENT',
                'CADENCE': 'CADENCE'}
+
+        if(lunation is True):
+            col['SKYBRIGHTNESS'] = 'LUNATION'
+
         if(nathan is True):
             for k in col.keys():
                 col[k] = col[k].lower()
@@ -859,12 +975,12 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         for ccadence in cadences_array:
             nexp = ccadence[col['NEXPOSURES']]
-            if(isinstance(ccadence[col['LUNATION']],
+            if(isinstance(ccadence[col['SKYBRIGHTNESS']],
                           type(np.zeros(0, dtype=np.float32)))):
                 instruments = np.array([ii.decode().strip()
                                         for ii in ccadence[col['INSTRUMENT']][0:nexp]])
                 self.add_cadence(nexposures=ccadence[col['NEXPOSURES']],
-                                 lunation=ccadence[col['LUNATION']][0:nexp],
+                                 skybrightness=ccadence[col['SKYBRIGHTNESS']][0:nexp],
                                  delta=ccadence[col['DELTA']][0:nexp],
                                  delta_min=ccadence[col['DELTA_MIN']][0:nexp],
                                  delta_max=ccadence[col['DELTA_MAX']][0:nexp],
@@ -873,7 +989,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
             else:
                 instruments = np.array([ccadence[col['INSTRUMENT']].decode().strip()])
                 self.add_cadence(nexposures=ccadence[col['NEXPOSURES']],
-                                 lunation=ccadence[col['LUNATION']],
+                                 skybrightness=ccadence[col['SKYBRIGHTNESS']],
                                  delta=ccadence[col['DELTA']],
                                  delta_min=ccadence[col['DELTA_MIN']],
                                  delta_max=ccadence[col['DELTA_MAX']],
@@ -881,7 +997,8 @@ class CadenceList(object, metaclass=CadenceSingleton):
                                  instrument=instruments)
         return
 
-    def fromfits(self, filename=None, nathan=False):
+    def fromfits(self, filename=None, nathan=False, lunation=False,
+                 unpickle=False):
         """Add cadences to ccadence list from a FITS file
 
         Parameters:
@@ -894,11 +1011,16 @@ class CadenceList(object, metaclass=CadenceSingleton):
         -----
 
         Expects a valid FITS file with columns 'NEXPOSURES',
-            'LUNATION', 'DELTA', 'DELTA_MIN', 'DELTA_MAX', 'CADENCE',
+            'SKYBRIGHTNESS', 'DELTA', 'DELTA_MIN', 'DELTA_MAX', 'CADENCE',
             'INSTRUMENT'
         """
         self.cadences_fits = fitsio.read(filename)
-        self.fromarray(self.cadences_fits, nathan=nathan)
+        self.fromarray(self.cadences_fits, nathan=nathan, lunation=lunation)
+        if(unpickle):
+            fp = open(filename + '.pkl', 'rb')
+            cc = pickle.load(fp)
+            for key in cc:
+                self._cadence_consistency[key] = cc[key]
         return
 
     def toarray(self):
@@ -915,7 +1037,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
         cadence0 = [('CADENCE', fits_type),
                     ('NEXPOSURES', np.int32),
                     ('DELTA', np.float64, max_nexp),
-                    ('LUNATION', np.float32, max_nexp),
+                    ('SKYBRIGHTNESS', np.float32, max_nexp),
                     ('DELTA_MAX', np.float32, max_nexp),
                     ('DELTA_MIN', np.float32, max_nexp),
                     ('INSTRUMENT', np.dtype('a10'), max_nexp)]
@@ -928,12 +1050,12 @@ class CadenceList(object, metaclass=CadenceSingleton):
             cads['DELTA'][indx, 0:nexp] = self.cadences[name].delta
             cads['DELTA_MIN'][indx, 0:nexp] = self.cadences[name].delta_min
             cads['DELTA_MAX'][indx, 0:nexp] = self.cadences[name].delta_max
-            cads['LUNATION'][indx, 0:nexp] = self.cadences[name].lunation
+            cads['SKYBRIGHTNESS'][indx, 0:nexp] = self.cadences[name].skybrightness
             cads['INSTRUMENT'][indx, 0:nexp] = self.cadences[name].instrument
         return(cads)
 
     def epoch_array(self):
-        """Return cadence epoches as a record array
+        """Return cadence epochs as a record array
 
         Returns:
         -------
@@ -947,7 +1069,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
                     ('NEPOCHS', np.int32),
                     ('NEXPOSURES', np.int32, max_nep),
                     ('DELTA', np.float64, max_nep),
-                    ('LUNATION', np.float32, max_nep),
+                    ('SKYBRIGHTNESS', np.float32, max_nep),
                     ('DELTA_MAX', np.float32, max_nep),
                     ('DELTA_MIN', np.float32, max_nep),
                     ('INSTRUMENT', np.dtype('a10'), max_nep)]
@@ -962,7 +1084,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
             cads['DELTA'][indx, 0:nep] = self.cadences[name].delta[epoch_indx]
             cads['DELTA_MIN'][indx, 0:nep] = self.cadences[name].delta_min[epoch_indx]
             cads['DELTA_MAX'][indx, 0:nep] = self.cadences[name].delta_max[epoch_indx]
-            cads['LUNATION'][indx, 0:nep] = self.cadences[name].lunation[epoch_indx]
+            cads['SKYBRIGHTNESS'][indx, 0:nep] = self.cadences[name].skybrightness[epoch_indx]
             instruments = [self.cadences[name].instrument[i] for i in epoch_indx]
             cads['INSTRUMENT'][indx][0:nep] = instruments
         return(cads)
@@ -990,12 +1112,12 @@ class CadenceList(object, metaclass=CadenceSingleton):
             delta = [float(n) for n in self.cadences[cadence].delta]
             delta_min = [float(n) for n in self.cadences[cadence].delta_min]
             delta_max = [float(n) for n in self.cadences[cadence].delta_max]
-            lunation = [float(n) for n in self.cadences[cadence].lunation]
+            skybrightness = [float(n) for n in self.cadences[cadence].skybrightness]
             spectrograph = [spectrograph_pk[n]
                             for n in self.cadences[cadence].instrument]
             targetdb.TargetCadence.insert(pk=pk, name=cadence,
                                           nexposures=nexposures,
-                                          delta=delta, lunation=lunation,
+                                          delta=delta, skybrightness=skybrightness,
                                           delta_min=delta_min,
                                           delta_max=delta_max,
                                           spectrograph_pk=spectrograph).execute()
@@ -1024,8 +1146,8 @@ class CadenceList(object, metaclass=CadenceSingleton):
                            targetdb.TargetCadence.delta_max:
                            [float(n)
                             for n in self.cadences[cadence].delta_max],
-                           targetdb.TargetCadence.lunation:
-                           [float(n) for n in self.cadences[cadence].lunation],
+                           targetdb.TargetCadence.skybrightness:
+                           [float(n) for n in self.cadences[cadence].skybrightness],
                            targetdb.TargetCadence.spectrograph_pk:
                            [spectrograph_pk[n]
                             for n in self.cadences[cadence].instrument]}
@@ -1058,5 +1180,5 @@ class CadenceList(object, metaclass=CadenceSingleton):
                              delta=np.array(cadence['delta']),
                              delta_min=np.array(cadence['delta_min']),
                              delta_max=np.array(cadence['delta_max']),
-                             lunation=np.array(cadence['lunation']),
+                             skybrightness=np.array(cadence['skybrightness']),
                              instrument=instruments)

@@ -1,0 +1,79 @@
+#!/usr/bin/env python
+# encoding: utf-8
+#
+# @Author: Michael R. Blanton
+# @Date: Aug 3, 2018
+# @Filename: rsc_test_files
+# @License: BSD 3-Clause
+# @Copyright: Michael R. Blanton
+
+
+from __future__ import division
+from __future__ import print_function
+from __future__ import absolute_import
+from __future__ import unicode_literals
+
+import os
+import fitsio
+import roboscheduler.cadence as cadence
+
+
+if __name__ == '__main__':
+
+    clist = cadence.CadenceList()
+
+    names = ['bright', 'faint']
+    skybrightnesses = [1., 0.35]
+
+    for name, skybrightness in zip(names, skybrightnesses):
+        if(name is 'bright'):
+            instrument = 'APOGEE'
+        else:
+            instrument = 'BOSS'
+
+        clist.add_cadence(name='{name}_1x1'.format(name=name), nexposures=1,
+                          skybrightness=[skybrightness], delta=[-1.],
+                          delta_min=[-1.], delta_max=[-1.],
+                          instrument=[instrument])
+
+        clist.add_cadence(name='{name}_1x4'.format(name=name), nexposures=4,
+                          skybrightness=[skybrightness] * 4,
+                          delta=[-1., 0., 0., 0.],
+                          delta_min=[-1., 0., 0., 0.],
+                          delta_max=[-1., 0., 0., 0.],
+                          instrument=[instrument] * 4)
+
+        clist.add_cadence(name='{name}_2x4'.format(name=name), nexposures=8,
+                          skybrightness=[skybrightness] * 8,
+                          delta=[-1., 0., 0., 0., -1., 0., 0., 0.],
+                          delta_min=[-1., 0., 0., 0., -1., 0., 0., 0.],
+                          delta_max=[-1., 0., 0., 0., -1., 0., 0., 0.],
+                          instrument=[instrument] * 8)
+
+        clist.add_cadence(name='{name}_2x2'.format(name=name), nexposures=4,
+                          skybrightness=[skybrightness] * 4,
+                          delta=[-1., 0., -1., 0.],
+                          delta_min=[-1., 0., -1., 0.],
+                          delta_max=[-1., 0., -1., 0.],
+                          instrument=[instrument] * 4)
+
+        clist.add_cadence(name='{name}_month_2x2'.format(name=name),
+                          nexposures=4,
+                          skybrightness=[skybrightness] * 4,
+                          delta=[0., 0., 30., 0.],
+                          delta_min=[0., 0., 20., 0.],
+                          delta_max=[0., 0., 40., 0.],
+                          instrument=[instrument] * 4)
+
+        clist.add_cadence(name='{name}_month_4x2'.format(name=name),
+                          nexposures=8,
+                          skybrightness=[skybrightness] * 8,
+                          delta=[0., 0., 30., 0., 30., 0., 30., 0.],
+                          delta_min=[0., 0., 20., 0., 20., 0., 20., 0.],
+                          delta_max=[0., 0., 40., 0., 40., 0., 40., 0.],
+                          instrument=[instrument] * 8)
+
+    ca = clist.toarray()
+    fitsio.write(os.path.join(os.getenv('ROBOSCHEDULER_DIR'),
+                              'data', 'rsc-test-cadence.fits'), ca,
+                 clobber=True)
