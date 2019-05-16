@@ -252,6 +252,7 @@ class Packing(object):
     Methods:
     -------
 
+    import_exposures() : create a packing from a list of exposures
     add_target() : add a new target (updating epoch_used, epoch_targets,
                    and exposures)
     pack_targets_greedy() : pack multiple targets in (updating epoch_used,
@@ -299,6 +300,11 @@ class Packing(object):
         self.epoch_nexposures = c.epoch_nexposures
         self.epoch_nused = np.zeros(self.nepochs, dtype=np.int32)
         self.set_exposures()
+        return
+
+    def import_exposures(self, exposures):
+        self.exposures = exposures
+        self.set_epochs()
         return
 
     def check_target(self, target_cadence=None):
@@ -379,6 +385,17 @@ class Packing(object):
         for et in self.epoch_targets:
             self.exposures = np.append(self.exposures, et)
             n = n + len(et)
+        return
+
+    def set_epochs(self):
+        """Set epoch-related attributes, based on exposures"""
+        n = 0
+        for indx in range(len(self.epoch_targets)):
+            net = len(self.epoch_targets[indx])
+            self.epoch_targets[indx] = self.exposures[n:n + net]
+            n = n + net
+            ii = np.where(self.epoch_targets[indx] >= 0)[0]
+            self.epoch_nused[indx] = len(ii)
         return
 
     def add_target(self, target_id=None, target_cadence=None,
