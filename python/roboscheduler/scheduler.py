@@ -403,7 +403,7 @@ class Observer(SchedulerBase):
         (alt, az) = self.sun_altaz(mjd=mjd)
         return (alt - twilight)
 
-    def evening_twilight(self, mjd=None):
+    def evening_twilight(self, mjd=None, twilight=None):
         """Return MJD (days) of evening twilight for MJD
 
         Parameters:
@@ -418,6 +418,8 @@ class Observer(SchedulerBase):
         evening_twilight : np.float64
             time of twilight in MJD (days)
         """
+        if twilight is None:
+            twilight = self.bright_twilight
         if(np.floor(np.float64(mjd)) != np.float64(mjd)):
             raise ValueError("MJD should be an integer")
         noon_ish = (np.float64(mjd) -
@@ -425,10 +427,10 @@ class Observer(SchedulerBase):
         midnight_ish = noon_ish + 0.5
         twi = optimize.brenth(self._twilight_function,
                               noon_ish, midnight_ish,
-                              args=(self.bright_twilight))
+                              args=twilight)
         return(np.float64(twi))
 
-    def morning_twilight(self, mjd=None):
+    def morning_twilight(self, mjd=None, twilight=None):
         """Return MJD (days) of morning twilight for MJD
 
         Parameters:
@@ -443,6 +445,8 @@ class Observer(SchedulerBase):
         morning_twilight : np.float64
             time of twilight in MJD (days)
         """
+        if twilight is None:
+            twilight = self.bright_twilight
         if(np.floor(np.float64(mjd)) != np.float64(mjd)):
             raise ValueError("MJD should be an integer")
         midnight_ish = (np.float64(mjd) -
@@ -450,7 +454,7 @@ class Observer(SchedulerBase):
         nextnoon_ish = midnight_ish + 0.5
         twi = optimize.brenth(self._twilight_function,
                               midnight_ish, nextnoon_ish,
-                              args=(self.bright_twilight))
+                              args=twilight)
         return(np.float64(twi))
 
 
