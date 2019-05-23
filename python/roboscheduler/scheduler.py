@@ -639,13 +639,17 @@ class Scheduler(Master):
     def initdb(self, designbase='plan-0'):
         """Initialize Scheduler fields and observation lists
         """
-        filebase = os.path.join(os.getenv('OBSERVING_PLAN_DIR'),
-                                designbase)
+        # filebase = os.path.join(os.getenv('OBSERVING_PLAN_DIR'),
+        #                         designbase)
+        base = os.getenv('OBSERVING_PLAN_DIR')
+        cadence_file = base + "/" + "rsCadences" + "-" + designbase + "-"\
+                       + self.observatory + ".fits"
+        fields_file = base + "/" + "rsAllocation" + "-" + designbase + "-"\
+                       + self.observatory + ".fits"
         self.cadencelist = roboscheduler.cadence.CadenceList()
-        self.cadencelist.fromfits(filename=filebase + "-cadences.fits")
+        self.cadencelist.fromfits(filename=cadence_file)
         self.fields = roboscheduler.fields.Fields()
-        self.fields.fromfits(filename=filebase + "-fields-" +
-                             self.observatory + ".fits")
+        self.fields.fromfits(filename=fields_file)
         self.observations = roboscheduler.observations.Observations(observatory=self.observatory)
         return
 
