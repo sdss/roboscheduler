@@ -710,7 +710,7 @@ class Scheduler(Master):
         return self.fields.fieldid[iobservable], nexp[iobservable]
 
 
-    def pick(self, mjd=None, fieldid=None, nexp=None):
+    def prioritize(self, mjd=None, fieldid=None, nexp=None):
         """Return the fieldid to pick from using heuristic strategy
 
         Parameters:
@@ -751,6 +751,12 @@ class Scheduler(Master):
         # gaussian weight, mean = obs lat, use 20 deg std
         priority -= 50 * np.exp( -(dec - self.latitude)**2 / (2 * 20**2))
 
+        return priority
+
+
+    def pick(self, priority=None, fieldid=None, nexp=None):
+        assert len(priority) == len(fieldid) and len(priority) == len(nexp), \
+            "inputs must be same size!"
         ipick = np.argmax(priority)
         pick_fieldid = fieldid[ipick]
         pick_exp = nexp[ipick]
@@ -758,7 +764,7 @@ class Scheduler(Master):
         return(pick_fieldid, pick_exp)
 
 
-    def nextfield(self, mjd=None, maxExp=None):
+    def nextfield(self, mjd=None, maxExp=None, returnAll=False):
         """Picks the next field to observe
 
         Parameters:
@@ -783,8 +789,15 @@ class Scheduler(Master):
                                                        check_cadence=False)
         if len(observable_fieldid) == 0:
             # print("D: D:")
+            if returnAll:
+                return None, -1, 0
             return None, -1
-        fieldid, next_exp = self.pick(fieldid=observable_fieldid, mjd=mjd, nexp=nexp)
+
+        priority = self.prioritize(fieldid=observable_fieldid, mjd=mjd, nexp=nexp)
+        if returnAll:
+            return observable_fieldid, nexp, priority
+
+        fieldid, next_exp = self.pick(priority=priority, fieldid=observable_fieldid, nexp=nexp)
         return(fieldid, next_exp)
 
     def update(self, fieldid=None, result=None):
