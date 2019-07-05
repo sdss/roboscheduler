@@ -224,8 +224,8 @@ class Cadence(object):
         """check lunation for mjd_past against lunation_next"""
         nexposures_past = len(mjd_past)
         if(nexposures_past >= self.nexposures):
-            return skybrightness_next < self.skybrightness[-1]
-        return skybrightness_next < self.skybrightness[nexposures_past]
+            return skybrightness_next <= self.skybrightness[-1]
+        return skybrightness_next <= self.skybrightness[nexposures_past]
 
 
     def evaluate_next(self, mjd_past=None, mjd_next=None,

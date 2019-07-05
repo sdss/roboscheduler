@@ -704,7 +704,7 @@ class Scheduler(Master):
                         rejected += 1
                         observable[indx] = False
 
-            print("{} rejected {} of {} for time/moon".format(mjd, rejected, len(iobservable)))
+            # print("{} rejected {} of {} for time/moon".format(mjd, rejected, len(iobservable)))
 
         iobservable = np.where(observable)[0]
         return self.fields.fieldid[iobservable], nexp[iobservable]
@@ -788,7 +788,7 @@ class Scheduler(Master):
             observable_fieldid, nexp = self.observable(mjd=mjd, maxExp=maxExp,
                                                        check_cadence=False)
         if len(observable_fieldid) == 0:
-            # print("D: D:")
+            print("!! nothing to observe; {} exp left in the night".format(maxExp))
             if returnAll:
                 return None, -1, 0
             return None, -1
