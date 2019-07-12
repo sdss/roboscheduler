@@ -729,7 +729,7 @@ class Scheduler(Master):
             fieldid
         """
 
-        priority = np.ones(len(fieldid))*100
+        priority = np.ones(len(fieldid))*200
 
         priority += 5*nexp
 
@@ -741,11 +741,13 @@ class Scheduler(Master):
 
         lstDiffs = self.fields.lstWeight(lstHrs, fieldid)
 
+        assert lstDiffs.shape == fieldid.shape, "lst weight going poorly"
+
         ha = self.ralst2ha(ra=self.fields.racen[fieldid], lst=lst)
         dec = self.fields.deccen[fieldid]
 
         # gaussian weight, mean already 0, use 1 hr  std
-        priority *= np.exp( -(lstDiffs)**2 / (2 * 1**2))
+        priority *= 1.5 * np.exp( -(lstDiffs)**2 / (2 * 0.5**2))
         # gaussian weight, mean already 0, use 1 hr = 15 deg std
         priority += 50 * np.exp( -(ha)**2 / (2 * 15**2))
         # gaussian weight, mean = obs lat, use 20 deg std

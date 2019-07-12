@@ -125,15 +125,15 @@ class Fields(object, metaclass=FieldsSingleton):
     def lstPlan(self):
         if self._lstPlan is None:
             # self._lstPlan = np.array([np.mean(p[0]) for p in self.obsPlan])
-            self._lstPlan = np.array([s[:,0] for s in self.slots])
+            self._lstPlan = np.array([np.sum(s, axis=1) for s in self.slots])
         return self._lstPlan
 
 
-    @property
-    def lunationPlan(self):
-        if self._lunationPlan is None:
-            self._lunationPlan = np.array([np.mean(p[1]) for p in self.obsPlan])
-        return self._lunationPlan
+    # @property
+    # def lunationPlan(self):
+    #     if self._lunationPlan is None:
+    #         self._lunationPlan = np.array([np.mean(p[1]) for p in self.obsPlan])
+    #     return self._lunationPlan
 
 
     def lstWeight(self, lst, fields=None):
@@ -152,10 +152,10 @@ class Fields(object, metaclass=FieldsSingleton):
             done = p - o
             elligible = np.where(done > 0)[0]
             if len(elligible) == 0:
-                diffs.append(0.)
+                diffs.append(12.)
                 continue
 
-            diff = lstDiff(elligible, elligible*np.ones(len(elligible)))
+            diff = lstDiff(elligible, lst*np.ones(len(elligible)))
             # at the moment we don't care which it lines up with
             diffs.append(np.min(diff))
 
