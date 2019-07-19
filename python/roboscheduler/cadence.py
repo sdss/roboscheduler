@@ -209,21 +209,49 @@ class Cadence(object):
         self.epoch_nexposures[-1] = self.nexposures - self.epoch_indx[-1]
         return
 
-    def evaluate_next(self, mjd_past=None, mjd_next=None,
-                      skybrightness_next=None, check_skybrightness=True):
-        """Evaluate next choice of observation (not well-tested)"""
+    def next_epoch_nexp(self, mjd_past):
+        """get number of exposures for elligible epoch"""
         nexposures_past = len(mjd_past)
         if(nexposures_past >= self.nexposures):
-            return(False)
-        ok_skybrightness = ((skybrightness_next <
-                             self.skybrightness[nexposures_past]) |
-                            (check_skybrightness is False))
+            return 1
+        epoch_indx = np.where(self.epoch_indx == nexposures_past)[0]
+        nexposures_next = self.epoch_nexposures[epoch_indx]
+        assert len(nexposures_next) == 1, "epoch selection failed"
+
+        return nexposures_next
+
+    def skybrightness_check(self, mjd_past, skybrightness_next):
+        """check lunation for mjd_past against lunation_next"""
+        nexposures_past = len(mjd_past)
+        if(nexposures_past >= self.nexposures):
+            return skybrightness_next <= self.skybrightness[-1]
+        return skybrightness_next <= self.skybrightness[nexposures_past]
+
+
+    def evaluate_next(self, mjd_past=None, mjd_next=None,
+                      skybrightness_next=None, check_skybrightness=True):
+        """Evaluate next choice of observation (not well-tested)
+
+           Returns whether cadence is ok AND how long until
+           cadence will become impossible (deltaMax - delta)
+        """
+        nexposures_past = len(mjd_past)
+        if(nexposures_past >= self.nexposures):
+            print("done!")
+            return(False, 0)
+
+        ok_skybrightness = (self.skybrightness_check(mjd_past, skybrightness_next)|
+                       (check_skybrightness is False))
         if(nexposures_past == 0):
-            return(ok_skybrightness)
+            return(ok_skybrightness, 1e6)
+
         delta = mjd_next - mjd_past[nexposures_past - 1]
         dlo = self.delta_min[nexposures_past]
         dhi = self.delta_max[nexposures_past]
-        return(ok_skybrightness & (delta >= dlo) & (delta <= dhi))
+        if(dlo == -1):
+            return(ok_skybrightness, 1e6)
+        # print("delta {} dhi {} dlo {}".format(delta, dhi, dlo))
+        return(ok_skybrightness & (delta >= dlo) & (delta <= dhi), dhi - delta)
 
 
 class Packing(object):
@@ -573,7 +601,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         The last epochs in the list may have delta = -1. These will be
         treated as unconstrained. Only single epoch cadences will be allowed.
-"""
+        """
         cadence = Cadence(*args, **kwargs)
         self.cadences[name] = cadence
         self.ncadences = len(self.cadences.keys())
@@ -614,7 +642,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
         -----
 
         If cadence one contains epochs with delta = -1 they will be ignored.
-"""
+        """
         eps = 1.e-3  # generously deal with round-off
         nexp = len(indx2)
         cone = self.cadences[one]
@@ -1002,7 +1030,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
         Expects a valid FITS file with columns 'NEXPOSURES',
             'SKYBRIGHTNESS', 'DELTA', 'DELTA_MIN', 'DELTA_MAX', 'CADENCE',
             'INSTRUMENT'
-"""
+        """
         self.cadences_fits = fitsio.read(filename)
         self.fromarray(self.cadences_fits, nathan=nathan, lunation=lunation)
         if(unpickle):
@@ -1020,7 +1048,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         cadences : ndarray
             information on each cadence
-"""
+        """
         nexps = np.array([c.nexposures for c in self.cadences.values()])
         max_nexp = nexps.max()
         cadence0 = [('CADENCE', fits_type),
@@ -1051,7 +1079,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         cadences : ndarray
             information on each cadence
-"""
+        """
         neps = np.array([c.nepochs for c in self.cadences.values()])
         max_nep = neps.max()
         cadence0 = [('CADENCE', fits_type),
@@ -1081,6 +1109,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
     def todb(self):
         """Insert all cadences into the targetdb
 """
+
         if(_database is False):
             print("No database available.")
             return()

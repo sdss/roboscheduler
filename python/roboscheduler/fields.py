@@ -3,7 +3,6 @@ import fitsio
 import roboscheduler.cadence
 import sys
 
-
 # Class to define a singleton
 class FieldsSingleton(type):
     _instances = {}
@@ -49,8 +48,15 @@ class Fields(object, metaclass=FieldsSingleton):
         self.nextmjd = np.zeros(0, dtype=np.float64)
         self.cadence = []
         self.observations = []
+        self.slots = []
+        self.lstObserved = np.zeros(0, dtype=np.int32)
         self.cadencelist = roboscheduler.cadence.CadenceList()
+        self._validCadance = None
+        self._obsPlan = None
+        self._lstPlan = None
+        self._lunationPlan = None
         return
+
 
     def fromarray(self, fields_array=None):
         self.nfields = len(fields_array)
@@ -58,28 +64,103 @@ class Fields(object, metaclass=FieldsSingleton):
         self.deccen = fields_array['deccen']
         self.fieldid = np.arange(self.nfields, dtype=np.int32)
         self.cadence = [c.decode().strip() for c in fields_array['cadence']]
+        self.slots = fields_array['slots_exposures']
+        self.lstObserved = np.zeros((len(self.slots), 24), dtype=np.int32)
         self.observations = [np.zeros(0, dtype=np.int32)] * self.nfields
         self.icadence = np.zeros(self.nfields, dtype=np.int32)
         self.nextmjd = np.zeros(self.nfields, dtype=np.float64)
         return
+
 
     def fromfits(self, filename=None):
         self.fields_fits = fitsio.read(filename)
         self.fromarray(self.fields_fits)
         return
 
-    def add_observations(self, mjd=None, fieldid=None, iobs=None):
+
+    def add_observations(self, mjd=None, fieldid=None, iobs=None, lst=None):
         self.observations[fieldid] = np.append(self.observations[fieldid],
                                                iobs)
         self.icadence[fieldid] = self.icadence[fieldid] + 1
         cadence = self.cadencelist.cadences[self.cadence[fieldid]]
         if(self.icadence[fieldid] < cadence.nexposures):
             self.nextmjd[fieldid] = (mjd +
-                                     cadence.delta[self.icadence[fieldid]] -
-                                     cadence.softness[self.icadence[fieldid]])
+                                     cadence.delta_min[self.icadence[fieldid]])
         else:
             self.nextmjd[fieldid] = 100000.
+        int_lst = int(np.round(lst/15, 0))
+        if int_lst == 24:
+            int_lst = 0
+        self.lstObserved[fieldid][int_lst] += 1
         return
+
+
+    @property
+    def validCadence(self):
+        if self._validCadance is None:
+            assert len(self.cadence) > 0, "no field cadences!"
+            assert len(self.cadencelist.cadences) > 0, "no cadences in cadencelist!"
+            self._validCadance = np.array([c in self.cadencelist.cadences
+                                           for c in self.cadence])
+        return self._validCadance
+
+
+    @property
+    def obsPlan(self):
+        """Slots specify when the field should be observed
+        make that information useful.
+
+        Returns:
+        -------
+
+        obsPlan : list
+            a list containing lst and lunation for each field
+        """
+        if self._obsPlan is None:
+            self._obsPlan = [np.where(s > 0)  for s in self.slots]
+        return self._obsPlan
+
+
+    @property
+    def lstPlan(self):
+        if self._lstPlan is None:
+            # self._lstPlan = np.array([np.mean(p[0]) for p in self.obsPlan])
+            self._lstPlan = np.array([np.sum(s, axis=1) for s in self.slots])
+        return self._lstPlan
+
+
+    # @property
+    # def lunationPlan(self):
+    #     if self._lunationPlan is None:
+    #         self._lunationPlan = np.array([np.mean(p[1]) for p in self.obsPlan])
+    #     return self._lunationPlan
+
+
+    def lstWeight(self, lst, fields=None):
+        # field id corresponds to indx, so fields is id/indx
+        # as is everywhere, but just to keep reminding me...
+        assert lst > 0 and lst < 24, "lst must be in hours!"
+        diffs = []
+        if fields is not None:
+            lst_obs = self.lstObserved[fields]
+            lst_plan = self.lstPlan[fields]
+        else:
+            lst_obs = self.lstObserved
+            lst_plan = self.lstPlan
+
+        for o, p in zip(lst_obs, lst_plan):
+            done = p - o
+            elligible = np.where(done > 0)[0]
+            if len(elligible) == 0:
+                diffs.append(12.)
+                continue
+
+            diff = lstDiff(elligible, lst*np.ones(len(elligible)))
+            # at the moment we don't care which it lines up with
+            diffs.append(np.min(diff))
+
+        return np.array(diffs)
+
 
     def toarray(self):
         """Return cadences as a record array
@@ -109,3 +190,60 @@ class Fields(object, metaclass=FieldsSingleton):
             if(fields['nobservations'][indx] > 0):
                 fields['observations'][indx][0:fields['nobservations'][indx]] = self.observations[indx]
         return(fields)
+
+
+def lstDiffSingle(a, b):
+    """Intelligently find difference in 2 lsts
+
+    Parameters:
+    -----------
+
+    a : np.float32, float
+        first lst in hours
+    b : np.float32, float
+        second lst in hours
+
+    Returns:
+    --------
+
+    diff: float
+        the absolute difference
+
+    Comments:
+    ---------
+
+    """
+
+    if a < b:
+        return min(b - a, (a + 24) - b)
+
+    else:
+        # a must be bigger
+        return min(a - b, (b + 24) - a)
+
+
+def lstDiff(a, b):
+    """wrap lst math to handle arrays
+
+    Parameters:
+    -----------
+
+    a : ndarray or list of float32
+        first lst in hours
+    b : ndarray or list of float32
+        second lst in hours
+
+    Returns:
+    --------
+
+    diff: ndarray of float32
+        the absolute differences
+
+    Comments:
+    ---------
+
+    """
+
+    assert len(a) == len(b), "can't compare arrays of different size!"
+
+    return np.array([lstDiffSingle(i, j) for i, j in zip(a, b)])
