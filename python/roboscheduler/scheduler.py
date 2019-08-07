@@ -751,13 +751,13 @@ class Scheduler(Master):
         dec = self.fields.deccen[fieldid]
 
         # gaussian weight, mean already 0, use 1 hr  std
-        priority += 30 * np.exp( -(lstDiffs)**2 / (2 * 0.5**2))
+        priority += 20 * np.exp( -(lstDiffs)**2 / (2 * 0.5**2))
         # gaussian weight, mean already 0, use 1 hr = 15 deg std
         # priority += 20 * np.exp( -(ha)**2 / (2 * 15**2))
         # gaussian weight, mean = obs lat, use 20 deg std
         # priority -= 20 * np.exp( -(dec - self.latitude)**2 / (2 * 20**2))
         # 1/sqrt(x) priority; at 1 day +100, at 10 days +30, at 30 days +18
-        priority += 15 * np.clip(10/np.sqrt(delta_remaining), a_min=None, a_max=10)
+        priority += 15* np.clip(10/np.sqrt(delta_remaining), a_min=None, a_max=10)
 
         return priority
 
@@ -796,7 +796,7 @@ class Scheduler(Master):
             observable_fieldid, nexp, delta_remaining = self.observable(mjd=mjd, maxExp=maxExp,
                                                        check_cadence=False)
         if len(observable_fieldid) == 0:
-            print("!! nothing to observe; {} exp left in the night".format(maxExp))
+            # print("!! nothing to observe; {} exp left in the night".format(maxExp))
             if returnAll:
                 return None, -1, 0
             return None, -1
