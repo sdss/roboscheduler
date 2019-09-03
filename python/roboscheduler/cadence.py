@@ -209,6 +209,37 @@ class Cadence(object):
         self.epoch_nexposures[-1] = self.nexposures - self.epoch_indx[-1]
         return
 
+
+    def smart_epoch_nexp(self, mjd_past, tolerance=45):
+        """Calculate # of observed epochs, allowing
+        for more exposures than planned.
+
+        tolerance is in minutes
+        """
+        nexposures_past = len(mjd_past)
+        if(nexposures_past >= self.nexposures):
+            return 1
+
+        tolerance = tolerance / 60. / 24.
+        obs_epochs = 0
+        prev = 0
+        for m in mjd_past:
+            delta = m - prev
+            prev = m
+            if delta < tolerance:
+                continue
+            else:
+                obs_epochs += 1
+
+        if obs_epochs >= self.nepochs:
+            assert nexposures_past >= self.nexposures, "skipped some exposures!!"
+            return 1
+
+        nexposures_next = self.epoch_nexposures[obs_epochs]
+
+        return nexposures_next
+
+
     def next_epoch_nexp(self, mjd_past):
         """get number of exposures for elligible epoch"""
         nexposures_past = len(mjd_past)
@@ -219,6 +250,7 @@ class Cadence(object):
         assert len(nexposures_next) == 1, "epoch selection failed"
 
         return nexposures_next
+
 
     def skybrightness_check(self, mjd_past, skybrightness_next):
         """check lunation for mjd_past against lunation_next"""

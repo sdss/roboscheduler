@@ -683,7 +683,7 @@ class Scheduler(Master):
                     cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
                     iobservations = self.fields.observations[indx]
                     mjd_past = self.observations.mjd[iobservations]
-                    nexp[indx] = cadence.next_epoch_nexp(mjd_past)
+                    nexp[indx] = cadence.smart_epoch_nexp(mjd_past)
                     observable[indx], delta_remaining[indx] = cadence.evaluate_next(mjd_past=mjd_past,
                                                              mjd_next=mjd,
                                                              skybrightness_next=skybrightness,
