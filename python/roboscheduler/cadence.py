@@ -124,7 +124,7 @@ class Cadence(object):
         else:
             self.requires_boss = 0
         self.nexposures_pack = len(np.where(self.delta != -1)[0])
-        self.nepochs_pack = len(np.where(self.delta[self.epoch_indx] != -1)[0])
+        self.nepochs_pack = len(np.where(self.delta[self.epoch_indx[0:-1]] != -1)[0])
         return
 
     def __str__(self):
@@ -195,20 +195,19 @@ class Cadence(object):
 
     def _create_epochs(self):
         """Define epochs based on exposure list"""
-        epoch_indx = [0]
+        epoch_indx = [np.int32(0)]
         self.nepochs = 1
-        for indx in np.arange(self.nexposures - 1) + 1:
+        for indx in np.arange(self.nexposures - 1, dtype=np.int32) + 1:
             if(self.delta[indx] != 0.):
                 epoch_indx.append(indx)
                 self.nepochs = self.nepochs + 1
+        epoch_indx = epoch_indx + [np.int32(self.nexposures)]
         self.epoch_indx = np.array(epoch_indx, dtype=np.int32)
         self.epoch_nexposures = np.zeros(self.nepochs, dtype=np.int32)
-        for indx in np.arange(self.nepochs - 1):
+        for indx in np.arange(self.nepochs):
             self.epoch_nexposures[indx] = (self.epoch_indx[indx + 1] -
                                            self.epoch_indx[indx])
-        self.epoch_nexposures[-1] = self.nexposures - self.epoch_indx[-1]
         return
-
 
     def smart_epoch_nexp(self, mjd_past, tolerance=45):
         """Calculate # of observed epochs, allowing
@@ -239,7 +238,6 @@ class Cadence(object):
 
         return nexposures_next
 
-
     def next_epoch_nexp(self, mjd_past):
         """get number of exposures for elligible epoch"""
         nexposures_past = len(mjd_past)
@@ -251,14 +249,12 @@ class Cadence(object):
 
         return nexposures_next
 
-
     def skybrightness_check(self, mjd_past, skybrightness_next):
         """check lunation for mjd_past against lunation_next"""
         nexposures_past = len(mjd_past)
         if(nexposures_past >= self.nexposures):
             return skybrightness_next <= self.skybrightness[-1]
         return skybrightness_next <= self.skybrightness[nexposures_past]
-
 
     def evaluate_next(self, mjd_past=None, mjd_next=None,
                       skybrightness_next=None, check_skybrightness=True):
@@ -371,7 +367,7 @@ class Packing(object):
         self.set_epochs()
         return
 
-    def check_target(self, target_cadence=None):
+    def check_target(self, target_cadence=None, exposure_mask=None):
         """Check if target fits into a packing and return a solution
 
         Parameters:
@@ -379,6 +375,9 @@ class Packing(object):
 
         target_cadence : str
             name of cadence for target to check
+
+        exposure_mask : ndarray
+            array of np.bool indicating how to mask each exposure
 
         Returns:
         -------
@@ -409,10 +408,17 @@ class Packing(object):
         if(ok is False):
             return(out)
 
+        if(exposure_mask is not None):
+            epoch_nmask = self.count_exposures_per_epoch(exposure_mask)
+        else:
+            epoch_nmask = 0
+
         for soln in solns:
             pack_soln = soln[0].copy()
             fill_grid = soln[1]
-            navail = self.epoch_nexposures - self.epoch_nused
+            navail = self.epoch_nexposures - self.epoch_nused - epoch_nmask
+            ineg = np.where(navail < 0)[0]
+            navail[ineg] = 0
             nneed = self.clist.cadences[target_cadence].epoch_nexposures.copy()
             soln_ok = True
             for indx in np.arange(len(pack_soln), dtype=np.int32):
@@ -451,19 +457,30 @@ class Packing(object):
             n = n + len(et)
         return
 
+    def count_exposures_per_epoch(self, exposures):
+        """Add up exposures used per epoch"""
+        ccadence = self.clist.cadences[self.field_cadence]
+        epe = np.zeros(ccadence.nepochs, dtype=np.int32)
+        epoch_indx = np.append(ccadence.epoch_indx,
+                               np.zeros(1, dtype=np.int32) - 1)
+        for indx in np.arange(ccadence.nepochs):
+            epe[indx] = np.int32(exposures[epoch_indx[indx]:
+                                           epoch_indx[indx + 1]]).sum()
+        return(epe)
+
     def set_epochs(self):
         """Set epoch-related attributes, based on exposures"""
         n = 0
         for indx in range(len(self.epoch_targets)):
             net = len(self.epoch_targets[indx])
-            self.epoch_targets[indx] = self.exposures[n:n + net]
+            self.epoch_targets[indx] = self.exposures[n:n + net].copy()
             n = n + net
             ii = np.where(self.epoch_targets[indx] >= 0)[0]
             self.epoch_nused[indx] = len(ii)
         return
 
     def add_target(self, target_id=None, target_cadence=None,
-                   reset_exposures=True):
+                   reset_exposures=True, exposure_mask=None):
         """Add a target to packing
 
         Parameters:
@@ -475,6 +492,9 @@ class Packing(object):
         target_cadence : str
             name of cadence for target to check
 
+        exposure_mask : ndarray
+            array of booleans (one per exposure); default None
+
         Returns:
         -------
 
@@ -482,9 +502,16 @@ class Packing(object):
             True if successful, false if no space available
 
 """
-        soln = self.check_target(target_cadence=target_cadence)
+        soln = self.check_target(target_cadence=target_cadence,
+                                 exposure_mask=exposure_mask)
         if(soln['ok'] is False):
             return(False)
+
+        epoch_indx = self.clist.cadences[self.field_cadence].epoch_indx
+        epoch_nexp = self.clist.cadences[self.field_cadence].epoch_nexposures
+
+        if(exposure_mask is None):
+            exposure_mask = np.zeros(len(self.exposures), dtype=np.bool)
 
         for indx in np.arange(self.clist.cadences[target_cadence].nepochs_pack):
             epoch = soln['pack'][indx]
@@ -492,20 +519,41 @@ class Packing(object):
             nneed = self.clist.cadences[target_cadence].epoch_nexposures[indx]
             self.epoch_targets[epoch][n:n + nneed] = target_id
             self.epoch_nused[epoch] = n + nneed
+            cexp = np.arange(epoch_indx[indx], epoch_indx[indx + 1])
+            ineed = 0
+            for iexp in cexp:
+                if((exposure_mask[iexp] == 0) & (self.exposures[iexp] < 0)):
+                    self.exposures[iexp] = target_id
+                    ineed = ineed + 1
+                    if(ineed == nneed):
+                        break
 
-        for epoch in np.arange(len(soln['fill'])):
-            n = self.epoch_nused[epoch]
-            nfill = len(soln['fill'][epoch])
-            self.epoch_targets[epoch][n:n + nfill] = target_id
-            self.epoch_nused[epoch] = n + nfill
+        for indx, cfill in enumerate(soln['fill']):
+            if(len(cfill) > 0):
+                n = self.epoch_nused[indx]
+                nfill = len(soln['fill'][indx])
+                self.epoch_targets[indx][n:n + nfill] = target_id
+                self.epoch_nused[indx] = n + nfill
+                ifill = 0
+                cexp = epoch_indx[indx] + np.arange(epoch_nexp[indx],
+                                                    dtype=np.int32)
+                for iexp in cexp:
+                    if((exposure_mask[iexp] == 0) &
+                       (self.exposures[iexp] < 0)):
+                        self.exposures[iexp] = target_id
+                        ifill = ifill + 1
+                        if(ifill == nfill):
+                            break
 
-        if(reset_exposures):
-            self.set_exposures()
+        self.set_epochs()
+
+        # if(reset_exposures):
+         #    self.set_exposures()
 
         return(True)
 
     def pack_targets_greedy(self, target_ids=None, target_cadences=None,
-                            value=None):
+                            value=None, exposure_mask=None):
         """Pack targets into a cadence greedily.
 
         Parameters:
@@ -542,7 +590,8 @@ class Packing(object):
         for i in isort:
             self.add_target(target_id=target_ids[i],
                             target_cadence=target_cadences[i],
-                            reset_exposures=False)
+                            reset_exposures=False,
+                            exposure_mask=exposure_mask[i, :])
 
         self.set_exposures()
 
@@ -696,12 +745,12 @@ class CadenceList(object, metaclass=CadenceSingleton):
         # For the subsequent checks, convert to exposure index if we
         # are at the epoch level
         if(epoch_level):
-            eindx2 = ctwo.epoch_indx
+            eindx2 = ctwo.epoch_indx[0:-1]
             delta2full = ctwo.delta[eindx2]
             delta_max2full = ctwo.delta_max[eindx2]
             delta_min2full = ctwo.delta_min[eindx2]
             skybrightness2 = ctwo.skybrightness[eindx2]
-            eindx1 = cone.epoch_indx
+            eindx1 = cone.epoch_indx[0:-1]
             delta1 = cone.delta[eindx1]
             delta_max1 = cone.delta_max[eindx1]
             delta_min1 = cone.delta_min[eindx1]
@@ -929,6 +978,9 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         ok : bool
             True if the grid can be filled, False if not
+
+        epoch_targets : list of ndarrays
+            list of lists of targets corresponding to each epoch
 """
         n1 = fill.shape[0]
         n2 = fill.shape[1]
@@ -943,7 +995,8 @@ class CadenceList(object, metaclass=CadenceSingleton):
                 if(fill[indx1, indx2]):
                     nfill = int(nexp2[indx2])
                 name = "{indx1}-{indx2}".format(indx1=indx1, indx2=indx2)
-                tmpvar = solver.IntVar(0, nfill, name)
+                tmpvar = solver.IntVar([int(0), int(nexp1[indx1])], name)
+                solver.Add(tmpvar <= int(nfill))
                 indx1vars.append(tmpvar)
             gridvars.append(indx1vars)
 
@@ -1128,7 +1181,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
             nep = self.cadences[name].nepochs
             cads['CADENCE'][indx] = name
             cads['NEPOCHS'][indx] = nep
-            epoch_indx = self.cadences[name].epoch_indx
+            epoch_indx = self.cadences[name].epoch_indx[0:-1]
             cads['NEXPOSURES'][indx, 0:nep] = self.cadences[name].epoch_nexposures
             cads['DELTA'][indx, 0:nep] = self.cadences[name].delta[epoch_indx]
             cads['DELTA_MIN'][indx, 0:nep] = self.cadences[name].delta_min[epoch_indx]
