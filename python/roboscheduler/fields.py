@@ -58,6 +58,12 @@ class Fields(object, metaclass=FieldsSingleton):
         return
 
 
+    def setPriorities(self):
+        scale = [10 if "bhm_rm" in c else 1 for c in self.cadence]
+        self.basePriority = self.basePriority * np.array(scale)
+        return
+
+
     def fromarray(self, fields_array=None):
         self.nfields = len(fields_array)
         self.racen = fields_array['racen']
@@ -69,6 +75,8 @@ class Fields(object, metaclass=FieldsSingleton):
         self.observations = [np.zeros(0, dtype=np.int32)] * self.nfields
         self.icadence = np.zeros(self.nfields, dtype=np.int32)
         self.nextmjd = np.zeros(self.nfields, dtype=np.float64)
+        self.basePriority = np.ones(self.nfields) * 200
+        self.setPriorities()
         return
 
 
