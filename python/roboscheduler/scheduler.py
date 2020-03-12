@@ -674,6 +674,8 @@ class Scheduler(Master):
         nexp = np.ones(len(observable), dtype=int)
         delta_remaining = np.zeros(len(observable), dtype=np.float64)
 
+        whereRM = np.where(["bhm_rm" in c for c in self.fields.cadence])[0]
+
         if(check_cadence):
             indxs = np.where(self.fields.nextmjd > mjd)[0]
             observable[indxs] = False
@@ -684,12 +686,18 @@ class Scheduler(Master):
                     iobservations = self.fields.observations[indx]
                     mjd_past = self.observations.mjd[iobservations]
                     nexp[indx] = cadence.smart_epoch_nexp(mjd_past)
+                    ignoreMax = indx in whereRM
                     observable[indx], delta_remaining[indx] = cadence.evaluate_next(mjd_past=mjd_past,
                                                              mjd_next=mjd,
                                                              skybrightness_next=skybrightness,
-                                                             check_skybrightness=check_skybrightness)
-                    if nexp[indx] > maxExp:
-                        observable[indx] = False
+                                                             check_skybrightness=check_skybrightness,
+                                                             ignoreMax=ignoreMax)
+                    # if nexp[indx] > maxExp:
+                    #     observable[indx] = False
+                    #     if indx in whereRM and skybrightness <= 0.35:
+                    #         print(indx, " kicked out for nexp")
+                    # if indx in whereRM and skybrightness <= 0.35:
+                    #     print(mjd, indx, observable[indx], delta_remaining[indx])
         else:
             rejected = 0
             # print("lunation: ", lunation)
@@ -710,6 +718,7 @@ class Scheduler(Master):
             # print("{} rejected {} of {} for time/moon".format(mjd, rejected, len(iobservable)))
 
         iobservable = np.where(observable)[0]
+
         return self.fields.fieldid[iobservable], nexp[iobservable], delta_remaining[iobservable]
 
 
@@ -733,6 +742,7 @@ class Scheduler(Master):
         """
 
         priority = np.ones(len(fieldid))*200
+        # priority = self.fields.basePriority[fieldid]
 
         priority += 5*nexp
 
@@ -803,10 +813,21 @@ class Scheduler(Master):
 
         priority = self.prioritize(fieldid=observable_fieldid, mjd=mjd, 
                                    nexp=nexp, delta_remaining=delta_remaining)
+
+        considered = False
+        # print(observable_fieldid)
+        # print(priority, self.fields.cadence[observable_fieldid])
+        # for p, c, i in zip(priority, np.array(self.fields.cadence)[observable_fieldid], observable_fieldid):
+        #     if "RM" in c.upper():
+        #         print(c, i, p, np.max(priority))
+        #         considered = True
+
         if returnAll:
             return observable_fieldid, nexp, priority
 
         fieldid, next_exp = self.pick(priority=priority, fieldid=observable_fieldid, nexp=nexp)
+
+
         return(fieldid, next_exp)
 
     def update(self, fieldid=None, result=None):
@@ -824,7 +845,7 @@ class Scheduler(Master):
         Comments:
         ---------
 
-"""
+        """
         (alt, az) = self.radec2altaz(mjd=result['mjd'],
                                      ra=self.fields.racen[fieldid],
                                      dec=self.fields.deccen[fieldid])

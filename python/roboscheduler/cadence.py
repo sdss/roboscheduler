@@ -257,8 +257,9 @@ class Cadence(object):
         return skybrightness_next <= self.skybrightness[nexposures_past]
 
     def evaluate_next(self, mjd_past=None, mjd_next=None,
-                      skybrightness_next=None, check_skybrightness=True):
-        """Evaluate next choice of observation (not well-tested)
+                      skybrightness_next=None, check_skybrightness=True,
+                      ignoreMax=False):
+        """Evaluate next choice of observation
 
            Returns whether cadence is ok AND how long until
            cadence will become impossible (deltaMax - delta)
@@ -279,6 +280,8 @@ class Cadence(object):
         if(dlo == -1):
             return(ok_skybrightness, 1e6)
         # print("delta {} dhi {} dlo {}".format(delta, dhi, dlo))
+        if ignoreMax:
+            return(ok_skybrightness & (delta >= dlo), np.abs(dhi - delta))
         return(ok_skybrightness & (delta >= dlo) & (delta <= dhi), dhi - delta)
 
 
