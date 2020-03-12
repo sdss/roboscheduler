@@ -502,6 +502,9 @@ class Packing(object):
             True if successful, false if no space available
 
 """
+        if(exposure_mask is None):
+            exposure_mask = np.zeros(len(self.exposures), dtype=np.bool)
+
         soln = self.check_target(target_cadence=target_cadence,
                                  exposure_mask=exposure_mask)
         if(soln['ok'] is False):
@@ -509,9 +512,6 @@ class Packing(object):
 
         epoch_indx = self.clist.cadences[self.field_cadence].epoch_indx
         epoch_nexp = self.clist.cadences[self.field_cadence].epoch_nexposures
-
-        if(exposure_mask is None):
-            exposure_mask = np.zeros(len(self.exposures), dtype=np.bool)
 
         for indx in np.arange(self.clist.cadences[target_cadence].nepochs_pack):
             epoch = soln['pack'][indx]
@@ -576,6 +576,10 @@ class Packing(object):
 """
         ntargets = len(target_cadences)
 
+        if(exposure_mask is None):
+            exposure_mask = np.zeros((ntargets, len(self.exposures)),
+                                     dtype=np.bool)
+
         if(value is None):
             value = np.ones(ntargets)
         else:
@@ -595,7 +599,7 @@ class Packing(object):
 
         self.set_exposures()
 
-        return
+        return()
 
 
 class CadenceList(object, metaclass=CadenceSingleton):
@@ -1183,11 +1187,11 @@ class CadenceList(object, metaclass=CadenceSingleton):
             cads['NEPOCHS'][indx] = nep
             epoch_indx = self.cadences[name].epoch_indx[0:-1]
             cads['NEXPOSURES'][indx, 0:nep] = self.cadences[name].epoch_nexposures
-            cads['DELTA'][indx, 0:nep] = self.cadences[name].delta[epoch_indx]
-            cads['DELTA_MIN'][indx, 0:nep] = self.cadences[name].delta_min[epoch_indx]
-            cads['DELTA_MAX'][indx, 0:nep] = self.cadences[name].delta_max[epoch_indx]
-            cads['SKYBRIGHTNESS'][indx, 0:nep] = self.cadences[name].skybrightness[epoch_indx]
-            instruments = [self.cadences[name].instrument[i] for i in epoch_indx]
+            cads['DELTA'][indx, 0:nep] = self.cadences[name].delta[epoch_indx[0:nep]]
+            cads['DELTA_MIN'][indx, 0:nep] = self.cadences[name].delta_min[epoch_indx[0:nep]]
+            cads['DELTA_MAX'][indx, 0:nep] = self.cadences[name].delta_max[epoch_indx[0:nep]]
+            cads['SKYBRIGHTNESS'][indx, 0:nep] = self.cadences[name].skybrightness[epoch_indx[0:nep]]
+            instruments = [self.cadences[name].instrument[i] for i in epoch_indx[0:nep]]
             cads['INSTRUMENT'][indx][0:nep] = instruments
         return(cads)
 
