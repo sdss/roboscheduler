@@ -69,7 +69,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.racen = fields_array['racen']
         self.deccen = fields_array['deccen']
         self.fieldid = np.arange(self.nfields, dtype=np.int32)
-        self.cadence = [c.decode().strip() for c in fields_array['cadence']]
+        self.cadence = [c.strip() for c in fields_array['cadence']]
         self.slots = fields_array['slots_exposures']
         self.lstObserved = np.zeros((len(self.slots), 24), dtype=np.int32)
         self.observations = [np.zeros(0, dtype=np.int32)] * self.nfields

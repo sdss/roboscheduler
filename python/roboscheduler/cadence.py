@@ -1082,23 +1082,23 @@ class CadenceList(object, metaclass=CadenceSingleton):
             nexp = ccadence[col['NEXPOSURES']]
             if(isinstance(ccadence[col['SKYBRIGHTNESS']],
                           type(np.zeros(0, dtype=np.float32)))):
-                instruments = np.array([ii.decode().strip()
+                instruments = np.array([ii.strip()
                                         for ii in ccadence[col['INSTRUMENT']][0:nexp]])
                 self.add_cadence(nexposures=ccadence[col['NEXPOSURES']],
                                  skybrightness=ccadence[col['SKYBRIGHTNESS']][0:nexp],
                                  delta=ccadence[col['DELTA']][0:nexp],
                                  delta_min=ccadence[col['DELTA_MIN']][0:nexp],
                                  delta_max=ccadence[col['DELTA_MAX']][0:nexp],
-                                 name=ccadence[col['CADENCE']].decode().strip(),
+                                 name=ccadence[col['CADENCE']].strip(),
                                  instrument=instruments)
             else:
-                instruments = np.array([ccadence[col['INSTRUMENT']].decode().strip()])
+                instruments = np.array([ccadence[col['INSTRUMENT']].strip()])
                 self.add_cadence(nexposures=ccadence[col['NEXPOSURES']],
                                  skybrightness=ccadence[col['SKYBRIGHTNESS']],
                                  delta=ccadence[col['DELTA']],
                                  delta_min=ccadence[col['DELTA_MIN']],
                                  delta_max=ccadence[col['DELTA_MAX']],
-                                 name=ccadence[col['CADENCE']].decode().strip(),
+                                 name=ccadence[col['CADENCE']].strip(),
                                  instrument=instruments)
         return
 
