@@ -994,6 +994,8 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         solver = pywrapcp.Solver("fill_grid")
 
+        # Build gridvars, which for each [target epoch][field epoch]
+        # combination has a variable for the number of exposures.
         gridvars = []
         for indx1 in np.arange(n1):
             indx1vars = []
@@ -1007,13 +1009,28 @@ class CadenceList(object, metaclass=CadenceSingleton):
                 indx1vars.append(tmpvar)
             gridvars.append(indx1vars)
 
+        # Set of constraints for each target epoch that total # of
+        # exposures is correct
         for indx1 in np.arange(n1):
             indx1vars = gridvars[indx1]
             solver.Add(solver.Sum(indx1vars) == int(nexp1[indx1]))
 
+        # Set of constraints for each field epoch that total # of exposures
+        # is not exceeded
         for indx2 in np.arange(n2):
             indx2vars = [x[indx2] for x in gridvars]
             solver.Add(solver.Sum(indx2vars) <= int(nexp2[indx2]))
+
+        objective_expr = solver.IntVar(int(0), 2 * int(n2 * n2 + 1), "tots")
+        filledcount = []
+        for indx2 in np.arange(n2):
+            indx2vars = [x[indx2] for x in gridvars]
+            fcvar = solver.IntVar(- int(2 * n1 * n2), int(2 * n1 * n2),
+                                  'fcvar-{indx2}'.format(indx2=indx2))
+            solver.Add(fcvar == solver.Sum(indx2vars) * (indx2 + 1))
+            filledcount.append(fcvar)
+        solver.Add(objective_expr == solver.Sum(filledcount))
+        objective = solver.Minimize(objective_expr, 1)
 
         allvars = [var for indx1vars in gridvars
                    for var in indx1vars]
@@ -1028,19 +1045,22 @@ class CadenceList(object, metaclass=CadenceSingleton):
         for allvar in allvars:
             collector.Add(allvar)
 
+        collector.AddObjective(objective_expr)
+
         tl = solver.TimeLimit(100)
-        status = solver.Solve(db, [collector, tl])
+        status = solver.Solve(db, [objective, collector, tl])
         if(status is False):
             return(False, [])
 
         # Retrieve list of targets for each epoch
         if collector.SolutionCount() > 0:
+            best_solution = collector.SolutionCount() - 1
             epoch_targets = [np.zeros(0, dtype=np.int32)] * n2
             for indx1 in np.arange(n1):
                 indx1vars = gridvars[indx1]
                 for i2 in range(len(indx1vars)):
                     var = indx1vars[i2]
-                    if(collector.Value(0, var)):
+                    if(collector.Value(best_solution, var)):
                         for i in np.arange(nexp1[indx1]):
                             epoch_targets[i2] = np.append(epoch_targets[i2],
                                                           np.int32(indx1))
