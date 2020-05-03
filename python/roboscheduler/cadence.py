@@ -1,4 +1,5 @@
 import pickle
+import multidict
 import numpy as np
 import fitsio
 from ortools.constraint_solver import pywrapcp
@@ -1260,7 +1261,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
                 where(targetdb.TargetCadence.name == cadence).execute()
         return
 
-    def fromdb(self):
+    def fromdb(self, clobber=False, version_select=None):
         """Extract cadences into the targetdb
 """
         if(_database is False):
@@ -1274,7 +1275,38 @@ class CadenceList(object, metaclass=CadenceSingleton):
             instrument[spectrograph['pk']] = spectrograph['label']
 
         cadences = targetdb.TargetCadence.select().dicts()
+
+        # Keep only versions wanted
+        if(version_select is not None):
+            keep_cadences = []
+            for i, cadence in enumerate(cadences):
+                if(cadence['name'] not in version_select.keys()):
+                    keep = True
+                else:
+                    if(cadence['version'] == version_select[cadence['name']]):
+                        keep = True
+                    else:
+                        keep = False
+                if(keep):
+                    keep_cadences.append(cadence)
+            cadences = keep_cadences
+
+        # Find duplicates in input
+        names = [c['name'] for c in cadences]
+        ok = True
+        for i, cadence in enumerate(cadences):
+            if(cadence['name'] in names[i:]):
+                print("Duplicate input {c}".format(c=cadence['name']))
+                ok = False
+        if(not ok):
+            print("Not loading input with duplications")
+            return
+
         for cadence in cadences:
+            if((cadence['name'] in self.cadences) &
+               (clobber is False)):
+                print("Not clobbering existing cadence {c}".format(c=cadence['name']))
+                break
             instruments = np.array([instrument[pk]
                                     for pk in cadence['spectrograph_pk']])
             if(len(instruments) == 0):
