@@ -1,4 +1,5 @@
 import pickle
+import re
 import numpy as np
 import fitsio
 from ortools.constraint_solver import pywrapcp
@@ -99,7 +100,8 @@ class Cadence(object):
     treated as unconstrained. Only single epoch cadences will be allowed.
 """
     def __init__(self, nexposures=None, skybrightness=None, delta=None,
-                 delta_min=None, delta_max=None, instrument=None):
+                 delta_min=None, delta_max=None, instrument=None,
+                 version=None):
         self.nexposures = np.int32(nexposures)
         self.skybrightness = np.zeros(self.nexposures,
                                       dtype=np.float32) + skybrightness
@@ -112,6 +114,10 @@ class Cadence(object):
         izero = np.where(self.delta == 0.)[0]
         self.delta_min[izero] = 0.
         self.delta_max[izero] = 0.
+        if(version is not None):
+            self.version = version
+        else:
+            self.version = ''
         self._create_epochs()
         iapogee = np.where(self.instrument == 'APOGEE')[0]
         if(len(iapogee) > 0):
@@ -153,6 +159,7 @@ class Cadence(object):
         for i in np.arange(self.nexposures):
             out = out + " {s}".format(s=self.instrument[i])
         out = out + "\n"
+        out = out + " version = {v}\n".format(v=self.version)
         return(out)
 
     def epoch_text(self):
@@ -183,6 +190,7 @@ class Cadence(object):
         for i in np.arange(self.nepochs):
             out = out + " {s}".format(s=self.instrument[epoch_indx[i]])
         out = out + "\n"
+        out = out + " version = {v}\n".format(v=self.version)
         return(out)
 
     def _arrayify(self, quantity=None, dtype=np.float64):
@@ -684,6 +692,9 @@ class CadenceList(object, metaclass=CadenceSingleton):
         instrument : list of str
             instrument for each exposure
 
+        version : str
+            version name of cadence (default '')
+
         Notes:
         -----
 
@@ -1076,7 +1087,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         cadences_array : ndarray
             ndarray with columns 'NEXPOSURES', 'SKYBRIGHTNESS', 'DELTA',
-            'DELTA_MIN', 'DELTA_MAX', 'CADENCE', 'INSTRUMENT'
+            'DELTA_MIN', 'DELTA_MAX', 'CADENCE', 'INSTRUMENT', 'VERSION'
 
         nathan : bool
             False if normal format, True if Nathan De Lee format
@@ -1087,7 +1098,8 @@ class CadenceList(object, metaclass=CadenceSingleton):
                'DELTA_MIN': 'DELTA_MIN',
                'DELTA_MAX': 'DELTA_MAX',
                'INSTRUMENT': 'INSTRUMENT',
-               'CADENCE': 'CADENCE'}
+               'CADENCE': 'CADENCE',
+               'VERSION': 'VERSION'}
 
         if(lunation is True):
             col['SKYBRIGHTNESS'] = 'LUNATION'
@@ -1102,28 +1114,35 @@ class CadenceList(object, metaclass=CadenceSingleton):
                     cadences_array[indx][col['DELTA_MIN']][iz] = 0.
                     cadences_array[indx][col['DELTA_MAX']][iz] = 0.
 
-        for ccadence in cadences_array:
+        if(col['VERSION'] in cadences_array.dtype.names):
+            versions = [v.strip() for v in cadences_array[col['VERSION']]]
+        else:
+            versions = [''] * len(cadences_array)
+
+        for ic, ccadence in enumerate(cadences_array):
             nexp = ccadence[col['NEXPOSURES']]
             if(isinstance(ccadence[col['SKYBRIGHTNESS']],
                           type(np.zeros(0, dtype=np.float32)))):
-                instruments = np.array([ii.decode().strip()
+                instruments = np.array([ii.strip()
                                         for ii in ccadence[col['INSTRUMENT']][0:nexp]])
                 self.add_cadence(nexposures=ccadence[col['NEXPOSURES']],
                                  skybrightness=ccadence[col['SKYBRIGHTNESS']][0:nexp],
                                  delta=ccadence[col['DELTA']][0:nexp],
                                  delta_min=ccadence[col['DELTA_MIN']][0:nexp],
                                  delta_max=ccadence[col['DELTA_MAX']][0:nexp],
-                                 name=ccadence[col['CADENCE']].decode().strip(),
-                                 instrument=instruments)
+                                 name=ccadence[col['CADENCE']].strip(),
+                                 instrument=instruments,
+                                 version=versions[ic])
             else:
-                instruments = np.array([ccadence[col['INSTRUMENT']].decode().strip()])
+                instruments = np.array([ccadence[col['INSTRUMENT']].strip()])
                 self.add_cadence(nexposures=ccadence[col['NEXPOSURES']],
                                  skybrightness=ccadence[col['SKYBRIGHTNESS']],
                                  delta=ccadence[col['DELTA']],
                                  delta_min=ccadence[col['DELTA_MIN']],
                                  delta_max=ccadence[col['DELTA_MAX']],
-                                 name=ccadence[col['CADENCE']].decode().strip(),
-                                 instrument=instruments)
+                                 name=ccadence[col['CADENCE']].strip(),
+                                 instrument=instruments,
+                                 version=versions[ic])
         return
 
     def fromfits(self, filename=None, nathan=False, lunation=False,
@@ -1141,7 +1160,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
 
         Expects a valid FITS file with columns 'NEXPOSURES',
             'SKYBRIGHTNESS', 'DELTA', 'DELTA_MIN', 'DELTA_MAX', 'CADENCE',
-            'INSTRUMENT'
+            'INSTRUMENT', 'VERSION'
         """
         self.cadences_fits = fitsio.read(filename)
         self.fromarray(self.cadences_fits, nathan=nathan, lunation=lunation)
@@ -1169,7 +1188,8 @@ class CadenceList(object, metaclass=CadenceSingleton):
                     ('SKYBRIGHTNESS', np.float32, max_nexp),
                     ('DELTA_MAX', np.float32, max_nexp),
                     ('DELTA_MIN', np.float32, max_nexp),
-                    ('INSTRUMENT', np.dtype('a10'), max_nexp)]
+                    ('INSTRUMENT', np.dtype('a10'), max_nexp),
+                    ('VERSION', np.dtype('a10'))]
         cads = np.zeros(self.ncadences, dtype=cadence0)
         names = self.cadences.keys()
         for indx, name in zip(np.arange(self.ncadences), names):
@@ -1181,6 +1201,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
             cads['DELTA_MAX'][indx, 0:nexp] = self.cadences[name].delta_max
             cads['SKYBRIGHTNESS'][indx, 0:nexp] = self.cadences[name].skybrightness
             cads['INSTRUMENT'][indx, 0:nexp] = self.cadences[name].instrument
+            cads['VERSION'][indx] = self.cadences[name].version
         return(cads)
 
     def epoch_array(self):
@@ -1201,7 +1222,8 @@ class CadenceList(object, metaclass=CadenceSingleton):
                     ('SKYBRIGHTNESS', np.float32, max_nep),
                     ('DELTA_MAX', np.float32, max_nep),
                     ('DELTA_MIN', np.float32, max_nep),
-                    ('INSTRUMENT', np.dtype('a10'), max_nep)]
+                    ('INSTRUMENT', np.dtype('a10'), max_nep),
+                    ('VERSION', np.dtype('a10'))]
         cads = np.zeros(self.ncadences, dtype=cadence0)
         names = self.cadences.keys()
         for indx, name in zip(np.arange(self.ncadences), names):
@@ -1216,6 +1238,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
             cads['SKYBRIGHTNESS'][indx, 0:nep] = self.cadences[name].skybrightness[epoch_indx[0:nep]]
             instruments = [self.cadences[name].instrument[i] for i in epoch_indx[0:nep]]
             cads['INSTRUMENT'][indx][0:nep] = instruments
+            cads['VERSION'][indx] = self.cadences[name].version
         return(cads)
 
     def todb(self):
@@ -1242,6 +1265,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
             delta_min = [float(n) for n in self.cadences[cadence].delta_min]
             delta_max = [float(n) for n in self.cadences[cadence].delta_max]
             skybrightness = [float(n) for n in self.cadences[cadence].skybrightness]
+            version = str(self.cadences[cadence].version)
             spectrograph = [spectrograph_pk[n]
                             for n in self.cadences[cadence].instrument]
             targetdb.TargetCadence.insert(pk=pk, name=cadence,
@@ -1249,7 +1273,8 @@ class CadenceList(object, metaclass=CadenceSingleton):
                                           delta=delta, skybrightness=skybrightness,
                                           delta_min=delta_min,
                                           delta_max=delta_max,
-                                          spectrograph_pk=spectrograph).execute()
+                                          spectrograph_pk=spectrograph,
+                                          version=version).execute()
 
     def updatedb(self):
         """Update the cadences in the targetdb by name
@@ -1284,7 +1309,7 @@ class CadenceList(object, metaclass=CadenceSingleton):
                 where(targetdb.TargetCadence.name == cadence).execute()
         return
 
-    def fromdb(self):
+    def fromdb(self, clobber=False, version_select=None):
         """Extract cadences into the targetdb
 """
         if(_database is False):
@@ -1298,7 +1323,49 @@ class CadenceList(object, metaclass=CadenceSingleton):
             instrument[spectrograph['pk']] = spectrograph['label']
 
         cadences = targetdb.TargetCadence.select().dicts()
+
+        # Keep only versions wanted
+        if(version_select is not None):
+            keep_cadences = []
+            for i, cadence in enumerate(cadences):
+                keep = True
+                for vs in version_select:
+                    if(re.match(vs, cadence['name']) is not None):
+                        if(cadence['version'] == version_select[vs]):
+                            keep = True
+                        else:
+                            keep = False
+                if(keep):
+                    keep_cadences.append(cadence)
+            cadences = keep_cadences
+
+        # Find duplicates in input
+        names = np.array([c['name'] for c in cadences])
+        versions = np.array([c['version'] for c in cadences])
+        keep = np.ones(len(cadences), dtype=np.bool)
+        for i, cadence in enumerate(cadences):
+            ii = np.where((cadence['name'] == names) &
+                          (cadence['version'] == versions))[0]
+            if(len(ii) > 1):
+                print("Duplicate input cadence {c} version {v}".format(c=cadence['name'],
+                                                                       v=cadence['version']))
+                print("Not loading with duplications.")
+                return
+            ii = np.where(cadence['name'] == names)[0]
+            for v in versions[ii]:
+                if(v > cadence['version']):
+                    keep[i] = 0
+        keep_cadences = []
+        for i, cadence in enumerate(cadences):
+            if(keep[i]):
+                keep_cadences.append(cadence)
+        cadences = keep_cadences
+
         for cadence in cadences:
+            if((cadence['name'] in self.cadences) &
+               (clobber is False)):
+                print("Not clobbering existing cadence {c}".format(c=cadence['name']))
+                break
             instruments = np.array([instrument[pk]
                                     for pk in cadence['spectrograph_pk']])
             if(len(instruments) == 0):
@@ -1310,4 +1377,5 @@ class CadenceList(object, metaclass=CadenceSingleton):
                              delta_min=np.array(cadence['delta_min']),
                              delta_max=np.array(cadence['delta_max']),
                              skybrightness=np.array(cadence['skybrightness']),
-                             instrument=instruments)
+                             instrument=instruments,
+                             version=cadence['version'])
