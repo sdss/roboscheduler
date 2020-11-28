@@ -16,6 +16,24 @@ def basename(cadence):
     return("_".join(cadence.split('-')[0].split('_')[0:-1]))
 
 
+def _instrument_name(instrument):
+    instrument_name = 'UNKNOWN'
+    if(instrument == Instrument.BossInstrument):
+        instrument_name = 'BOSS'
+    if(instrument == Instrument.ApogeeInstrument):
+        instrument_name = 'APOGEE'
+    return(instrument_name)
+
+
+def _name_instrument(name):
+    name_instrument = None
+    if(name == 'BOSS'):
+        name_instrument = Instrument.BossInstrument
+    if(name == 'APOGEE'):
+        name_instrument = Instrument.ApogeeInstrument
+    return(name_instrument)
+
+
 # Class to define a singleton
 class CadenceListSingleton(type):
     _instances = {}
@@ -433,7 +451,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             cads['DELTA_MAX'][indx, 0:nepochs] = self.cadences[name].delta_max
             cads['NEXP'][indx, 0:nepochs] = self.cadences[name].nexp
             cads['SKYBRIGHTNESS'][indx, 0:nepochs] = self.cadences[name].skybrightness
-            cads['INSTRUMENT'] = self.cadences[name].instrument
+            cads['INSTRUMENT'][indx] = _instrument_name(self.cadences[name].instrument)
         return(cads)
 
     def todb(self):
