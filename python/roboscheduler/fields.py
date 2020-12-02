@@ -39,7 +39,7 @@ class Fields(object, metaclass=FieldsSingleton):
 
     observations : list of ndarray of np.int32
         for each field, indices of observations
-"""
+    """
     def __init__(self):
         self.nfields = 0
         self.racen = np.zeros(0, dtype=np.float64)
@@ -57,12 +57,10 @@ class Fields(object, metaclass=FieldsSingleton):
         self._lunationPlan = None
         return
 
-
     def setPriorities(self):
         scale = [10 if "bhm_rm" in c else 1 for c in self.cadence]
         self.basePriority = self.basePriority * np.array(scale)
         return
-
 
     def fromarray(self, fields_array=None):
         self.nfields = len(fields_array)
@@ -79,29 +77,26 @@ class Fields(object, metaclass=FieldsSingleton):
         self.setPriorities()
         return
 
-
     def fromfits(self, filename=None):
         self.fields_fits = fitsio.read(filename)
         self.fromarray(self.fields_fits)
         return
 
-
-    def add_observations(self, mjd=None, fieldid=None, iobs=None, lst=None):
-        self.observations[fieldid] = np.append(self.observations[fieldid],
+    def add_observations(self, mjd=None, fieldidx=None, iobs=None, lst=None):
+        self.observations[fieldidx] = np.append(self.observations[fieldidx],
                                                iobs)
-        self.icadence[fieldid] = self.icadence[fieldid] + 1
-        cadence = self.cadencelist.cadences[self.cadence[fieldid]]
-        if(self.icadence[fieldid] < cadence.nexposures):
-            self.nextmjd[fieldid] = (mjd +
-                                     cadence.delta_min[self.icadence[fieldid]])
+        self.icadence[fieldidx] = self.icadence[fieldidx] + 1
+        cadence = self.cadencelist.cadences[self.cadence[fieldidx]]
+        if(self.icadence[fieldidx] < cadence.nexposures):
+            self.nextmjd[fieldidx] = (mjd +
+                                     cadence.delta_min[self.icadence[fieldidx]])
         else:
-            self.nextmjd[fieldid] = 100000.
+            self.nextmjd[fieldidx] = 100000.
         int_lst = int(np.round(lst/15, 0))
         if int_lst == 24:
             int_lst = 0
-        self.lstObserved[fieldid][int_lst] += 1
+        self.lstObserved[fieldidx][int_lst] += 1
         return
-
 
     @property
     def validCadence(self):
@@ -111,7 +106,6 @@ class Fields(object, metaclass=FieldsSingleton):
             self._validCadance = np.array([c in self.cadencelist.cadences
                                            for c in self.cadence])
         return self._validCadance
-
 
     @property
     def obsPlan(self):
@@ -125,9 +119,8 @@ class Fields(object, metaclass=FieldsSingleton):
             a list containing lst and lunation for each field
         """
         if self._obsPlan is None:
-            self._obsPlan = [np.where(s > 0)  for s in self.slots]
+            self._obsPlan = [np.where(s > 0) for s in self.slots]
         return self._obsPlan
-
 
     @property
     def lstPlan(self):
@@ -136,22 +129,20 @@ class Fields(object, metaclass=FieldsSingleton):
             self._lstPlan = np.array([np.sum(s, axis=1) for s in self.slots])
         return self._lstPlan
 
-
     # @property
     # def lunationPlan(self):
     #     if self._lunationPlan is None:
     #         self._lunationPlan = np.array([np.mean(p[1]) for p in self.obsPlan])
     #     return self._lunationPlan
 
-
-    def lstWeight(self, lst, fields=None):
+    def lstWeight(self, lst, field_idx=None):
         # field id corresponds to indx, so fields is id/indx
         # as is everywhere, but just to keep reminding me...
         assert lst > 0 and lst < 24, "lst must be in hours!"
         diffs = []
-        if fields is not None:
-            lst_obs = self.lstObserved[fields]
-            lst_plan = self.lstPlan[fields]
+        if field_idx is not None:
+            lst_obs = self.lstObserved[field_idx]
+            lst_plan = self.lstPlan[field_idx]
         else:
             lst_obs = self.lstObserved
             lst_plan = self.lstPlan
@@ -169,7 +160,6 @@ class Fields(object, metaclass=FieldsSingleton):
 
         return np.array(diffs)
 
-
     def toarray(self):
         """Return cadences as a record array
 
@@ -178,7 +168,7 @@ class Fields(object, metaclass=FieldsSingleton):
 
         fields : ndarray
             information on each field
-"""
+        """
         maxn = np.array([len(x) for x in self.observations]).max()
         if(maxn == 1):
             maxn = 2
