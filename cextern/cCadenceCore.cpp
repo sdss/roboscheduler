@@ -1,5 +1,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/numpy.h>
 #include "cadenceCore.h"
 
 namespace py = pybind11;
@@ -12,9 +13,9 @@ PYBIND11_MODULE(cCadenceCore, m) {
         .export_values();
 
     py::class_<CadenceCore, std::shared_ptr<CadenceCore>>(m, "CadenceCore")
-			.def(py::init<std::string, int, Instrument, std::vector<float>,
-					 std::vector<float>, std::vector<float>, std::vector<float>,
-					 std::vector<int>>())
+			.def(py::init<std::string, int, Instrument, py::array_t<float>,
+					 py::array_t<float>, py::array_t<float>, py::array_t<float>,
+					 py::array_t<int>, py::array_t<int>, py::array_t<int>>())
 			.def("epoch_text", &CadenceCore::epochText)
 			.def("__str__", &CadenceCore::__str__)
 			.def("epochs_consistency", &CadenceCore::epochsConsistency,

@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <vector>
 #include <pybind11/pybind11.h> // must be first
+#include <pybind11/numpy.h> // must be first
 #include <string>
 #include "cadenceCore.h"
 
@@ -13,27 +14,33 @@ namespace py = pybind11;
 CadenceCore::CadenceCore(std::string name,
 												 int nepochs,
 												 Instrument instrument,
-												 std::vector<float> skybrightness,
-												 std::vector<float> delta,
-												 std::vector<float> delta_min,
-												 std::vector<float> delta_max,
-												 std::vector<int> nexp) :
+												 py::array_t<float> skybrightness,
+												 py::array_t<float> delta,
+												 py::array_t<float> delta_min,
+												 py::array_t<float> delta_max,
+												 py::array_t<int> nexp,
+												 py::array_t<int> epoch_indx,
+												 py::array_t<int> epochs) :
 	name(name), nepochs(nepochs), instrument(instrument),
 	skybrightness(skybrightness), delta(delta), delta_min(delta_min),
-	delta_max(delta_max), nexp(nexp)
+	delta_max(delta_max), nexp(nexp), epoch_indx(epoch_indx),
+	epochs(epochs)
 {
-	
+	int *nexp_a = (int *) nexp.request().ptr;
+	int *epoch_indx_a = (int *) epoch_indx.request().ptr;
+	int *epochs_a = (int *) epochs.request().ptr;
+
 	// Count up the exposures for convenience, set up "epoch_indx"
 	// from epoch number into exposure list (note it has nepochs+1 entries),
 	// and set up "epochs" giving epoch number for each exposure
 	nexp_total = 0;
 	for(auto i = 0; i < nepochs; i++) {
-		epoch_indx.push_back(nexp_total);
-		nexp_total += nexp[i];
-		for(auto j = 0; j < nexp[i]; j++)
-			epochs.push_back(i);
+		epoch_indx_a[i] = nexp_total;
+		for(auto j = 0; j < nexp_a[i]; j++)
+			epochs_a[nexp_total + j] = i;
+		nexp_total += nexp_a[i];
 	}
-	epoch_indx.push_back(nexp_total);
+	epoch_indx_a[nepochs] = nexp_total;
 }
 
 std::string CadenceCore::__str__()
@@ -46,6 +53,12 @@ std::string CadenceCore::epochText()
 	std::string out, tmps;
 	char tmp[2000];
 
+	int *nexp_a = (int *) nexp.request().ptr;
+	float *skybrightness_a = (float *) skybrightness.request().ptr;
+	float *delta_a = (float *) delta.request().ptr;
+	float *delta_min_a = (float *) delta_min.request().ptr;
+	float *delta_max_a = (float *) delta_max.request().ptr;
+
 	out = name + "\n";
 	out = out + " nepochs=" + std::to_string(nepochs) + "\n";
 
@@ -56,35 +69,35 @@ std::string CadenceCore::epochText()
 
 	out = out + " skybrightness=";
 	for(auto i = 0; i < nepochs; i++) {
-		sprintf(tmp, " %4.2f", skybrightness[i]);
+		sprintf(tmp, " %4.2f", skybrightness_a[i]);
 		out = out + tmps.assign(tmp);
 	}
 	out = out + "\n";
 
 	out = out + " delta=";
 	for(auto i = 0; i < nepochs; i++) {
-		sprintf(tmp, " %4.2f", delta[i]);
+		sprintf(tmp, " %4.2f", delta_a[i]);
 		out = out + tmps.assign(tmp);
 	}
 	out = out + "\n";
 
 	out = out + " delta_min=";
 	for(auto i = 0; i < nepochs; i++) {
-		sprintf(tmp, " %4.2f", delta_min[i]);
+		sprintf(tmp, " %4.2f", delta_min_a[i]);
 		out = out + tmps.assign(tmp);
 	}
 	out = out + "\n";
 
 	out = out + " delta_max=";
 	for(auto i = 0; i < nepochs; i++) {
-		sprintf(tmp, " %4.2f", delta_max[i]);
+		sprintf(tmp, " %4.2f", delta_max_a[i]);
 		out = out + tmps.assign(tmp);
 	}
 	out = out + "\n";
 
 	out = out + " nexp=";
 	for(auto i = 0; i < nepochs; i++) {
-		sprintf(tmp, " %d", nexp[i]);
+		sprintf(tmp, " %d", nexp_a[i]);
 		out = out + tmps.assign(tmp);
 	}
 
@@ -96,26 +109,37 @@ bool CadenceCore::epochsConsistency(CadenceCore target_cadence,
 	int ok;
 	float dtotmin, dtotmax;
 
-	ok = (target_cadence.nexp[0] <= nexp[epochs[0]]) &
-		(target_cadence.skybrightness[0] >= skybrightness[epochs[0]]);
+	int *t_nexp_a = (int *) target_cadence.nexp.request().ptr;
+	float *t_skybrightness_a = (float *) target_cadence.skybrightness.request().ptr;
+	float *t_delta_a = (float *) target_cadence.delta.request().ptr;
+	float *t_delta_min_a = (float *) target_cadence.delta_min.request().ptr;
+	float *t_delta_max_a = (float *) target_cadence.delta_max.request().ptr;
+
+	int *nexp_a = (int *) nexp.request().ptr;
+	float *skybrightness_a = (float *) skybrightness.request().ptr;
+	float *delta_min_a = (float *) delta_min.request().ptr;
+	float *delta_max_a = (float *) delta_max.request().ptr;
+
+	ok = (t_nexp_a[0] <= nexp_a[epochs[0]]) &
+		(t_skybrightness_a[0] >= skybrightness_a[epochs[0]]);
 	if(!ok)
 		return(false);
 
 	for(unsigned long i = 1; i < epochs.size(); i++) {
-		if(target_cadence.delta[i] >= 0) {
+		if(t_delta_a[i] >= 0) {
 			dtotmin = 0.;
 			for(auto j = epochs[i - 1] + 1; j <= epochs[i]; j++)
-				dtotmin += delta_min[j];
+				dtotmin += delta_min_a[j];
 			dtotmax = 0.;
 			for(auto j = epochs[i - 1] + 1; j <= epochs[i]; j++)
-				dtotmax += delta_max[j];
-			ok = (target_cadence.delta_min[i] <= dtotmin) &
-				(target_cadence.delta_max[i] >= dtotmax) &
-				(target_cadence.nexp[i] <= nexp[epochs[i]]) &
-				(target_cadence.skybrightness[i] >= skybrightness[epochs[i]]);
+				dtotmax += delta_max_a[j];
+			ok = (t_delta_min_a[i] <= dtotmin) &
+				(t_delta_max_a[i] >= dtotmax) &
+				(t_nexp_a[i] <= nexp_a[epochs[i]]) &
+				(t_skybrightness_a[i] >= skybrightness_a[epochs[i]]);
 		} else {
-			ok = (target_cadence.nexp[i] <= nexp[epochs[i]]) &
-				(target_cadence.skybrightness[i] >= skybrightness[epochs[i]]);
+			ok = (t_nexp_a[i] <= nexp_a[epochs[i]]) &
+				(t_skybrightness_a[i] >= skybrightness_a[epochs[i]]);
 		}
 		if(!ok)
 			return(false);

@@ -134,15 +134,18 @@ class Cadence(cCadenceCore.CadenceCore):
         delta_min = self._arrayify(delta_min, dtype=np.float32)
         delta_max = self._arrayify(delta_max, dtype=np.float32)
         nexp = self._arrayify(nexp, dtype=np.int32)
+        epoch_indx = np.zeros(nepochs + 1, dtype=np.int32)
+        epochs = np.zeros(nexp.sum(), dtype=np.int32)
         super().__init__(name, nepochs, instrument,
                          skybrightness, delta, delta_min,
-                         delta_max, nexp)
+                         delta_max, nexp, epoch_indx, epochs)
         return
 
     def as_cadencecore(self):
         cc = cCadenceCore.CadenceCore(self.name, self.nepochs, self.instrument,
                                       self.skybrightness, self.delta,
-                                      self.delta_min, self.delta_max, self.nexp)
+                                      self.delta_min, self.delta_max, self.nexp,
+                                      self.epoch_indx, self.epochs)
         return(cc)
 
     def _arrayify(self, quantity=None, dtype=np.float64):
@@ -341,8 +344,8 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         ok : int
             1 if there is a solution, 0 otherwise
 
-        solutions : list (if return_solutions is True)
-            list of solutions, see below.
+        solutions : list of lists
+            list of solutions, where each solution is a list of epochs
 
         Notes:
         -----
