@@ -148,6 +148,44 @@ def test_epochs_consistency_3():
                                                            epochs=[0, 1]) is False
 
 
+def test_epochs_consistency_4():
+    clist = cadence.CadenceList()
+
+    clist.add_cadence(name='bright_3x2',
+                      nepochs=3,
+                      skybrightness=[1., 1., 1.],
+                      instrument='BOSS',
+                      delta=[-1., -1., -1.],
+                      delta_min=[-1., -1., -1.],
+                      delta_max=[-1., -1., -1.],
+                      nexp=[2, 2, 2])
+
+    clist.add_cadence(name='bright_3x1',
+                      nepochs=3,
+                      skybrightness=[1., 1., 1.],
+                      instrument='BOSS',
+                      delta=[-1., -1., -1.],
+                      delta_min=[-1., -1., -1.],
+                      delta_max=[-1., -1., -1.],
+                      nexp=[1, 1, 1])
+
+    tcore = clist.cadences['bright_3x1'].as_cadencecore()
+    assert clist.cadences['bright_3x2'].epochs_consistency(tcore,
+                                                           epochs=[0, 1, 2]) is True
+
+    tcore = clist.cadences['bright_3x1'].as_cadencecore()
+    assert clist.cadences['bright_3x2'].epochs_consistency(tcore,
+                                                           epochs=[0, 0, 2]) is True
+
+    tcore = clist.cadences['bright_3x1'].as_cadencecore()
+    assert clist.cadences['bright_3x2'].epochs_consistency(tcore,
+                                                           epochs=[0, 1, 1]) is True
+
+    tcore = clist.cadences['bright_3x1'].as_cadencecore()
+    assert clist.cadences['bright_3x2'].epochs_consistency(tcore,
+                                                           epochs=[0, 0, 0]) is False
+
+
 def test_cadence_consistency_1():
     clist = cadence.CadenceList()
 
