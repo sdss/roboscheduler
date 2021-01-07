@@ -727,7 +727,6 @@ class Scheduler(Master):
 
         return self.fields.fieldid[iobservable], nexp[iobservable], delta_remaining[iobservable]
 
-
     def prioritize(self, mjd=None, fieldid=None, nexp=None, delta_remaining=None):
         """Return the fieldid to pick from using heuristic strategy
 
@@ -777,7 +776,6 @@ class Scheduler(Master):
 
         return priority
 
-
     def pick(self, priority=None, fieldid=None, nexp=None):
         assert len(priority) == len(fieldid) and len(priority) == len(nexp), \
             "inputs must be same size!"
@@ -786,7 +784,6 @@ class Scheduler(Master):
         pick_exp = nexp[ipick]
 
         return(pick_fieldid, pick_exp)
-
 
     def nextfield(self, mjd=None, maxExp=None, returnAll=False):
         """Picks the next field to observe
@@ -817,7 +814,7 @@ class Scheduler(Master):
                 return None, -1, 0
             return None, -1
 
-        priority = self.prioritize(fieldid=observable_fieldid, mjd=mjd, 
+        priority = self.prioritize(fieldid=observable_fieldid, mjd=mjd,
                                    nexp=nexp, delta_remaining=delta_remaining)
 
         considered = False
@@ -852,9 +849,16 @@ class Scheduler(Master):
         ---------
 
         """
+
+        racen = self.fields.racen[fieldid]
+        deccen = self.fields.deccen[fieldid]
+        cadence = self.fields.cadence[fieldid]
+        nfilled = self.fields.nfilled[fieldid]
+        nexp_cumul = len(self.fields.observations[fieldid]) + 1
+
         (alt, az) = self.radec2altaz(mjd=result['mjd'],
-                                     ra=self.fields.racen[fieldid],
-                                     dec=self.fields.deccen[fieldid])
+                                     ra=racen,
+                                     dec=deccen)
         airmass = self.alt2airmass(alt)
         skybrightness = self.skybrightness(result['mjd'])
         lst = self.lst(result['mjd'])
@@ -864,7 +868,12 @@ class Scheduler(Master):
                                      sn2=result['sn2'],
                                      skybrightness=skybrightness,
                                      airmass=airmass,
-                                     lst=lst)
+                                     lst=lst,
+                                     racen=racen,
+                                     deccen=deccen,
+                                     cadence=cadence,
+                                     nfilled=nfilled,
+                                     nexp_cumul=nexp_cumul)
         self.fields.add_observations(result['mjd'], fieldid, iobs, lst)
         return
 
@@ -897,6 +906,7 @@ def lstDiffSingle(a, b):
     else:
         # a must be bigger
         return min(a - b, (b + 24) - a)
+
 
 def lstDiff(a, b):
     """wrap lst math to handle arrays

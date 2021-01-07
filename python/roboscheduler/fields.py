@@ -44,6 +44,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.nfields = 0
         self.racen = np.zeros(0, dtype=np.float64)
         self.deccen = np.zeros(0, dtype=np.float64)
+        self.nfilled = np.zeros(0, dtype=np.float64)
         self.fieldid = np.zeros(0, dtype=np.int32)
         self.nextmjd = np.zeros(0, dtype=np.float64)
         self.cadence = []
@@ -57,17 +58,16 @@ class Fields(object, metaclass=FieldsSingleton):
         self._lunationPlan = None
         return
 
-
     def setPriorities(self):
         scale = [10 if "bhm_rm" in c else 1 for c in self.cadence]
         self.basePriority = self.basePriority * np.array(scale)
         return
 
-
     def fromarray(self, fields_array=None):
         self.nfields = len(fields_array)
         self.racen = fields_array['racen']
         self.deccen = fields_array['deccen']
+        self.nfilled = fields_array['nfilled']
         self.fieldid = np.arange(self.nfields, dtype=np.int32)
         self.cadence = [c.strip() for c in fields_array['cadence']]
         self.slots = fields_array['slots_exposures']
@@ -79,12 +79,10 @@ class Fields(object, metaclass=FieldsSingleton):
         self.setPriorities()
         return
 
-
     def fromfits(self, filename=None):
         self.fields_fits = fitsio.read(filename)
         self.fromarray(self.fields_fits)
         return
-
 
     def add_observations(self, mjd=None, fieldid=None, iobs=None, lst=None):
         self.observations[fieldid] = np.append(self.observations[fieldid],
@@ -102,7 +100,6 @@ class Fields(object, metaclass=FieldsSingleton):
         self.lstObserved[fieldid][int_lst] += 1
         return
 
-
     @property
     def validCadence(self):
         if self._validCadance is None:
@@ -111,7 +108,6 @@ class Fields(object, metaclass=FieldsSingleton):
             self._validCadance = np.array([c in self.cadencelist.cadences
                                            for c in self.cadence])
         return self._validCadance
-
 
     @property
     def obsPlan(self):
@@ -128,7 +124,6 @@ class Fields(object, metaclass=FieldsSingleton):
             self._obsPlan = [np.where(s > 0)  for s in self.slots]
         return self._obsPlan
 
-
     @property
     def lstPlan(self):
         if self._lstPlan is None:
@@ -136,13 +131,11 @@ class Fields(object, metaclass=FieldsSingleton):
             self._lstPlan = np.array([np.sum(s, axis=1) for s in self.slots])
         return self._lstPlan
 
-
     # @property
     # def lunationPlan(self):
     #     if self._lunationPlan is None:
     #         self._lunationPlan = np.array([np.mean(p[1]) for p in self.obsPlan])
     #     return self._lunationPlan
-
 
     def lstWeight(self, lst, fields=None):
         # field id corresponds to indx, so fields is id/indx
@@ -168,7 +161,6 @@ class Fields(object, metaclass=FieldsSingleton):
             diffs.append(np.min(diff))
 
         return np.array(diffs)
-
 
     def toarray(self):
         """Return cadences as a record array
