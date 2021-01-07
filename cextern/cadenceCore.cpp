@@ -108,6 +108,11 @@ bool CadenceCore::epochsConsistency(CadenceCore target_cadence,
 																		std::vector<int> epochs) {
 	int ok;
 	float dtotmin, dtotmax;
+  std::vector<int> nexp_count;
+
+	nexp_count.resize(nepochs);
+	for(unsigned long i = 0; i < nepochs; i++)
+		nexp_count[i] = 0;
 
 	int *t_nexp_a = (int *) target_cadence.nexp.request().ptr;
 	float *t_skybrightness_a = (float *) target_cadence.skybrightness.request().ptr;
@@ -120,10 +125,12 @@ bool CadenceCore::epochsConsistency(CadenceCore target_cadence,
 	float *delta_min_a = (float *) delta_min.request().ptr;
 	float *delta_max_a = (float *) delta_max.request().ptr;
 
-	ok = (t_nexp_a[0] <= nexp_a[epochs[0]]) &
+	ok = (t_nexp_a[0] <= nexp_a[epochs[0]] - nexp_count[epochs[0]]) &
 		(t_skybrightness_a[0] >= skybrightness_a[epochs[0]]);
 	if(!ok)
 		return(false);
+
+	nexp_count[epochs[0]] += t_nexp_a[0];
 
 	for(unsigned long i = 1; i < epochs.size(); i++) {
 		if(t_delta_a[i] >= 0) {
@@ -135,14 +142,16 @@ bool CadenceCore::epochsConsistency(CadenceCore target_cadence,
 				dtotmax += delta_max_a[j];
 			ok = (t_delta_min_a[i] <= dtotmin) &
 				(t_delta_max_a[i] >= dtotmax) &
-				(t_nexp_a[i] <= nexp_a[epochs[i]]) &
+				(t_nexp_a[i] <= nexp_a[epochs[i]] - nexp_count[epochs[i]]) &
 				(t_skybrightness_a[i] >= skybrightness_a[epochs[i]]);
 		} else {
-			ok = (t_nexp_a[i] <= nexp_a[epochs[i]]) &
+			ok = (t_nexp_a[i] <= nexp_a[epochs[i]] - nexp_count[epochs[i]]) &
 				(t_skybrightness_a[i] >= skybrightness_a[epochs[i]]);
 		}
 		if(!ok)
 			return(false);
+
+		nexp_count[epochs[i]] += t_nexp_a[i];
 	}
 	return(true);
 }
@@ -174,7 +183,7 @@ std::vector<std::vector<int>> CadenceCore::cadenceConsistency(CadenceCore target
 		// Each time, check all previous working solutions
 		for(unsigned long i = 0; i < current_epochs_list.size(); i++) {
 			epochs = current_epochs_list[i];
-			ifield_start = epochs.back() + 1;
+			ifield_start = epochs.back(); // allow to repeat the epoch
 
 			// And find all subsequent field epochs that will work for each
 			for(int ifield = ifield_start; ifield < nepochs; ifield++) {
