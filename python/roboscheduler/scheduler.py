@@ -868,7 +868,7 @@ class Scheduler(Master):
         airmass = self.alt2airmass(alt)
         skybrightness = self.skybrightness(result['mjd'])
         lst = self.lst(result['mjd'])
-        iobs = self.observations.add(fieldid=fieldidx,
+        iobs = self.observations.add(fieldid=fieldid,
                                      mjd=result['mjd'],
                                      duration=result['duration'],
                                      sn2=result['sn2'],
