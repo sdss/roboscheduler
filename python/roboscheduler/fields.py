@@ -84,14 +84,8 @@ class Fields(object, metaclass=FieldsSingleton):
         self.fromarray(self.fields_fits)
         return
 
-<<<<<<< HEAD
-    def add_observations(self, mjd=None, fieldid=None, iobs=None, lst=None):
-        self.observations[fieldid] = np.append(self.observations[fieldid],
-=======
     def add_observations(self, mjd=None, fieldidx=None, iobs=None, lst=None):
-        self.observations[fieldidx] = np.append(self.observations[fieldidx],
->>>>>>> 52bfb422a0122dc9e805055cd50d7fd4ea90ba31
-                                               iobs)
+        self.observations[fieldidx] = np.append(self.observations[fieldidx], iobs)
         self.icadence[fieldidx] = self.icadence[fieldidx] + 1
         cadence = self.cadencelist.cadences[self.cadence[fieldidx]]
         if(self.icadence[fieldidx] < cadence.nexposures):
@@ -142,11 +136,7 @@ class Fields(object, metaclass=FieldsSingleton):
     #         self._lunationPlan = np.array([np.mean(p[1]) for p in self.obsPlan])
     #     return self._lunationPlan
 
-<<<<<<< HEAD
-    def lstWeight(self, lst, fields=None):
-=======
     def lstWeight(self, lst, field_idx=None):
->>>>>>> 52bfb422a0122dc9e805055cd50d7fd4ea90ba31
         # field id corresponds to indx, so fields is id/indx
         # as is everywhere, but just to keep reminding me...
         assert lst > 0 and lst < 24, "lst must be in hours!"
