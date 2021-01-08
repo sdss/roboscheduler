@@ -73,7 +73,7 @@ class Observations(object):
         self.fieldid = np.zeros(0, dtype=np.int32)
         self.racen = np.zeros(0, dtype=np.float64)
         self.deccen = np.zeros(0, dtype=np.float64)
-        self.cadence = np.zeros(0, dtype=np.a40)
+        self.cadence = np.zeros(0, dtype=np.dtype('a20'))
         self.nfilled = np.zeros(0, dtype=np.int32)
         self.mjd = np.zeros(0, dtype=np.float64)
         self.duration = np.zeros(0, dtype=np.float64)
@@ -110,7 +110,7 @@ class Observations(object):
         self.deccen = np.append(self.deccen,
                                 np.array([np.float64(deccen)]))
         self.cadence = np.append(self.cadence,
-                                 np.array([np.a40(cadence)]))
+                                 np.array([cadence]))
         self.nfilled = np.append(self.nfilled,
                                  np.array([np.int32(nfilled)]))
 
@@ -151,7 +151,7 @@ class Observations(object):
                 ('lst', np.float32),
                 ('racen', np.float64),
                 ('deccen', np.float64),
-                ('cadence', np.a40),
+                ('cadence', np.dtype('a20')),
                 ('nfilled', np.int32),
                 ('ha', np.float32),
                 ('nexp_cumul', np.int32)]
