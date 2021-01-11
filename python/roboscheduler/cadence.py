@@ -102,8 +102,11 @@ class Cadence(cCadenceCore.CadenceCore):
     epoch_indx : ndarray of np.int32
         index into delta for first exposure at each epoch
 
-    epoch_nexposures : ndarray of np.float32
+    epoch_nexposures : ndarray of np.int32
         number of exposures for each separate epoch
+
+    epochs : ndarray of np.int32
+        epoch number for each exposure
 
     Methods:
     -------
@@ -349,17 +352,6 @@ class CadenceList(object, metaclass=CadenceListSingleton):
 
         Notes:
         -----
-
-        Each cadence may have a set of epochs with delta = -1.
-        There are nexposures_pack_1 epochs with delta >= 0 in one
-        There are nexposures_fill_1 epochs with delta == -1 in one
-        There are nexposures_pack_2 epochs with delta >= 0 in two
-        There are nexposures_fill_2 epochs with delta == -1 in two
-
-        A solution is a tuple, with
-           solns - an array of nexposures_pack_1 exposures within cadence 2
-           fill - a 2-d array (nexposures_fill_1, nexposures_2) expressing
-                  which exposures can be filled into for this solution
 """
         cache_key = (one, two, epoch_level, return_solutions)
         if(cache_key in self._cadence_consistency):
@@ -374,6 +366,56 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         else:
             self._cadence_consistency[cache_key] = success
         return(self._cadence_consistency[cache_key])
+
+    def exposure_consistency(self, one, two, iexp):
+        """Is cadence #1 consistent with a set of exposures in cadence #2?
+
+        Parameters:
+        ----------
+
+        one : string
+            name of cadence #1
+
+        two : string
+            name of cadence #2
+
+        iexp : ndarray of np.int32
+            indices of exposures to check
+
+        Returns:
+        -------
+
+        ok : bool
+            True if these exposures under cadence #2 satisfy cadence #1
+"""
+        # Are there any ways cadence one fits into cadence two?
+        ok, epochs_list = self.cadence_consistency(one, two)
+        if(not ok):
+            return False
+
+        # Check each solution and see if the current assignment satisfies
+        for epochs_two in epochs_list:
+
+            # For this solution, count how many exposures are required
+            # at each epoch of cadence two
+            nneed = np.zeros(self.cadences[two].nepochs, dtype=np.int32)
+            for epoch_one, epoch_two in enumerate(epochs_two):
+                nneed[epoch_two] = nneed[epoch_two] + self.cadences[one].nexp[epoch_one]
+
+            # Now count how many exposures there are at each epoch for this
+            # array of iexp
+            epochs_two_got, nexps_got = np.unique(self.cadences[two].epochs[iexp],
+                                                  return_counts=True)
+            ngot = np.zeros(self.cadences[two].nepochs, dtype=np.int32)
+            ngot[epochs_two_got] = nexps_got
+
+            # For each exposure in the solution, are there enough exposures?
+            nbad = (ngot < nneed).sum()
+            if(nbad == 0):
+                return True
+
+        # If we have gotten here no working solution was found
+        return False
 
     def fromarray(self, cadences_array=None):
         """Add cadences to ccadence list from an array
