@@ -6,6 +6,7 @@ import roboscheduler.cadence as cadence
 
 def test_add_cadence():
     clist = cadence.CadenceList()
+    clist.reset()
 
     clist.add_cadence(name='single_1x1',
                       nepochs=1,
@@ -45,6 +46,7 @@ def test_add_cadence():
 
 def test_epochs_consistency_1():
     clist = cadence.CadenceList()
+    clist.reset()
 
     clist.add_cadence(name='timed_2x1',
                       nepochs=2,
@@ -75,6 +77,7 @@ def test_epochs_consistency_1():
 
 def test_epochs_consistency_2():
     clist = cadence.CadenceList()
+    clist.reset()
 
     clist.add_cadence(name='single_2x1',
                       nepochs=2,
@@ -120,6 +123,7 @@ def test_epochs_consistency_2():
 
 def test_epochs_consistency_3():
     clist = cadence.CadenceList()
+    clist.reset()
 
     clist.add_cadence(name='bright_2x1',
                       nepochs=2,
@@ -150,6 +154,7 @@ def test_epochs_consistency_3():
 
 def test_epochs_consistency_4():
     clist = cadence.CadenceList()
+    clist.reset()
 
     clist.add_cadence(name='bright_3x2',
                       nepochs=3,
@@ -186,8 +191,47 @@ def test_epochs_consistency_4():
                                                            epochs=[0, 0, 0]) is False
 
 
+def test_exposure_consistency():
+    clist = cadence.CadenceList()
+    clist.reset()
+
+    clist.add_cadence(name='bright_3x2',
+                      nepochs=3,
+                      skybrightness=[1., 1., 1.],
+                      instrument='BOSS',
+                      delta=[-1., -1., -1.],
+                      delta_min=[-1., -1., -1.],
+                      delta_max=[-1., -1., -1.],
+                      nexp=[2, 2, 2])
+
+    clist.add_cadence(name='bright_3x1',
+                      nepochs=3,
+                      skybrightness=[1., 1., 1.],
+                      instrument='BOSS',
+                      delta=[-1., -1., -1.],
+                      delta_min=[-1., -1., -1.],
+                      delta_max=[-1., -1., -1.],
+                      nexp=[1, 1, 1])
+
+    assert clist.exposure_consistency('bright_3x1', 'bright_3x2',
+                                      [0, 1, 2]) is True
+
+    assert clist.exposure_consistency('bright_3x1', 'bright_3x2',
+                                      [0, 0, 2]) is True
+
+    assert clist.exposure_consistency('bright_3x1', 'bright_3x2',
+                                      [0, 0, 0]) is False
+
+    assert clist.exposure_consistency('bright_3x1', 'bright_3x2',
+                                      [0, 2, 2]) is True
+
+    assert clist.exposure_consistency('bright_3x1', 'bright_3x2',
+                                      [2, 2, 2]) is False
+
+
 def test_cadence_consistency_1():
     clist = cadence.CadenceList()
+    clist.reset()
 
     clist.add_cadence(name='single_2x1',
                       nepochs=2,
@@ -233,6 +277,7 @@ def test_cadence_consistency_1():
 
 def test_cadence_consistency_2():
     clist = cadence.CadenceList()
+    clist.reset()
 
     clist.add_cadence(name='single_100x1',
                       nepochs=100,
@@ -285,6 +330,7 @@ def test_cadence_consistency_2():
 
 def test_cadence_consistency_3():
     clist = cadence.CadenceList()
+    clist.reset()
 
     clist.add_cadence(name='mwm_tess_rgb_2x1',
                       nepochs=2,
@@ -306,3 +352,68 @@ def test_cadence_consistency_3():
 
     ok, epochs_list = clist.cadence_consistency('mwm_tess_rgb_2x1', 'csc_faint_boss_1x4')
     assert ok is False
+
+
+def test_cadence_consistency_4():
+    clist = cadence.CadenceList()
+    clist.reset()
+
+    clist.add_cadence(name='dark_2x2',
+                      nepochs=2,
+                      instrument='BOSS',
+                      skybrightness=[0.35, 0.35],
+                      delta=[0., 26.],
+                      delta_min=[0., 1.],
+                      delta_max=[0., 3000.],
+                      nexp=[2, 2])
+
+    clist.add_cadence(name='dark_6x3',
+                      nepochs=6,
+                      instrument='BOSS',
+                      skybrightness=[0.35] * 6,
+                      delta=[0., 26., 26., 26., 26., 26.],
+                      delta_min=[0., 1., 1., 1., 1., 1.],
+                      delta_max=[0., 3000., 3000., 3000., 3000., 3000.],
+                      nexp=[3] * 6)
+
+    clist.add_cadence(name='dark_4x1',
+                      nepochs=4,
+                      instrument='BOSS',
+                      skybrightness=[0.35] * 4,
+                      delta=[-1.] * 4,
+                      delta_min=[-1.] * 4,
+                      delta_max=[-1.] * 4,
+                      nexp=[1] * 4)
+
+    clist.add_cadence(name='dark_8x1',
+                      nepochs=8,
+                      instrument='BOSS',
+                      skybrightness=[0.35] * 8,
+                      delta=[-1.] * 8,
+                      delta_min=[-1.] * 8,
+                      delta_max=[-1.] * 8,
+                      nexp=[1] * 8)
+
+    ok, epochs_list = clist.cadence_consistency('dark_4x1',
+                                                'dark_2x2')
+    assert ok is True
+
+    ok, epochs_list = clist.cadence_consistency('dark_2x2',
+                                                'dark_6x3')
+    assert ok is True
+
+    ok, epochs_list = clist.cadence_consistency('dark_4x1',
+                                                'dark_6x3')
+    assert ok is True
+
+    ok, epochs_list = clist.cadence_consistency('dark_2x2',
+                                                'dark_4x1')
+    assert ok is False
+
+    ok, epochs_list = clist.cadence_consistency('dark_8x1',
+                                                'dark_2x2')
+    assert ok is False
+
+    ok, epochs_list = clist.cadence_consistency('dark_8x1',
+                                                'dark_6x3')
+    assert ok is True
