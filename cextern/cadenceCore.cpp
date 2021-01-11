@@ -111,7 +111,7 @@ bool CadenceCore::epochsConsistency(CadenceCore target_cadence,
   std::vector<int> nexp_count;
 
 	nexp_count.resize(nepochs);
-	for(unsigned long i = 0; i < nepochs; i++)
+	for(int i = 0; i < nepochs; i++)
 		nexp_count[i] = 0;
 
 	int *t_nexp_a = (int *) target_cadence.nexp.request().ptr;
@@ -160,14 +160,30 @@ std::vector<std::vector<int>> CadenceCore::cadenceConsistency(CadenceCore target
 	std::vector<std::vector<int>> epochs_list;
 	std::vector<std::vector<int>> current_epochs_list;
 	std::vector<int> epochs;
-	int ok, ifield_start;
+	int ok, ifield_start, nexp_left_target, nexp_left_field;
+
+	int *t_nexp_a = (int *) target_cadence.nexp.request().ptr;
+	int *nexp_a = (int *) nexp.request().ptr;
 
 	// Initialize solutions to those to start with
 	for(auto istart = 0; istart < nepochs; istart++) {
 		epochs.clear();
 		epochs.push_back(istart);
-		if(epochsConsistency(target_cadence, epochs))
-			epochs_list.push_back(epochs);
+		if(epochsConsistency(target_cadence, epochs)) {
+			// Check number of exposures left total; if the field
+			// doesn't have enough exposures left, no point in continuing
+			// the check
+			nexp_left_target = 0;
+			for(auto j = 1; j < target_cadence.nepochs; j++)
+				nexp_left_target += t_nexp_a[j];
+			nexp_left_field = nexp_a[istart] - t_nexp_a[0];
+			for(auto j = istart + 1; j < nepochs; j++)
+				nexp_left_field += nexp_a[j];
+
+			if(nexp_left_field >= nexp_left_target) {
+				epochs_list.push_back(epochs);
+			}
+		}
 	}
 
 	// Return if nowhere to begin
@@ -191,7 +207,21 @@ std::vector<std::vector<int>> CadenceCore::cadenceConsistency(CadenceCore target
 				epochs.push_back(ifield);
 				ok = epochsConsistency(target_cadence, epochs);
 				if(ok) {
-					epochs_list.push_back(epochs);
+					// Check number of exposures left total; if the field
+					// doesn't have enough exposures left, no point in
+					// continuing the check; note that this check includes any
+					// previously used exposures of the current epoch, even though
+					// some of those may have been used already. That will allow
+					// a non-viable case through, but the epochConsistency()
+					// check will catch those issues in subsequent target epochs.
+					nexp_left_target = 0;
+					for(int j = epochs.size(); j < target_cadence.nepochs; j++)
+						nexp_left_target += t_nexp_a[j];
+					nexp_left_field = nexp_a[ifield] - t_nexp_a[epochs.size() - 1];
+					for(auto j = ifield + 1; j < nepochs; j++)
+						nexp_left_field += nexp_a[j];
+					if(nexp_left_field >= nexp_left_target)
+						epochs_list.push_back(epochs);
 				}
 			}
 			epochs.clear();
