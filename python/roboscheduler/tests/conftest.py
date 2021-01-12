@@ -9,6 +9,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import os
 
 """
 Here you can add fixtures that will be used for all the tests in this
@@ -17,3 +18,7 @@ Those conftest.py will only be applies to the tests in that subdirectory and
 underlying directories. See https://docs.pytest.org/en/2.7.3/plugins.html for
 more information.
 """
+
+rs_dir = os.path.abspath(__file__).split("/python/roboscheduler/")[0]
+
+os.environ["ROBOSCHEDULER_DIR"] = rs_dir
