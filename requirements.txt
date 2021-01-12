@@ -2,7 +2,8 @@
 numpy
 PyAstronomy
 ortools
-# astropy
+astropy
+scipy
 pyyaml
 pygments
 sdss-tree>=2.15.2
