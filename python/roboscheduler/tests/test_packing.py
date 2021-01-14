@@ -78,30 +78,30 @@ class TestPacking(object):
         assert (packing.check_target(target_cadence='faint_month_2x2')['ok']
                 is False)
 
-    def test_add_target(self):
-        clist = cadence.CadenceList()
-        clist.reset()
-        cfile = os.path.join(os.getenv('ROBOSCHEDULER_DIR'),
-                             'data', 'rsc-test-cadence.fits')
-        clist.fromfits(cfile)
+    # def test_add_target(self):
+    #     clist = cadence.CadenceList()
+    #     clist.reset()
+    #     cfile = os.path.join(os.getenv('ROBOSCHEDULER_DIR'),
+    #                          'data', 'rsc-test-cadence.fits')
+    #     clist.fromfits(cfile)
 
-        packing = cadence.Packing(field_cadence='faint_2x4')
-        assert(packing.add_target(target_id=1, target_cadence='faint_1x1') is
-               True)
-        assert(packing.add_target(target_id=1, target_cadence='faint_2x4') is
-               False)
-        assert(packing.epoch_targets[0][0] == 1)
-        assert(packing.epoch_nused[0] == 1)
-        assert(packing.epoch_nused.sum() == 1)
-        assert(packing.exposures[0] == 1)
-        assert(packing.exposures[1:].max() == -1)
+    #     packing = cadence.Packing(field_cadence='faint_2x4')
+    #     assert(packing.add_target(target_id=1, target_cadence='faint_1x1') is
+    #            True)
+    #     assert(packing.add_target(target_id=1, target_cadence='faint_2x4') is
+    #            False)
+    #     assert(packing.epoch_targets[0][0] == 1)
+    #     assert(packing.epoch_nused[0] == 1)
+    #     assert(packing.epoch_nused.sum() == 1)
+    #     assert(packing.exposures[0] == 1)
+    #     assert(packing.exposures[1:].max() == -1)
 
-        packing = cadence.Packing(field_cadence='faint_2x4')
-        assert(packing.add_target(target_id=1, target_cadence='faint_2x4') is
-               True)
-        assert(packing.add_target(target_id=1, target_cadence='faint_1x4') is
-               False)
-        assert(packing.epoch_nused.min() == 4)
-        assert(packing.epoch_nused.max() == 4)
-        assert(packing.exposures.min() == 1)
-        assert(packing.exposures.max() == 1)
+    #     packing = cadence.Packing(field_cadence='faint_2x4')
+    #     assert(packing.add_target(target_id=1, target_cadence='faint_2x4') is
+    #            True)
+    #     assert(packing.add_target(target_id=1, target_cadence='faint_1x4') is
+    #            False)
+    #     assert(packing.epoch_nused.min() == 4)
+    #     assert(packing.epoch_nused.max() == 4)
+    #     assert(packing.exposures.min() == 1)
+    #     assert(packing.exposures.max() == 1)
