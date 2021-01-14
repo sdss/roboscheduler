@@ -690,10 +690,12 @@ class Scheduler(Master):
                     cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
                     iobservations = self.fields.observations[indx]
                     mjd_past = self.observations.mjd[iobservations]
-                    nexp[indx] = cadence.smart_epoch_nexp(mjd_past)
+                    epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=45) - 1
+                    nexp[indx] = cadence.nexp[epoch_idx]
                     ignoreMax = indx in whereRM
                     observable[indx], delta_remaining[indx] =\
-                        cadence.evaluate_next(mjd_past=mjd_past,
+                        cadence.evaluate_next(epoch_idx=epoch_idx,
+                                              mjd_past=mjd_prev,
                                               mjd_next=mjd,
                                               skybrightness_next=skybrightness,
                                               check_skybrightness=check_skybrightness,
@@ -883,6 +885,32 @@ class Scheduler(Master):
 
         self.fields.add_observations(result['mjd'], fieldidx, iobs, lst)
         return
+
+
+def epochs_completed(mjd_past, tolerance=45):
+    """Calculate # of observed epochs, allowing
+    for more exposures than planned.
+
+    tolerance is in minutes
+    """
+    if len(mjd_past) == 0:
+        return 0, 0
+
+    tolerance = tolerance / 60. / 24.
+    begin_last_epoch = mjd_past[0]
+
+    obs_epochs = 1
+    prev = begin_last_epoch
+    for m in mjd_past:
+        delta = m - prev
+        if delta < tolerance:
+            continue
+        else:
+            obs_epochs += 1
+            begin_last_epoch = m
+        prev = m
+
+    return obs_epochs, begin_last_epoch
 
 
 def lstDiffSingle(a, b):

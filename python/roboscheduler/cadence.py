@@ -138,6 +138,7 @@ class Cadence(cCadenceCore.CadenceCore):
         delta_max = self._arrayify(delta_max, dtype=np.float32)
         nexp = self._arrayify(nexp, dtype=np.int32)
         epoch_indx = np.zeros(nepochs + 1, dtype=np.int32)
+        # "epochs" below is ACTUALLY the total number of exposures
         epochs = np.zeros(nexp.sum(), dtype=np.int32)
         super().__init__(name, nepochs, instrument,
                          skybrightness, delta, delta_min,
@@ -159,45 +160,45 @@ class Cadence(cCadenceCore.CadenceCore):
             length = 1
         return np.zeros(length, dtype=dtype) + quantity
 
-    def smart_epoch_nexp(self, mjd_past, tolerance=45):
-        """Calculate # of observed epochs, allowing
-        for more exposures than planned.
+    # def smart_epoch_nexp(self, mjd_past, tolerance=45):
+    #     """Calculate # of observed epochs, allowing
+    #     for more exposures than planned.
 
-        tolerance is in minutes
-        """
-        nexposures_past = len(mjd_past)
-        if(nexposures_past >= self.nexposures):
-            return 1
+    #     tolerance is in minutes
+    #     """
+    #     nexposures_past = len(mjd_past)
+    #     if(nexposures_past >= self.epochs):
+    #         return 1
 
-        tolerance = tolerance / 60. / 24.
-        obs_epochs = 0
-        prev = 0
-        for m in mjd_past:
-            delta = m - prev
-            prev = m
-            if delta < tolerance:
-                continue
-            else:
-                obs_epochs += 1
+    #     tolerance = tolerance / 60. / 24.
+    #     obs_epochs = 0
+    #     prev = 0
+    #     for m in mjd_past:
+    #         delta = m - prev
+    #         prev = m
+    #         if delta < tolerance:
+    #             continue
+    #         else:
+    #             obs_epochs += 1
 
-        if obs_epochs >= self.nepochs:
-            assert nexposures_past >= self.nexposures, "skipped some exposures!!"
-            return 1
+    #     if obs_epochs >= self.nepochs:
+    #         assert nexposures_past >= self.epochs, "skipped some exposures!!"
+    #         return 1
 
-        nexposures_next = self.epoch_nexposures[obs_epochs]
+    #     nexposures_next = self.nexp[obs_epochs]
 
-        return nexposures_next
+    #     return nexposures_next
 
-    def next_epoch_nexp(self, mjd_past):
-        """get number of exposures for elligible epoch"""
-        nexposures_past = len(mjd_past)
-        if(nexposures_past >= self.nexposures):
-            return 1
-        epoch_indx = np.where(self.epoch_indx == nexposures_past)[0]
-        nexposures_next = self.epoch_nexposures[epoch_indx]
-        assert len(nexposures_next) == 1, "epoch selection failed"
+    # def next_epoch_nexp(self, mjd_past):
+    #     """get number of exposures for elligible epoch"""
+    #     nexposures_past = len(mjd_past)
+    #     if(nexposures_past >= self.epochs):
+    #         return 1
+    #     epoch_indx = np.where(self.epoch_indx == nexposures_past)[0]
+    #     nexposures_next = self.nexp[epoch_indx]
+    #     assert len(nexposures_next) == 1, "epoch selection failed"
 
-        return nexposures_next
+    #     return nexposures_next
 
     def skybrightness_check(self, mjd_past, skybrightness_next):
         """check lunation for mjd_past against lunation_next"""
