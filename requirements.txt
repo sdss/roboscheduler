@@ -5,6 +5,7 @@ ortools
 astropy
 scipy
 fitsio
+pybind11
 pydl
 pyyaml
 pygments
