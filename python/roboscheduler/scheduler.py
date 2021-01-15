@@ -690,7 +690,10 @@ class Scheduler(Master):
                     cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
                     iobservations = self.fields.observations[indx]
                     mjd_past = self.observations.mjd[iobservations]
-                    epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=45) - 1
+                    # epoch_idx is the *index* of the *next* epoch
+                    # for 0 indexed arrays, this equivalent to
+                    # "how many epochs have I done previously"
+                    epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=45)
                     nexp[indx] = cadence.nexp[epoch_idx]
                     ignoreMax = indx in whereRM
                     observable[indx], delta_remaining[indx] =\
