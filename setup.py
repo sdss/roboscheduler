@@ -58,7 +58,7 @@ if sys.platform == 'darwin':
     extra_link_args = ["-v", '-mmacosx-version-min=10.9']
 
 module = Extension(
-    'roboscheduler/cCadenceCore',
+    'roboscheduler.cCadenceCore',
     include_dirs=getIncludes(),
     extra_compile_args=extra_compile_args,
     extra_link_args=extra_link_args,
