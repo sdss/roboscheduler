@@ -80,6 +80,7 @@ def run(packages, install_requires):
           url='https://github.com/sdss/roboscheduler',
           include_package_data=True,
           packages=packages,
+          setup_requires=["pybind11"],
           install_requires=install_requires,
           package_dir={'': 'python'},
           scripts=['bin/roboscheduler'],
