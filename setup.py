@@ -58,7 +58,7 @@ if sys.platform == 'darwin':
     extra_link_args = ["-v", '-mmacosx-version-min=10.9']
 
 module = Extension(
-    'roboscheduler/cCadenceCore',
+    'roboscheduler.cCadenceCore',
     include_dirs=getIncludes(),
     extra_compile_args=extra_compile_args,
     extra_link_args=extra_link_args,
@@ -80,6 +80,7 @@ def run(packages, install_requires):
           url='https://github.com/sdss/roboscheduler',
           include_package_data=True,
           packages=packages,
+          setup_requires=["pybind11"],
           install_requires=install_requires,
           package_dir={'': 'python'},
           scripts=['bin/roboscheduler'],
