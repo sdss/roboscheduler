@@ -677,7 +677,7 @@ class Scheduler(Master):
         # valid cadence checks against "none" cadence issue
         observable = (alt > 0.) & (airmass < self.airmass_limit) & self.fields.validCadence
         nexp = np.ones(len(observable), dtype=int)
-        delta_remaining = np.zeros(len(observable), dtype=np.float64)
+        delta_priority = np.zeros(len(observable), dtype=np.float64)
 
         whereRM = np.where(["bhm_rm" in c for c in self.fields.cadence])[0]
 
@@ -697,10 +697,13 @@ class Scheduler(Master):
                     if epoch_idx >= cadence.nepochs:
                         observable[indx] = False
                         continue
+                    # how many exp/"designs" since start of last epoch?
+                    exp_epoch = len(np.where(mjd_past > mjd_prev)[0])
                     nexp[indx] = cadence.nexp[epoch_idx]
                     ignoreMax = indx in whereRM
-                    observable[indx], delta_remaining[indx] =\
+                    observable[indx], delta_priority[indx] =\
                         cadence.evaluate_next(epoch_idx=epoch_idx,
+                                              exp_epoch=exp_epoch,
                                               mjd_past=mjd_prev,
                                               mjd_next=mjd,
                                               skybrightness_next=skybrightness,
@@ -711,13 +714,13 @@ class Scheduler(Master):
                     #     if indx in whereRM and skybrightness <= 0.35:
                     #         print(indx, " kicked out for nexp")
                     # if indx in whereRM and skybrightness <= 0.35:
-                    #     print(mjd, indx, observable[indx], delta_remaining[indx])
+                    #     print(mjd, indx, observable[indx], delta_priority[indx])
         else:
             rejected = 0
             # print("lunation: ", lunation)
             iobservable = np.where(observable)[0]
             # 1,000,000 means it won't affect the weight
-            delta_remaining = np.ones(len(observable), dtype=np.float64)*1e6
+            delta_priority = np.ones(len(observable), dtype=np.float64)*1e6
             for indx in iobservable:
                 if(observable[indx]):
                     cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
@@ -736,10 +739,10 @@ class Scheduler(Master):
 
         iobservable = np.where(observable)[0]
 
-        return iobservable, nexp[iobservable], delta_remaining[iobservable]
+        return iobservable, nexp[iobservable], delta_priority[iobservable]
 
     def prioritize(self, mjd=None, iobservable=None, nexp=None,
-                   delta_remaining=None):
+                   delta_priority=None):
         """Return the fieldid to pick from using heuristic strategy
 
         Parameters:
@@ -758,8 +761,9 @@ class Scheduler(Master):
             fieldid
         """
 
-        priority = np.ones(len(iobservable))*200
+        priority = np.ones(len(iobservable))*100
         # priority = self.fields.basePriority[fieldid]
+        priority += delta_priority
 
         priority += 5*nexp
 
@@ -772,7 +776,7 @@ class Scheduler(Master):
         lstDiffs = self.fields.lstWeight(lstHrs, iobservable)
 
         assert len(lstDiffs) == len(iobservable), "lst weight going poorly"
-        assert 0 not in delta_remaining, "some delta remaining not set properly!"
+        # assert 0 not in delta_remaining, "some delta remaining not set properly!"
 
         ha = self.ralst2ha(ra=self.fields.racen[iobservable], lst=lst)
         dec = self.fields.deccen[iobservable]
@@ -783,8 +787,6 @@ class Scheduler(Master):
         # priority += 20 * np.exp( -(ha)**2 / (2 * 15**2))
         # gaussian weight, mean = obs lat, use 20 deg std
         # priority -= 20 * np.exp( -(dec - self.latitude)**2 / (2 * 20**2))
-        # 1/sqrt(x) priority; at 1 day +100, at 10 days +30, at 30 days +18
-        priority += 15 * np.clip(10/np.sqrt(delta_remaining), a_min=None, a_max=10)
 
         return priority
 
@@ -815,11 +817,11 @@ class Scheduler(Master):
         fieldid : np.int32, int
             ID of field to observe
         """
-        iobservable, nexp, delta_remaining = self.observable(mjd=mjd, maxExp=maxExp)
+        iobservable, nexp, delta_priority = self.observable(mjd=mjd, maxExp=maxExp)
         if(len(iobservable) == 0):
             # print("Nothing observable")
-            iobservable, nexp, delta_remaining = self.observable(mjd=mjd, maxExp=maxExp,
-                                                       check_cadence=False)
+            iobservable, nexp, delta_priority = self.observable(mjd=mjd, maxExp=maxExp,
+                                                                check_cadence=False)
         if len(iobservable) == 0:
             # print("!! nothing to observe; {} exp left in the night".format(maxExp))
             if returnAll:
@@ -827,7 +829,7 @@ class Scheduler(Master):
             return None, -1
 
         priority = self.prioritize(iobservable=iobservable, mjd=mjd,
-                                   nexp=nexp, delta_remaining=delta_remaining)
+                                   nexp=nexp, delta_priority=delta_priority)
 
         # considered = False
         # print(observable_fieldid)

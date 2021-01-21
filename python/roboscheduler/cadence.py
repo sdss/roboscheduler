@@ -160,86 +160,54 @@ class Cadence(cCadenceCore.CadenceCore):
             length = 1
         return np.zeros(length, dtype=dtype) + quantity
 
-    # def smart_epoch_nexp(self, mjd_past, tolerance=45):
-    #     """Calculate # of observed epochs, allowing
-    #     for more exposures than planned.
-
-    #     tolerance is in minutes
-    #     """
-    #     nexposures_past = len(mjd_past)
-    #     if(nexposures_past >= self.epochs):
-    #         return 1
-
-    #     tolerance = tolerance / 60. / 24.
-    #     obs_epochs = 0
-    #     prev = 0
-    #     for m in mjd_past:
-    #         delta = m - prev
-    #         prev = m
-    #         if delta < tolerance:
-    #             continue
-    #         else:
-    #             obs_epochs += 1
-
-    #     if obs_epochs >= self.nepochs:
-    #         assert nexposures_past >= self.epochs, "skipped some exposures!!"
-    #         return 1
-
-    #     nexposures_next = self.nexp[obs_epochs]
-
-    #     return nexposures_next
-
-    # def next_epoch_nexp(self, mjd_past):
-    #     """get number of exposures for elligible epoch"""
-    #     nexposures_past = len(mjd_past)
-    #     if(nexposures_past >= self.epochs):
-    #         return 1
-    #     epoch_indx = np.where(self.epoch_indx == nexposures_past)[0]
-    #     nexposures_next = self.nexp[epoch_indx]
-    #     assert len(nexposures_next) == 1, "epoch selection failed"
-
-    #     return nexposures_next
-
     def skybrightness_check(self, epoch_idx, skybrightness_next):
         """check lunation for mjd_past against lunation_next"""
         if(epoch_idx >= self.nepochs):
             return skybrightness_next <= self.skybrightness[-1]
         return skybrightness_next <= self.skybrightness[epoch_idx]
 
-    def evaluate_next(self, epoch_idx=None, mjd_past=None, mjd_next=None,
+    def evaluate_next(self, epoch_idx=None, exp_epoch=None,
+                      mjd_past=None, mjd_next=None,
                       skybrightness_next=None, check_skybrightness=True,
                       ignoreMax=False):
         """Evaluate next choice of observation
 
            Returns whether cadence is ok AND how long until
            cadence will become impossible (deltaMax - delta)
-
-        TODO: let's calculate a priority in here, not just a time till max
-        this way we can heavily weight orphaned epochs
-
-        if orphaned epochs are to be dealt with here...
-
-        Also: can use delta_nom for priority,
-        weight be abs(delta_curr-delta_nom[idx])
         """
-        if(epoch_idx >= self.nepochs):
+
+        # are we finished with the last epoch?
+        # epoch_idx = 0 will happen a lot, it's the first epoch!
+        if exp_epoch < self.nexp[epoch_idx - 1] and epoch_idx != 0:
+            epoch_idx -= 1
+            base_priority = 200
+        elif(epoch_idx >= self.nepochs):
             print("done!")
             return(False, 0)
+        else:
+            base_priority = 0
 
         ok_skybrightness = (self.skybrightness_check(epoch_idx, skybrightness_next)|
                                                     (check_skybrightness is False))
         if(epoch_idx == 0):
-            return(ok_skybrightness, 1e6)
+            return(ok_skybrightness, 0)
 
         delta_curr = mjd_next - mjd_past
         dlo = self.delta_min[epoch_idx]
         dhi = self.delta_max[epoch_idx]
+        dnom = self.delta[epoch_idx]
         if(dlo == -1):
-            return(ok_skybrightness, 1e6)
+            return(ok_skybrightness, 0)
         # print("delta {} dhi {} dlo {}".format(delta, dhi, dlo))
+        # 1/sqrt(x) priority; at 1 day +100, at 10 days +30, at 30 days +18
+        remain_priority = 15 * np.clip(10/np.sqrt(np.abs(dhi - delta_curr)),
+                                       a_min=None, a_max=10)
+        nom_priority = 5 * np.clip(10/np.sqrt(np.abs(dnom - delta_curr)),
+                                       a_min=None, a_max=10)
+        priority = base_priority + remain_priority + nom_priority
         if ignoreMax:
-            return(ok_skybrightness & (delta_curr >= dlo), np.abs(dhi - delta_curr))
-        return(ok_skybrightness & (delta_curr >= dlo) & (delta_curr <= dhi), dhi - delta_curr)
+            return(ok_skybrightness & (delta_curr >= dlo), priority)
+        return(ok_skybrightness & (delta_curr >= dlo) & (delta_curr <= dhi), priority)
 
 
 class CadenceList(object, metaclass=CadenceListSingleton):
