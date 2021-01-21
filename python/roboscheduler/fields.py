@@ -84,15 +84,17 @@ class Fields(object, metaclass=FieldsSingleton):
         self.fromarray(self.fields_fits)
         return
 
-    def add_observations(self, mjd=None, fieldidx=None, iobs=None, lst=None):
+    def add_observations(self, mjd=None, fieldidx=None, iobs=None,
+                         lst=None, epoch_idx=None):
         self.observations[fieldidx] = np.append(self.observations[fieldidx], iobs)
-        self.icadence[fieldidx] = self.icadence[fieldidx] + 1
+        self.icadence[fieldidx] = epoch_idx
         cadence = self.cadencelist.cadences[self.cadence[fieldidx]]
-        if(self.icadence[fieldidx] < cadence.nexposures):
+        if(self.icadence[fieldidx] < cadence.nepochs):
             self.nextmjd[fieldidx] = (mjd +
                                      cadence.delta_min[self.icadence[fieldidx]])
         else:
             self.nextmjd[fieldidx] = 100000.
+            self.icadence[fieldidx] = cadence.nepochs - 1
         int_lst = int(np.round(lst/15, 0))
         if int_lst == 24:
             int_lst = 0

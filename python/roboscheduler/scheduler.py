@@ -694,6 +694,9 @@ class Scheduler(Master):
                     # for 0 indexed arrays, this equivalent to
                     # "how many epochs have I done previously"
                     epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=45)
+                    if epoch_idx >= cadence.nepochs:
+                        observable[indx] = False
+                        continue
                     nexp[indx] = cadence.nexp[epoch_idx]
                     ignoreMax = indx in whereRM
                     observable[indx], delta_remaining[indx] =\
@@ -720,8 +723,11 @@ class Scheduler(Master):
                     cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
                     iobservations = self.fields.observations[indx]
                     mjd_past = self.observations.mjd[iobservations]
-                    nexp[indx] = cadence.next_epoch_nexp(mjd_past)
-                    skybrightness_ok = cadence.skybrightness_check(mjd_past, skybrightness)
+                    epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=45)
+                    if epoch_idx >= cadence.nepochs:
+                        epoch_idx = cadence.nepochs - 1
+                    nexp[indx] = cadence.nexp[epoch_idx]
+                    skybrightness_ok = cadence.skybrightness_check(epoch_idx, skybrightness)
                     if nexp[indx] > maxExp or not skybrightness_ok:
                         rejected += 1
                         observable[indx] = False
@@ -886,7 +892,15 @@ class Scheduler(Master):
                                      nfilled=nfilled,
                                      nexp_cumul=nexp_cumul)
 
-        self.fields.add_observations(result['mjd'], fieldidx, iobs, lst)
+        iobservations = self.fields.observations[fieldidx]
+        mjd_past = self.observations.mjd[iobservations]
+        # epoch_idx is the *index* of the *next* epoch
+        # for 0 indexed arrays, this equivalent to
+        # "how many epochs have I done previously"
+        epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=45)
+
+        self.fields.add_observations(result['mjd'], fieldidx, iobs, lst,
+                                     epoch_idx)
         return
 
 
