@@ -493,19 +493,18 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         newpks = pks.max() + 1 + np.arange(len(self.cadences))
 
         for cadence, pk in zip(self.cadences, newpks):
-            nexposures = int(self.cadences[cadence].nexposures)
+            nexposures = [int(n) for n in self.cadences[cadence].nexp]
             delta = [float(n) for n in self.cadences[cadence].delta]
             delta_min = [float(n) for n in self.cadences[cadence].delta_min]
             delta_max = [float(n) for n in self.cadences[cadence].delta_max]
             skybrightness = [float(n) for n in self.cadences[cadence].skybrightness]
-            instrument = [instrument_pk[n]
-                          for n in self.cadences[cadence].instrument]
+            # instrument = [instrument_pk[n]
+            #               for n in self.cadences[cadence].instrument]
             targetdb.Cadence.insert(pk=pk, label=cadence,
-                                    nexposures=nexposures,
+                                    nexp=nexposures,
                                     delta=delta, skybrightness=skybrightness,
                                     delta_min=delta_min,
-                                    delta_max=delta_max,
-                                    instrument_pk=instrument).execute()
+                                    delta_max=delta_max).execute()
 
     def updatedb(self):
         """Update the cadences in the targetdb by name
