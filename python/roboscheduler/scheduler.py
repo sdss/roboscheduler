@@ -654,7 +654,8 @@ class Scheduler(Master):
                        + self.observatory + ".fits"
         self.cadencelist = roboscheduler.cadence.CadenceList()
         self.cadencelist.fromfits(filename=cadence_file)
-        self.fields = roboscheduler.fields.Fields()
+        self.fields = roboscheduler.fields.Fields(plan=designbase,
+                                                  observatory=self.observatory)
         self.fields.fromfits(filename=fields_file)
         self.observations = roboscheduler.observations.Observations(observatory=self.observatory)
         return

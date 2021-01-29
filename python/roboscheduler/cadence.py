@@ -502,6 +502,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             #               for n in self.cadences[cadence].instrument]
             targetdb.Cadence.insert(pk=pk, label=cadence,
                                     nexp=nexposures,
+                                    nepochs=self.cadences[cadence].nepochs,
                                     delta=delta, skybrightness=skybrightness,
                                     delta_min=delta_min,
                                     delta_max=delta_max).execute()
@@ -547,24 +548,25 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             return()
 
         # Create dictionary to look up instrument pk from instrument name
-        instruments = targetdb.Instrument.select().dicts()
-        instrument = dict()
-        for cinstrument in instruments:
-            instrument[cinstrument['pk']] = cinstrument['label']
+        # instruments = targetdb.Instrument.select().dicts()
+        # instrument = dict()
+        # for cinstrument in instruments:
+        #     instrument[cinstrument['pk']] = cinstrument['label']
 
         cadences = targetdb.Cadence.select().dicts()
 
         for cadence in cadences:
-            if(cadence['delta'] is None):
+            if(cadence['delta'] is None or len(cadence['delta']) == 0):
                 continue
 
-            instruments = np.array([instrument[pk]
-                                    for pk in cadence['instrument_pk']])
-            if(len(instruments) == 0):
-                print("No instruments, defaulting to APOGEE")
-                instruments = ['APOGEE'] * cadence['nexposures']
+            # instruments = np.array([instrument[pk]
+            #                         for pk in cadence['instrument_pk']])
+            # if(len(instruments) == 0):
+            #     print("No instruments, defaulting to APOGEE")
+            #     instruments = ['APOGEE'] * cadence['nexposures']
             self.add_cadence(name=cadence['label'],
-                             nexposures=cadence['nexposures'],
+                             nexp=cadence['nexp'],
+                             nepochs=cadence['nepochs'],
                              delta=np.array(cadence['delta']),
                              delta_min=np.array(cadence['delta_min']),
                              delta_max=np.array(cadence['delta_max']),

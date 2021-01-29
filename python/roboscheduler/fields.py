@@ -3,6 +3,13 @@ import fitsio
 import roboscheduler.cadence
 import sys
 
+try:
+    import sdssdb.peewee.sdss5db.targetdb as targetdb
+    _database = True
+except:
+    _database = False
+
+
 # Class to define a singleton
 class FieldsSingleton(type):
     _instances = {}
@@ -40,7 +47,9 @@ class Fields(object, metaclass=FieldsSingleton):
     observations : list of ndarray of np.int32
         for each field, indices of observations
     """
-    def __init__(self):
+    def __init__(self, plan=None, observatory=None):
+        self.plan = plan
+        self.observatory = observatory
         self.nfields = 0
         self.racen = np.zeros(0, dtype=np.float64)
         self.deccen = np.zeros(0, dtype=np.float64)
@@ -69,7 +78,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.deccen = fields_array['deccen']
         self.nfilled = fields_array['nfilled']
         self.fieldid = np.arange(self.nfields, dtype=np.int32)
-        self.cadence = [c.strip() for c in fields_array['cadence']]
+        self.cadence = [str(c.strip()) for c in fields_array['cadence']]
         self.slots = fields_array['slots_exposures']
         self.lstObserved = np.zeros((len(self.slots), 24), dtype=np.int32)
         self.observations = [np.zeros(0, dtype=np.int32)] * self.nfields
@@ -91,7 +100,7 @@ class Fields(object, metaclass=FieldsSingleton):
         cadence = self.cadencelist.cadences[self.cadence[fieldidx]]
         if(self.icadence[fieldidx] < cadence.nepochs):
             self.nextmjd[fieldidx] = (mjd +
-                                     cadence.delta_min[self.icadence[fieldidx]])
+                                      cadence.delta_min[self.icadence[fieldidx]])
         else:
             self.nextmjd[fieldidx] = 100000.
             self.icadence[fieldidx] = cadence.nepochs - 1
@@ -128,8 +137,12 @@ class Fields(object, metaclass=FieldsSingleton):
     @property
     def lstPlan(self):
         if self._lstPlan is None:
-            # self._lstPlan = np.array([np.mean(p[0]) for p in self.obsPlan])
-            self._lstPlan = np.array([np.sum(s, axis=1) for s in self.slots])
+            if _database:
+                # with hacky localDB stuff this is kind of how it's going...
+                self._lstPlan = self.slots
+            else:
+                # this was for a 24x2 array
+                self._lstPlan = np.array([np.sum(s, axis=1) for s in self.slots])
         return self._lstPlan
 
     # @property
@@ -137,6 +150,60 @@ class Fields(object, metaclass=FieldsSingleton):
     #     if self._lunationPlan is None:
     #         self._lunationPlan = np.array([np.mean(p[1]) for p in self.obsPlan])
     #     return self._lunationPlan
+
+    def fromdb(self, version=None):
+        """Extract cadences into the targetdb
+        """
+        if(_database is False):
+            print("No database available.")
+            return()
+
+        if version is None:
+            version = self.plan
+        assert version is not None, "must specify version!"
+
+        fields_model = [('fieldid', np.int32),
+                        ('racen', np.float64),
+                        ('deccen', np.float64),
+                        ('nfilled', np.int32),
+                        ('slots_exposures', np.int32, (24, 2)),
+                        ('cadence', np.dtype('a20'))]
+
+        versionDB = targetdb.Version()
+        ver = versionDB.get(plan=version)
+        # Create dictionary to look up instrument pk from instrument name
+
+        obsDB = targetdb.Observatory()
+        obs = obsDB.get(label=self.observatory.upper())
+
+        Field = targetdb.Field
+        dbfields = Field.select().where(Field.version == ver,
+                                        Field.observatory == obs)
+
+        fieldid = list()
+        racen = list()
+        deccen = list()
+        slots_exposures = list()
+        cadence = list()
+
+        for field in dbfields:
+            fieldid.append(field.field_id)
+            racen.append(field.racen)
+            deccen.append(field.deccen)
+            slots_exposures.append(field.slots_exposures)
+            cadence.append(str(field.cadence.label))
+
+        fields = np.zeros(len(dbfields), dtype=fields_model)
+
+        fields["fieldid"] = fieldid
+        fields["racen"] = racen
+        fields["deccen"] = deccen
+        fields["slots_exposures"] = slots_exposures
+        fields["cadence"] = cadence
+
+        self.fromarray(fields_array=fields)
+
+        self.cadencelist.fromdb()
 
     def lstWeight(self, lst, field_idx=None):
         # field id corresponds to indx, so fields is id/indx
