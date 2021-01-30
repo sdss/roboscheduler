@@ -4,7 +4,7 @@ PyAstronomy
 ortools
 astropy
 scipy
-fitsio
+fitsio<=1.0.5
 pydl
 pyyaml
 pygments
