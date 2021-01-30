@@ -417,3 +417,41 @@ def test_cadence_consistency_4():
     ok, epochs_list = clist.cadence_consistency('dark_8x1',
                                                 'dark_6x3')
     assert ok is True
+
+
+def test_cadence_consistency_merge():
+    clist = cadence.CadenceList()
+    clist.reset()
+
+    clist.add_cadence(name='dark_2x2',
+                      nepochs=2,
+                      instrument='BOSS',
+                      skybrightness=[0.35, 0.35],
+                      delta=[-1., -1.],
+                      delta_min=[-1., -1.],
+                      delta_max=[-1., -1.],
+                      nexp=[2, 2])
+
+    clist.add_cadence(name='dark_2x4',
+                      nepochs=2,
+                      instrument='BOSS',
+                      skybrightness=[0.35] * 6,
+                      delta=[0., 26., 26., 26., 26., 26.],
+                      delta_min=[0., 1., 1., 1., 1., 1.],
+                      delta_max=[0., 3000., 3000., 3000., 3000., 3000.],
+                      nexp=[4] * 2)
+
+    ok, epochs_list, nexps_list = clist.cadence_consistency('dark_2x2',
+                                                            'dark_2x4',
+                                                            merge_epochs=True)
+    assert ok is True
+
+    assert len(nexps_list[0]) == 1
+    assert nexps_list[0][0] == 4
+
+    assert len(nexps_list[1]) == 2
+    assert nexps_list[1][0] == 2
+    assert nexps_list[1][1] == 2
+
+    assert len(nexps_list[2]) == 1
+    assert nexps_list[2][0] == 4
