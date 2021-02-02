@@ -564,7 +564,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             # if(len(instruments) == 0):
             #     print("No instruments, defaulting to APOGEE")
             #     instruments = ['APOGEE'] * cadence['nexposures']
-            self.add_cadence(name=cadence['label'],
+            self.add_cadence(name=str(cadence['label'].strip()),
                              nexp=cadence['nexp'],
                              nepochs=cadence['nepochs'],
                              delta=np.array(cadence['delta']),

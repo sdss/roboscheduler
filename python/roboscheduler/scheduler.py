@@ -642,21 +642,27 @@ class Scheduler(Master):
         self.airmass_limit = airmass_limit
         return
 
-    def initdb(self, designbase='plan-0'):
+    def initdb(self, designbase='plan-0', fromFits=True):
         """Initialize Scheduler fields and observation lists
         """
-        filebase = os.path.join(os.getenv('OBSERVING_PLAN_DIR'),
-                                designbase)
-        # base = os.getenv('OBSERVING_PLAN_DIR')
-        cadence_file = filebase + "/" + "rsCadences" + "-" + designbase + "-"\
-                       + self.observatory + ".fits"
-        fields_file = filebase + "/" + "rsAllocation" + "-" + designbase + "-"\
-                       + self.observatory + ".fits"
         self.cadencelist = roboscheduler.cadence.CadenceList()
-        self.cadencelist.fromfits(filename=cadence_file)
         self.fields = roboscheduler.fields.Fields(plan=designbase,
                                                   observatory=self.observatory)
-        self.fields.fromfits(filename=fields_file)
+        if fromFits:
+            filebase = os.path.join(os.getenv('OBSERVING_PLAN_DIR'),
+                                    designbase)
+            # base = os.getenv('OBSERVING_PLAN_DIR')
+            cadence_file = filebase + "/" + "rsCadences" + "-" + designbase + "-"\
+                           + self.observatory + ".fits"
+            fields_file = filebase + "/" + "rsAllocation" + "-" + designbase + "-"\
+                           + self.observatory + ".fits"
+
+            self.cadencelist.fromfits(filename=cadence_file)
+            self.fields.fromfits(filename=fields_file)
+        else:
+            self.cadencelist.fromdb()
+            self.fields.fromdb()
+
         self.observations = roboscheduler.observations.Observations(observatory=self.observatory)
         return
 

@@ -78,7 +78,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.deccen = fields_array['deccen']
         self.nfilled = fields_array['nfilled']
         self.fieldid = np.arange(self.nfields, dtype=np.int32)
-        self.cadence = [str(c.strip()) for c in fields_array['cadence']]
+        self.cadence = [c.strip().decode() for c in fields_array['cadence']]
         self.slots = fields_array['slots_exposures']
         self.lstObserved = np.zeros((len(self.slots), 24), dtype=np.int32)
         self.observations = [np.zeros(0, dtype=np.int32)] * self.nfields
@@ -137,12 +137,7 @@ class Fields(object, metaclass=FieldsSingleton):
     @property
     def lstPlan(self):
         if self._lstPlan is None:
-            if _database:
-                # with hacky localDB stuff this is kind of how it's going...
-                self._lstPlan = self.slots
-            else:
-                # this was for a 24x2 array
-                self._lstPlan = np.array([np.sum(s, axis=1) for s in self.slots])
+            self._lstPlan = np.array([np.sum(s, axis=1) for s in self.slots])
         return self._lstPlan
 
     # @property
@@ -191,7 +186,7 @@ class Fields(object, metaclass=FieldsSingleton):
             racen.append(field.racen)
             deccen.append(field.deccen)
             slots_exposures.append(field.slots_exposures)
-            cadence.append(str(field.cadence.label))
+            cadence.append(field.cadence.label)
 
         fields = np.zeros(len(dbfields), dtype=fields_model)
 
