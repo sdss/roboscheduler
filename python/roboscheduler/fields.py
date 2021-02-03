@@ -5,6 +5,7 @@ import sys
 
 try:
     import sdssdb.peewee.sdss5db.targetdb as targetdb
+    import sdssdb.peewee.sdss5db.opsdb as opsdb
     _database = True
 except:
     _database = False
@@ -54,7 +55,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.racen = np.zeros(0, dtype=np.float64)
         self.deccen = np.zeros(0, dtype=np.float64)
         self.nfilled = np.zeros(0, dtype=np.float64)
-        self.fieldid = np.zeros(0, dtype=np.int32)
+        self.field_id = np.zeros(0, dtype=np.int32)
         self.nextmjd = np.zeros(0, dtype=np.float64)
         self.cadence = []
         self.observations = []
@@ -65,6 +66,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self._obsPlan = None
         self._lstPlan = None
         self._lunationPlan = None
+        self._hist = None
         return
 
     def setPriorities(self):
@@ -77,7 +79,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.racen = fields_array['racen']
         self.deccen = fields_array['deccen']
         self.nfilled = fields_array['nfilled']
-        self.fieldid = np.arange(self.nfields, dtype=np.int32)
+        self.field_id = fields_array['field_id']
         self.cadence = [c.strip().decode() for c in fields_array['cadence']]
         self.slots = fields_array['slots_exposures']
         self.lstObserved = np.zeros((len(self.slots), 24), dtype=np.int32)
@@ -146,6 +148,35 @@ class Fields(object, metaclass=FieldsSingleton):
     #         self._lunationPlan = np.array([np.mean(p[1]) for p in self.obsPlan])
     #     return self._lunationPlan
 
+    @property
+    def hist(self):
+        if self._hist is None:
+            self._hist = {f: list() for f in self.field_id}
+            if _database:
+                versionDB = targetdb.Version()
+                ver = versionDB.get(plan=self.plan)
+
+                obsDB = targetdb.Observatory()
+                obs = obsDB.get(label=self.observatory.upper())
+
+                Field = targetdb.Field
+                Design = targetdb.Design
+                Status = opsdb.CompletionStatus
+                d2s = opsdb.DesignToStatus
+                done = Status.get(label="done")
+
+                dbfields = Field.select(d2s.mjd, Field.field_id)\
+                                .join(Design)\
+                                .join(d2s, on=(Design.pk == d2s.design_pk))\
+                                .where((Field.version == ver) &
+                                       (Field.observatory == obs),
+                                       (d2s.status == done)).dicts()
+
+                for d in dbfields:
+                    self._hist[d["field_id"]].append(d["mjd"])
+
+        return self._hist
+
     def fromdb(self, version=None):
         """Extract cadences into the targetdb
         """
@@ -155,9 +186,11 @@ class Fields(object, metaclass=FieldsSingleton):
 
         if version is None:
             version = self.plan
+        else:
+            self.plan = version
         assert version is not None, "must specify version!"
 
-        fields_model = [('fieldid', np.int32),
+        fields_model = [('field_id', np.int32),
                         ('racen', np.float64),
                         ('deccen', np.float64),
                         ('nfilled', np.int32),
@@ -166,7 +199,6 @@ class Fields(object, metaclass=FieldsSingleton):
 
         versionDB = targetdb.Version()
         ver = versionDB.get(plan=version)
-        # Create dictionary to look up instrument pk from instrument name
 
         obsDB = targetdb.Observatory()
         obs = obsDB.get(label=self.observatory.upper())
@@ -190,7 +222,7 @@ class Fields(object, metaclass=FieldsSingleton):
 
         fields = np.zeros(len(dbfields), dtype=fields_model)
 
-        fields["fieldid"] = fieldid
+        fields["field_id"] = fieldid
         fields["racen"] = racen
         fields["deccen"] = deccen
         fields["slots_exposures"] = slots_exposures

@@ -846,7 +846,7 @@ class Scheduler(Master):
         #         print(c, i, p, np.max(priority))
         #         considered = True
 
-        observable_fieldid = self.fields.fieldid[iobservable]
+        observable_fieldid = self.fields.field_id[iobservable]
 
         if returnAll:
             return iobservable, nexp, priority
@@ -874,7 +874,7 @@ class Scheduler(Master):
 
         """
 
-        fieldidx = int(np.where(self.fields.fieldid == fieldid)[0])
+        fieldidx = int(np.where(self.fields.field_id == fieldid)[0])
 
         racen = self.fields.racen[fieldidx]
         deccen = self.fields.deccen[fieldidx]
