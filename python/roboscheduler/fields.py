@@ -97,7 +97,7 @@ class Fields(object, metaclass=FieldsSingleton):
 
     def add_observations(self, mjd=None, fieldidx=None, iobs=None,
                          lst=None, epoch_idx=None):
-        self._hist[fieldidx].append(mjd)
+        self._hist[self.field_id[fieldidx]].append(mjd)
 
         self.observations[fieldidx] = np.append(self.observations[fieldidx], iobs)
         self.icadence[fieldidx] = epoch_idx

@@ -697,7 +697,7 @@ class Scheduler(Master):
                     cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
                     iobservations = self.fields.observations[indx]
                     # mjd_past = self.observations.mjd[iobservations]
-                    mjd_past = self.fields.hist[indx]
+                    mjd_past = self.fields.hist[self.fields.field_id[indx]]
                     # epoch_idx is the *index* of the *next* epoch
                     # for 0 indexed arrays, this equivalent to
                     # "how many epochs have I done previously"
