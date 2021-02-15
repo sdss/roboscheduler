@@ -19,12 +19,13 @@ CadenceCore::CadenceCore(std::string name,
 												 py::array_t<float> delta_min,
 												 py::array_t<float> delta_max,
 												 py::array_t<int> nexp,
+												 py::array_t<float> max_length,
 												 py::array_t<int> epoch_indx,
 												 py::array_t<int> epochs) :
 	name(name), nepochs(nepochs), instrument(instrument),
 	skybrightness(skybrightness), delta(delta), delta_min(delta_min),
-	delta_max(delta_max), nexp(nexp), epoch_indx(epoch_indx),
-	epochs(epochs)
+	delta_max(delta_max), nexp(nexp), max_length(max_length),
+	epoch_indx(epoch_indx), epochs(epochs)
 {
 	int *nexp_a = (int *) nexp.request().ptr;
 	int *epoch_indx_a = (int *) epoch_indx.request().ptr;
@@ -54,6 +55,7 @@ std::string CadenceCore::epochText()
 	char tmp[2000];
 
 	int *nexp_a = (int *) nexp.request().ptr;
+	float *max_length_a = (float *) max_length.request().ptr;
 	float *skybrightness_a = (float *) skybrightness.request().ptr;
 	float *delta_a = (float *) delta.request().ptr;
 	float *delta_min_a = (float *) delta_min.request().ptr;
@@ -98,6 +100,12 @@ std::string CadenceCore::epochText()
 	out = out + " nexp=";
 	for(auto i = 0; i < nepochs; i++) {
 		sprintf(tmp, " %d", nexp_a[i]);
+		out = out + tmps.assign(tmp);
+	}
+
+	out = out + " max_length=";
+	for(auto i = 0; i < nepochs; i++) {
+		sprintf(tmp, " %4.2f", max_length_a[i]);
 		out = out + tmps.assign(tmp);
 	}
 
