@@ -102,6 +102,7 @@ std::string CadenceCore::epochText()
 		sprintf(tmp, " %d", nexp_a[i]);
 		out = out + tmps.assign(tmp);
 	}
+	out = out + "\n";
 
 	out = out + " max_length=";
 	for(auto i = 0; i < nepochs; i++) {
