@@ -129,7 +129,10 @@ class Cadence(cCadenceCore.CadenceCore):
 """
     def __init__(self, name=None, nepochs=None, skybrightness=None,
                  delta=None, delta_min=None, delta_max=None, nexp=None,
-                 max_length=None, instrument=None):
+                 max_length=None, instrument=None, text=None):
+        if(text is not None):
+            self._from_text(text=text)
+            return
         nepochs = np.int32(nepochs)
         skybrightness = self._arrayify(skybrightness, dtype=np.float32)
         if(instrument == 'APOGEE'):
@@ -140,7 +143,7 @@ class Cadence(cCadenceCore.CadenceCore):
         delta_min = self._arrayify(delta_min, dtype=np.float32)
         delta_max = self._arrayify(delta_max, dtype=np.float32)
         nexp = self._arrayify(nexp, dtype=np.int32)
-        max_length = self._arrayify(nexp, dtype=np.float32)
+        max_length = self._arrayify(max_length, dtype=np.float32)
         epoch_indx = np.zeros(nepochs + 1, dtype=np.int32)
         # "epochs" below is ACTUALLY the total number of exposures
         epochs = np.zeros(nexp.sum(), dtype=np.int32)
@@ -148,6 +151,24 @@ class Cadence(cCadenceCore.CadenceCore):
                          skybrightness, delta, delta_min,
                          delta_max, nexp, max_length,
                          epoch_indx, epochs)
+        return
+
+    def _from_text(self, text=None):
+        lines = text.splitlines()
+        name = lines[0]
+        nepochs = np.int32(lines[1].split('=')[1])
+        instrument = lines[2].split('=')[1]
+        skybrightness = np.array(lines[3].split('=')[1].split(), dtype=np.float32)
+        delta = np.array(lines[4].split('=')[1].split(), dtype=np.float32)
+        delta_min = np.array(lines[5].split('=')[1].split(), dtype=np.float32)
+        delta_max = np.array(lines[6].split('=')[1].split(), dtype=np.float32)
+        nexp = np.array(lines[7].split('=')[1].split(), dtype=np.int32)
+        max_length = np.array(lines[8].split('=')[1].split(), dtype=np.float32)
+        self.__init__(name=name, nepochs=nepochs, instrument=instrument,
+                      delta=delta, delta_min=delta_min, delta_max=delta_max,
+                      nexp=nexp, max_length=max_length,
+                      skybrightness=skybrightness)
+
         return
 
     def as_cadencecore(self):
