@@ -34,5 +34,5 @@ PYBIND11_MODULE(cCadenceCore, m) {
 			.def_readwrite("epoch_indx", &CadenceCore::epoch_indx)
 			.def_readwrite("epochs", &CadenceCore::epochs)
 			.def_readwrite("nexp", &CadenceCore::nexp)
-			.def_readwrite("max_length", &CadenceCore::nexp);
+			.def_readwrite("max_length", &CadenceCore::max_length);
 }

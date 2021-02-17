@@ -47,6 +47,41 @@ def test_add_cadence():
     assert len(clist.cadences['single_2x2'].delta_max) == 2
 
 
+def test_add_cadence_cfg():
+    clist = cadence.CadenceList()
+    clist.reset()
+
+    clist.fromcfg('test_cfginput.cfg')
+
+    assert clist.cadences['single_1x1'].nepochs == 1
+    assert clist.cadences['single_1x1'].nexp[0] == 1
+    assert clist.cadences['single_1x1'].delta[0] == -1.
+    assert clist.cadences['single_1x1'].delta_min[0] == -1.
+    assert clist.cadences['single_1x1'].delta_max[0] == -1.
+    assert np.abs(clist.cadences['single_1x1'].skybrightness[0] - 0.35) < 0.001
+    assert clist.cadences['single_1x1'].max_length[0] == 100.
+
+    assert clist.cadences['single_3xY'].nepochs == 3
+    assert clist.cadences['single_3xY'].nexp[0] == 2
+    assert clist.cadences['single_3xY'].nexp[1] == 3
+    assert clist.cadences['single_3xY'].nexp[2] == 4
+    assert clist.cadences['single_3xY'].delta[0] == 3.
+    assert clist.cadences['single_3xY'].delta[1] == 4.
+    assert clist.cadences['single_3xY'].delta[2] == 5.
+    assert clist.cadences['single_3xY'].delta_min[0] == 6.
+    assert clist.cadences['single_3xY'].delta_min[1] == 7.
+    assert clist.cadences['single_3xY'].delta_min[2] == 8.
+    assert clist.cadences['single_3xY'].delta_max[0] == 9.
+    assert clist.cadences['single_3xY'].delta_max[1] == 10.
+    assert clist.cadences['single_3xY'].delta_max[2] == 11.
+    assert clist.cadences['single_3xY'].skybrightness[0] == 1.
+    assert clist.cadences['single_3xY'].skybrightness[1] == 2.
+    assert clist.cadences['single_3xY'].skybrightness[2] == 3.
+    assert clist.cadences['single_3xY'].max_length[0] == 10.
+    assert clist.cadences['single_3xY'].max_length[1] == 100.
+    assert clist.cadences['single_3xY'].max_length[2] == 1000.
+
+
 def test_epochs_consistency_1():
     clist = cadence.CadenceList()
     clist.reset()

@@ -1,3 +1,4 @@
+import configparser
 import pickle
 import numpy as np
 import fitsio
@@ -53,6 +54,9 @@ class Cadence(cCadenceCore.CadenceCore):
 
     name : str
         name of cadence
+
+    cfg : configparser.ConfigParser
+        configuration object (if set all other parameters except 'name' ignored)
 
     nepochs : np.int32
         number of epochs
@@ -129,9 +133,9 @@ class Cadence(cCadenceCore.CadenceCore):
 """
     def __init__(self, name=None, nepochs=None, skybrightness=None,
                  delta=None, delta_min=None, delta_max=None, nexp=None,
-                 max_length=None, instrument=None, text=None):
-        if(text is not None):
-            self._from_text(text=text)
+                 max_length=None, instrument=None, cfg=None):
+        if(cfg is not None):
+            self._from_cfg(name=name, cfg=cfg)
             return
         nepochs = np.int32(nepochs)
         skybrightness = self._arrayify(skybrightness, dtype=np.float32)
@@ -145,7 +149,6 @@ class Cadence(cCadenceCore.CadenceCore):
         nexp = self._arrayify(nexp, dtype=np.int32)
         max_length = self._arrayify(max_length, dtype=np.float32)
         epoch_indx = np.zeros(nepochs + 1, dtype=np.int32)
-        # "epochs" below is ACTUALLY the total number of exposures
         epochs = np.zeros(nexp.sum(), dtype=np.int32)
         super().__init__(name, nepochs, instrument,
                          skybrightness, delta, delta_min,
@@ -153,17 +156,21 @@ class Cadence(cCadenceCore.CadenceCore):
                          epoch_indx, epochs)
         return
 
-    def _from_text(self, text=None):
-        lines = text.splitlines()
-        name = lines[0]
-        nepochs = np.int32(lines[1].split('=')[1])
-        instrument = lines[2].split('=')[1]
-        skybrightness = np.array(lines[3].split('=')[1].split(), dtype=np.float32)
-        delta = np.array(lines[4].split('=')[1].split(), dtype=np.float32)
-        delta_min = np.array(lines[5].split('=')[1].split(), dtype=np.float32)
-        delta_max = np.array(lines[6].split('=')[1].split(), dtype=np.float32)
-        nexp = np.array(lines[7].split('=')[1].split(), dtype=np.int32)
-        max_length = np.array(lines[8].split('=')[1].split(), dtype=np.float32)
+    def _from_cfg(self, name=None, cfg=None):
+        nepochs = np.int32(cfg.get(name, 'nepochs'))
+        instrument = cfg.get(name, 'nepochs')
+        skybrightness = np.array(cfg.get(name, 'skybrightness').split(),
+                                 dtype=np.float32)
+        delta = np.array(cfg.get(name, 'delta').split(),
+                         dtype=np.float32)
+        delta_min = np.array(cfg.get(name, 'delta_min').split(),
+                             dtype=np.float32)
+        delta_max = np.array(cfg.get(name, 'delta_max').split(),
+                             dtype=np.float32)
+        nexp = np.array(cfg.get(name, 'nexp').split(),
+                        dtype=np.int32)
+        max_length = np.array(cfg.get(name, 'max_length').split(),
+                              dtype=np.float32)
         self.__init__(name=name, nepochs=nepochs, instrument=instrument,
                       delta=delta, delta_min=delta_min, delta_max=delta_max,
                       nexp=nexp, max_length=max_length,
@@ -259,6 +266,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
     add_cadence() : add a new cadence
     fromarray(): add to cadence list from an ndarray
     fromfits(): add to cadence list from a FITS file
+    fromcfg(): add to cadence list from a configuration file
     toarray(): return an ndarray with cadence list
     epoch_array(): return an ndarray with epoch-oriented list of cadences
     todb(): insert cadences into the targetdb
@@ -472,6 +480,38 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             cc = pickle.load(fp)
             for key in cc:
                 self._cadence_consistency[key] = cc[key]
+        return
+
+    def fromcfg(self, filename=None):
+        """Add cadences to cadence list from a configuration file
+
+        Parameters:
+        -----------
+
+        filename : str
+            File name to read from
+
+        Notes:
+        -----
+
+        Expects a configuration file compatible with configparser. Each
+        section corresponds to a cadence, and is specified as follows:
+
+        [cadence_name]
+        nepochs = <N>
+        instrument = <instrument name>
+        skybrightness = <sb1> .. <sbN>
+        delta = <delta1> .. <deltaN>
+        delta_min = <dmin1> .. <dminN>
+        delta_max = <dmax1> .. <dminN>
+        nexp = <nexp1> .. <nexpN>
+        max_length = <ml1> .. <mlN>
+        """
+
+        cfg = configparser.ConfigParser()
+        cfg.read(filename)
+        for name in cfg.sections():
+            self.add_cadence(name=name, cfg=cfg)
         return
 
     def toarray(self):
