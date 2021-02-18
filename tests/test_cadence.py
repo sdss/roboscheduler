@@ -81,6 +81,11 @@ def test_add_cadence_cfg():
     assert clist.cadences['single_3xY'].max_length[1] == 100.
     assert clist.cadences['single_3xY'].max_length[2] == 1000.
 
+    arr = clist.toarray()
+    assert len(arr) == 2
+    assert arr['nepochs'][0] == 1
+    return
+
 
 def test_epochs_consistency_1():
     clist = cadence.CadenceList()
