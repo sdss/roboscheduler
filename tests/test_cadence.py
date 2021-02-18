@@ -83,7 +83,7 @@ def test_add_cadence_cfg():
 
     arr = clist.toarray()
     assert len(arr) == 2
-    assert arr['nepochs'][0] == 1
+    assert arr['NEPOCHS'][0] == 1
     return
 
 
