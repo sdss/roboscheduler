@@ -1,3 +1,4 @@
+import os
 import pytest
 
 import numpy as np
@@ -51,7 +52,12 @@ def test_add_cadence_cfg():
     clist = cadence.CadenceList()
     clist.reset()
 
-    clist.fromcfg('test_cfginput.cfg')
+    test_file = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)),
+        'test_cfginput.cfg',
+        )
+
+    clist.fromcfg(test_file)
 
     assert clist.cadences['single_1x1'].nepochs == 1
     assert clist.cadences['single_1x1'].nexp[0] == 1
@@ -506,7 +512,7 @@ def test_cadence_evaluate_next():
     mjd_past = 0  # this would be returned by epochs_completed
     mjd_next = 59900
     skybrightness_next = 0.2
-    observable, delta = \
+    observable, priority = \
     test_cadence.evaluate_next(epoch_idx=idx,
                                mjd_past=mjd_past,
                                mjd_next=mjd_next,
@@ -515,7 +521,7 @@ def test_cadence_evaluate_next():
     assert observable
 
     skybrightness_next = 0.5
-    observable, delta = \
+    observable, priority = \
     test_cadence.evaluate_next(epoch_idx=idx,
                                mjd_past=mjd_past,
                                mjd_next=mjd_next,
@@ -527,20 +533,27 @@ def test_cadence_evaluate_next():
     mjd_past = 59895  # this would be returned by epochs_completed
     mjd_next = 59900
     skybrightness_next = 0.2
-    observable, delta = \
+    observable, priority1 = \
+    test_cadence.evaluate_next(epoch_idx=idx,
+                               mjd_past=mjd_past,
+                               mjd_next=mjd_next,
+                               skybrightness_next=skybrightness_next)
+
+    mjd_next = mjd_past + 25
+    observable, priority2 = \
     test_cadence.evaluate_next(epoch_idx=idx,
                                mjd_past=mjd_past,
                                mjd_next=mjd_next,
                                skybrightness_next=skybrightness_next)
 
     assert observable
-    assert np.isclose(delta, 35)
+    assert priority2 > priority1
 
     idx = 1
     mjd_past = 59800  # this would be returned by epochs_completed
     mjd_next = 59900
     skybrightness_next = 0.2
-    observable, delta = \
+    observable, priority = \
     test_cadence.evaluate_next(epoch_idx=idx,
                                mjd_past=mjd_past,
                                mjd_next=mjd_next,
