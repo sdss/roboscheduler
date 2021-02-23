@@ -200,7 +200,7 @@ class Cadence(cCadenceCore.CadenceCore):
             return skybrightness_next <= self.skybrightness[-1]
         return skybrightness_next <= self.skybrightness[epoch_idx]
 
-    def evaluate_next(self, epoch_idx=None, exp_epoch=None,
+    def evaluate_next(self, epoch_idx=None, partial_epoch=False,
                       mjd_past=None, mjd_next=None,
                       skybrightness_next=None, check_skybrightness=True,
                       ignoreMax=False):
@@ -210,10 +210,7 @@ class Cadence(cCadenceCore.CadenceCore):
            cadence will become impossible (deltaMax - delta)
         """
 
-        # are we finished with the last epoch?
-        # epoch_idx = 0 will happen a lot, it's the first epoch!
-        if exp_epoch < self.nexp[epoch_idx - 1] and epoch_idx != 0:
-            epoch_idx -= 1
+        if partial_epoch:
             base_priority = 200
         elif(epoch_idx >= self.nepochs):
             print("done!")
@@ -573,6 +570,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             delta_min = [float(n) for n in self.cadences[cadence].delta_min]
             delta_max = [float(n) for n in self.cadences[cadence].delta_max]
             skybrightness = [float(n) for n in self.cadences[cadence].skybrightness]
+            max_length = [float(n) for n in self.cadences[cadence].max_length]
             # instrument = [instrument_pk[n]
             #               for n in self.cadences[cadence].instrument]
             targetdb.Cadence.insert(pk=pk, label=cadence,
@@ -580,7 +578,8 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                                     nepochs=self.cadences[cadence].nepochs,
                                     delta=delta, skybrightness=skybrightness,
                                     delta_min=delta_min,
-                                    delta_max=delta_max).execute()
+                                    delta_max=delta_max,
+                                    max_length=max_length).execute()
 
     def updatedb(self):
         """Update the cadences in the targetdb by name
@@ -590,10 +589,10 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             return()
 
         # Create dictionary to look up instrument pk from instrument name
-        instruments = targetdb.Instrument.select().dicts()
-        instrument_pk = dict()
-        for instrument in instruments:
-            instrument_pk[instrument['label']] = instrument['pk']
+        # instruments = targetdb.Instrument.select().dicts()
+        # instrument_pk = dict()
+        # for instrument in instruments:
+        #     instrument_pk[instrument['label']] = instrument['pk']
 
         for cadence in self.cadences:
             update_dict = {targetdb.Cadence.nexposures:
@@ -608,9 +607,9 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                             for n in self.cadences[cadence].delta_max],
                            targetdb.Cadence.skybrightness:
                            [float(n) for n in self.cadences[cadence].skybrightness],
-                           targetdb.Cadence.instrument_pk:
-                           [instrument_pk[n]
-                            for n in self.cadences[cadence].instrument]}
+                           targetdb.Cadence.epoch_max_length:
+                           [float(n)
+                            for n in self.cadences[cadence].max_length]}
             targetdb.Cadence.update(update_dict). \
                 where(targetdb.Cadence.label == cadence).execute()
         return
@@ -645,4 +644,5 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                              delta=np.array(cadence['delta']),
                              delta_min=np.array(cadence['delta_min']),
                              delta_max=np.array(cadence['delta_max']),
-                             skybrightness=np.array(cadence['skybrightness']))
+                             skybrightness=np.array(cadence['skybrightness']),
+                             max_length=np.array(cadence["max_length"]))

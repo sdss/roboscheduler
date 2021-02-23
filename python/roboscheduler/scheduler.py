@@ -707,11 +707,17 @@ class Scheduler(Master):
                         continue
                     # how many exp/"designs" since start of last epoch?
                     exp_epoch = np.sum(np.greater(mjd_past, mjd_prev))
-                    nexp[indx] = cadence.nexp[epoch_idx]
+                    if exp_epoch < cadence.nexp[epoch_idx]:
+                        nexp[indx] = cadence.nexp[epoch_idx] - exp_epoch
+                        epoch_idx -= 1
+                        partial_epoch = True
+                    else:
+                        nexp[indx] = cadence.nexp[epoch_idx]
+                        partial_epoch = False
                     ignoreMax = indx in whereRM
                     observable[indx], delta_priority[indx] =\
                         cadence.evaluate_next(epoch_idx=epoch_idx,
-                                              exp_epoch=exp_epoch,
+                                              partial_epoch=partial_epoch,
                                               mjd_past=mjd_prev,
                                               mjd_next=mjd,
                                               skybrightness_next=skybrightness,
@@ -734,7 +740,7 @@ class Scheduler(Master):
                     cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
                     iobservations = self.fields.observations[indx]
                     mjd_past = self.observations.mjd[iobservations]
-                    epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=45)
+                    epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=240)
                     if epoch_idx >= cadence.nepochs:
                         epoch_idx = cadence.nepochs - 1
                     nexp[indx] = cadence.nexp[epoch_idx]
@@ -839,6 +845,14 @@ class Scheduler(Master):
         priority = self.prioritize(iobservable=iobservable, mjd=mjd,
                                    nexp=nexp, delta_priority=delta_priority)
 
+        if returnAll:
+            # inverse priority, highest first
+            sorted_priority = np.argsort(priority)[::-1]
+            sorted_idx = [iobservable[i] for i in sorted_priority]
+            sorted_fields = [self.fields.field_id[i] for i in sorted_idx]
+            sorted_exp = [nexp[i] for i in sorted_priority]
+            return sorted_fields, sorted_expS
+
         # considered = False
         # print(observable_fieldid)
         # print(priority, self.fields.cadence[observable_fieldid])
@@ -848,9 +862,6 @@ class Scheduler(Master):
         #         considered = True
 
         observable_fieldid = self.fields.field_id[iobservable]
-
-        if returnAll:
-            return iobservable, nexp, priority
 
         fieldid, next_exp = self.pick(priority=priority,
                                       fieldid=observable_fieldid,
