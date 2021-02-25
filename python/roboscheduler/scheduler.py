@@ -851,7 +851,7 @@ class Scheduler(Master):
             sorted_idx = [iobservable[i] for i in sorted_priority]
             sorted_fields = [self.fields.field_id[i] for i in sorted_idx]
             sorted_exp = [nexp[i] for i in sorted_priority]
-            return sorted_fields, sorted_expS
+            return sorted_fields, sorted_exp
 
         # considered = False
         # print(observable_fieldid)
