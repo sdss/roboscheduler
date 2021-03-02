@@ -813,6 +813,25 @@ class Scheduler(Master):
 
         return(pick_fieldid, pick_exp)
 
+    def designsNext(self, fieldid):
+        """Figure out next designs on a field, i.e. which exposure are we on?
+        """
+        fieldidx = self.fields.getidx(fieldid)
+        mjd_past = self.fields.hist[fieldidx]
+        cadence = self.cadencelist.cadences[self.fields.cadence[fieldidx]]
+        epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=240)
+        nexp_next = cadence.nexp[epoch_idx]
+        # how many completed designs since start of epoch
+        # this assumes designs are marked incomplete when epoch_max_length
+        # is hit
+        exp_in_epoch = np.sum(np.greater(mjd_past, mjd_prev))
+
+        exp_to_do = nexp_next - exp_in_epoch
+
+        designs = list(len(mjd_past) + np.arange(exp_to_do))
+
+        return designs
+
     def nextfield(self, mjd=None, maxExp=None, returnAll=False, live=False):
         """Picks the next field to observe
 
@@ -850,8 +869,8 @@ class Scheduler(Master):
             sorted_priority = np.argsort(priority)[::-1]
             sorted_idx = [iobservable[i] for i in sorted_priority]
             sorted_fields = [self.fields.field_id[i] for i in sorted_idx]
-            sorted_exp = [nexp[i] for i in sorted_priority]
-            return sorted_fields, sorted_exp
+            # sorted_exp = [nexp[i] for i in sorted_priority]
+            return sorted_fields  # , sorted_exp
 
         # considered = False
         # print(observable_fieldid)
@@ -870,19 +889,7 @@ class Scheduler(Master):
         if not live:
             return(fieldid, next_exp)
 
-        fieldidx = int(np.where(self.fields.field_id == fieldid)[0])
-        mjd_past = self.fields.hist[fieldidx]
-        cadence = self.cadencelist.cadences[self.fields.cadence[fieldidx]]
-        epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=240)
-        nexp_next = cadence.nexp[epoch_idx]
-        # how many completed designs since start of epoch
-        # this assumes designs are marked incomplete when epoch_max_length
-        # is hit
-        exp_in_epoch = np.sum(np.greater(mjd_past, mjd_prev))
-
-        exp_to_do = nexp_next - exp_in_epoch
-
-        designs = list(len(mjd_past) + np.arange(exp_to_do))
+        designs = self.designsNext(fieldid)
 
         return fieldid, designs
 

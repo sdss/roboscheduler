@@ -288,6 +288,10 @@ class Fields(object, metaclass=FieldsSingleton):
                 fields['observations'][indx][0:fields['nobservations'][indx]] = self.observations[indx]
         return(fields)
 
+    def getidx(self, fieldid):
+        # return idx into array of fieldid
+        return int(np.where(self.field_id == fieldid)[0])
+
 
 def lstDiffSingle(a, b):
     """Intelligently find difference in 2 lsts
