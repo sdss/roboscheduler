@@ -667,7 +667,7 @@ class Scheduler(Master):
         return
 
     def observable(self, mjd=None,  maxExp=None, check_skybrightness=True,
-                   check_cadence=True):
+                   check_cadence=True, ignore=[]):
         """Return array of fields observable
 
         Parameters:
@@ -694,6 +694,9 @@ class Scheduler(Master):
             indxs = np.where(self.fields.nextmjd <= mjd)[0]
             for indx in indxs:
                 if(observable[indx]):
+                    if int(self.fields.field_id[indx]) in ignore:
+                        observable[indx] = False
+                        continue
                     cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
                     iobservations = self.fields.observations[indx]
                     # mjd_past = self.observations.mjd[iobservations]
@@ -723,8 +726,8 @@ class Scheduler(Master):
                                               skybrightness_next=skybrightness,
                                               check_skybrightness=check_skybrightness,
                                               ignoreMax=ignoreMax)
-                    # if nexp[indx] > maxExp:
-                    #     observable[indx] = False
+                    if nexp[indx] > maxExp:
+                        observable[indx] = False
                     #     if indx in whereRM and skybrightness <= 0.35:
                     #         print(indx, " kicked out for nexp")
                     # if indx in whereRM and skybrightness <= 0.35:
@@ -800,7 +803,7 @@ class Scheduler(Master):
         # gaussian weight, mean already 0, use 1 hr = 15 deg std
         # priority += 20 * np.exp( -(ha)**2 / (2 * 15**2))
         # gaussian weight, mean = obs lat, use 20 deg std
-        # priority -= 20 * np.exp( -(dec - self.latitude)**2 / (2 * 20**2))
+        priority -= 5 * np.exp( -(dec - self.latitude)**2 / (2 * 20**2))
 
         return priority
 
@@ -832,7 +835,8 @@ class Scheduler(Master):
 
         return designs
 
-    def nextfield(self, mjd=None, maxExp=None, returnAll=False, live=False):
+    def nextfield(self, mjd=None, maxExp=None, returnAll=False, live=False,
+                  ignore=[]):
         """Picks the next field to observe
 
         Parameters:
@@ -843,6 +847,13 @@ class Scheduler(Master):
 
         maxExp : int
             maximum number of full exposures before next event
+        returnAll : boolean
+            Return all the fields? For choosing backups
+        live : boolean
+            Are we live in Kronos? otherwise sim behavior slightly different
+        ignore : list
+            Fields to ignore temporarily, i.e. because they are already
+            scheduled but have no exposures in opsdb
 
         Returns:
         --------
@@ -850,11 +861,13 @@ class Scheduler(Master):
         fieldid : np.int32, int
             ID of field to observe
         """
-        iobservable, nexp, delta_priority = self.observable(mjd=mjd, maxExp=maxExp)
+        iobservable, nexp, delta_priority = self.observable(mjd=mjd, maxExp=maxExp,
+                                                            ignore=ignore)
         if(len(iobservable) == 0):
             # print("Nothing observable")
             iobservable, nexp, delta_priority = self.observable(mjd=mjd, maxExp=maxExp,
-                                                                check_cadence=False)
+                                                                check_cadence=False,
+                                                                ignore=ignore)
         if len(iobservable) == 0:
             # print("!! nothing to observe; {} exp left in the night".format(maxExp))
             if returnAll:
@@ -867,10 +880,15 @@ class Scheduler(Master):
         if returnAll:
             # inverse priority, highest first
             sorted_priority = np.argsort(priority)[::-1]
+            # for i in sorted_priority:
+            #     field_idx = iobservable[i]
+            #     print(i, priority[i], nexp[i],
+            #           self.fields.field_id[field_idx],
+            #           self.fields.cadence[field_idx])
             sorted_idx = [iobservable[i] for i in sorted_priority]
             sorted_fields = [self.fields.field_id[i] for i in sorted_idx]
-            # sorted_exp = [nexp[i] for i in sorted_priority]
-            return sorted_fields  # , sorted_exp
+            sorted_exp = [nexp[i] for i in sorted_priority]
+            return sorted_fields, sorted_exp
 
         # considered = False
         # print(observable_fieldid)
@@ -887,8 +905,10 @@ class Scheduler(Master):
                                       nexp=nexp)
 
         if not live:
+            # just a sim return number of designs
             return(fieldid, next_exp)
 
+        # its live, return list of exp indices
         designs = self.designsNext(fieldid)
 
         return fieldid, designs
