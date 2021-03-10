@@ -271,6 +271,48 @@ class Observer(SchedulerBase):
         ra, dec, dist, geolon, geolat = pyasl.moonpos(jd)
         return (ra, dec)
 
+    def moon_dist(self, mjd=None, ra=None, dec=None, threshold=None):
+        """Return distance to the moon in deg at MJD (days)
+
+        Parameters:
+        ----------
+
+        mjd : np.float64
+            Modified Julian Day (days)
+
+        ra : np.float64
+            right ascension, J2000 (deg)
+
+        dec : np.float64
+            declination, J2000 (deg)
+
+        threshold : np.float64
+            minimum allowed distance (deg); if provided a boolean array
+            of the distance check is returned, other the distance array is returned
+
+        Returns:
+        -------
+
+        distance : np.float64
+            angular distance to the moon (deg)
+
+        far_enough: np.bool
+            array of distance checks for input targets,
+            returned if threshold is passed
+        """
+        ra = self._arrayify(ra)
+        dec = self._arrayify(dec)
+
+        moonra, moondec = self.moon_radec(mjd)
+
+        moon_dist = np.power((ra - moonra)*np.cos(dec*np.pi / 180), 2)\
+                  + np.power((dec - moondec), 2)
+
+        if threshold:
+            return moon_dist > np.power(threshold, 2)
+        else:
+            return np.power(moon_dist, 0.5)
+
     def radec2altaz(self, mjd=None, ra=None, dec=None):
         """Return (alt, az) for (ra, dec) in deg J2000 at MJD (days)
 
@@ -682,7 +724,10 @@ class Scheduler(Master):
         airmass = self.alt2airmass(alt)
         skybrightness = self.skybrightness(mjd)
         # valid cadence checks against "none" cadence issue
-        observable = (alt > 0.) & (airmass < self.airmass_limit) & self.fields.validCadence
+        moon_check = self.moon_dist(mjd=mjd, ra=self.fields.racen,
+                                    dec=self.fields.deccen, threshold=15)
+        observable = (alt > 0.) & (airmass < self.airmass_limit)\
+                   & self.fields.validCadence & moon_check
         nexp = np.ones(len(observable), dtype=int)
         delta_priority = np.zeros(len(observable), dtype=np.float64)
 
