@@ -1,16 +1,16 @@
-observesim.cadence package
+roboscheduler.cadence package
 ==========================
 
 Cadence
 --------
 .. _Cadence:
-.. autoclass:: observesim.cadence.Cadence
+.. autoclass:: roboscheduler.cadence.Cadence
     :inherited-members:
     :members:
 
 CadenceList
 -----------
 .. _CadenceList:
-.. autoclass:: observesim.cadence.CadenceList
+.. autoclass:: roboscheduler.cadence.CadenceList
     :inherited-members:
     :members:

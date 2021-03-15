@@ -6,10 +6,17 @@ roboscheduler Reference
 
 .. _api-main:
 
-Main
+Scheduler
 ----
 
-.. automodule:: roboscheduler.main
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. autoclass:: roboscheduler.scheduler.Observer
+    :members:
+
+.. autoclass:: roboscheduler.scheduler.Scheduler
+    :members:
+
+.. .. automodule:: roboscheduler.main
+..    :members:
+..    :undoc-members:
+..    :show-inheritance:
+..    :inherited-members:

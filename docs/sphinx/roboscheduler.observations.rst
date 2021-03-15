@@ -1,9 +1,9 @@
-observesim.observations package
+roboscheduler.observations package
 ===============================
 
 Observations
 ------------
 
 .. _Observations:
-.. autoclass:: observesim.observations.Observations
+.. autoclass:: roboscheduler.observations.Observations
     :members:

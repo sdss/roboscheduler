@@ -508,7 +508,7 @@ class Master(Observer):
 
     Parameters:
     ----------
-    schedulefile : str
+    schedule : str
         schedule file to use; default $ROBOSCHEDULER_DIR/data/master_schedule.par
 
     Attributes:
@@ -634,17 +634,19 @@ class Scheduler(Master):
     airmass_limit : float, np.float32
         airmass limit for observations
 
+    observatory : str
+        Name of observatory to use (must be in observatory file)
+        (default 'apo')
+
+    observatoryfile : str
+        Name of Yanny-format observatory file to read
+        (default $ROBOSCHEDULER_DIR/data/observatories.par)
+
     Attributes:
     ----------
 
     airmass_limit : float, np.float32
         airmass limit for observations
-
-    master : Master object
-        Master schedule to use for scheduling
-
-    observer : Observer object
-        Observer to use for scheduling
 
     fields : Fields object
         object for fields
@@ -670,10 +672,6 @@ class Scheduler(Master):
          - fields are limited to set that are conceivably observable
          - A strategy to optimize completion
 
-    In this default Scheduler, the strategy is a completely heuristic one
-         - take lowest HA cases in bins of 5 deg
-         - take lowest transit altitude case among those
-
     """
     def __init__(self, airmass_limit=2.,
                  schedule='normal', observatory='apo', observatoryfile=None):
@@ -685,7 +683,15 @@ class Scheduler(Master):
         return
 
     def initdb(self, designbase='plan-0', fromFits=True):
-        """Initialize Scheduler fields and observation lists
+        """Initialize Scheduler fields and observation lists.
+           Required before fields can be scheduled.
+
+            designbase : str
+                the name of the robostrategy version to load.
+
+            fromFits : boolean
+                For simulations we want to use a fits file, which should
+                exist in "$OBSERVING_PLAN_DIR" and be named using 'designbase'
         """
         self.cadencelist = roboscheduler.cadence.CadenceList()
         self.fields = roboscheduler.fields.Fields(plan=designbase,
@@ -717,6 +723,19 @@ class Scheduler(Master):
 
         mjd : np.float64
             current MJD
+
+        maxExp : integer
+            the maximum number of exposures to allow, useful towards
+
+        check_skybrightness : boolean
+            text
+
+        check_cadence : boolean
+            text
+
+        ignore : list
+            text
+
         """
 
         (alt, az) = self.radec2altaz(mjd=mjd, ra=self.fields.racen,
