@@ -167,21 +167,6 @@ class Observer(SchedulerBase):
     longitude : numpy.float64
         Longitude (E of Greenwich) of observatory
 
-    Methods:
-    -------
-
-    ralst2ha(ra=, lst=) : convert RA and LST to hour angle
-    hadec2altaz(ha=, dec=, lat=) : convert HA, Dec, latitude to alt, az
-    alt2airmass(alt=) : convert altitude to airmass
-    lst(mjd=) : return LST in degrees for observer at given MJD (days)
-    radec2altaz(mjd=, ra=, dec=) : return alt/az for ra/dec at given MJD
-    sun_radec(mjd=) : return position of Sun in Ra/Dec
-    sun_altaz(mjd=) : return position of Sun in Alt/AZ
-    moon_radec(mjd=) : return position of Moon in Ra/Dec
-    moon_altaz(mjd=) : return position of Moon in Alt/AZ
-    moon_illumination(mjd=) : return illumination of Moon at given MJD
-    evening_twilight(mjd=): return evening twilight on MJD
-    morning_twilight(mjd=): return morning twilight on MJD
     """
     def __init__(self, observatory='apo', observatoryfile=None,
                  dark_twilight=-15., bright_twilight=-8.):
@@ -527,10 +512,6 @@ class Master(Observer):
         list of times in ISO format for events of note
     event_mjd : ndarray of numpy.float64
         MJDs (days) of events of note
-
-    Methods:
-    -------
-    on() : is the survey on
     """
     def __init__(self, schedule='normal', observatory='apo',
                  observatoryfile=None):
@@ -654,17 +635,6 @@ class Scheduler(Master):
     observations : Observations object
         object accessing list of observations
 
-    Methods:
-    -------
-
-    initdb() : initialize field list and set to unobserved
-
-    nextfield(mjd=mjd) : return field to observe at mjd
-
-    observable(mjd=mjd) : return fieldids observable at mjd
-
-    update(fieldid=fieldid, result=result) : update observations with result
-
     Comments:
     --------
 
@@ -684,14 +654,17 @@ class Scheduler(Master):
 
     def initdb(self, designbase='plan-0', fromFits=True):
         """Initialize Scheduler fields and observation lists.
-           Required before fields can be scheduled.
+        Required before fields can be scheduled.
 
-            designbase : str
-                the name of the robostrategy version to load.
+        Parameters:
+        ----------
 
-            fromFits : boolean
-                For simulations we want to use a fits file, which should
-                exist in "$OBSERVING_PLAN_DIR" and be named using 'designbase'
+        designbase : str
+            the name of the robostrategy version to load.
+
+        fromFits : boolean
+            For simulations we want to use a fits file, which should
+            exist in "$OBSERVING_PLAN_DIR" and be named using 'designbase'
         """
         self.cadencelist = roboscheduler.cadence.CadenceList()
         self.fields = roboscheduler.fields.Fields(plan=designbase,
@@ -728,13 +701,16 @@ class Scheduler(Master):
             the maximum number of exposures to allow, useful towards
 
         check_skybrightness : boolean
-            text
+            passed to cadence check, rarely used
 
         check_cadence : boolean
-            text
+            if all else fails, just see if a field is up, don't worry
+            about cadence, rarely used
 
         ignore : list
-            text
+            a list of fields to mark unobservable. Mostly used while
+            planning a night to avoid rescheduling the same field that
+            hasn't been marked done in the database.
 
         """
 
@@ -829,11 +805,16 @@ class Scheduler(Master):
         Parameters:
         ----------
 
-        fieldid : ndarray  of np.int32
-            array of available fieldid values
-
-        nexp: ndarray  of np.int32, len of fieldid
-            array of nexp if field is chosen
+        mjd : float
+            mjd to check, for find current lst
+        iobservable : list of integer
+            index into Scheduler.fields of observable fields
+        nexp : ndarray  of np.int32
+            array of number of exp for each field
+        delta_priority : ndarray of np.float64
+            change to the default priority, from cadence check.
+            This accounts for time left in cadence or whether
+            the cadence is partially complete.
 
         Returns:
         -------

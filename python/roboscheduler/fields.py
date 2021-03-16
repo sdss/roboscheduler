@@ -22,10 +22,17 @@ class FieldsSingleton(type):
 
 
 class Fields(object, metaclass=FieldsSingleton):
-    """List of fields
+    """List of fields. Initialized empty; attributes will be set
+    via fromfits() or fromdb().
 
     Parameters:
     ----------
+
+    plan : string
+        robostrategy version, used for db access
+
+    observatory : string
+        APO or LCO, used for db access
 
     Attributes:
     ----------
@@ -39,14 +46,26 @@ class Fields(object, metaclass=FieldsSingleton):
     deccen : ndarray of np.float64
         declination of each design (J2000 deg)
 
-    fieldid : ndarray of np.int32
+    field_id : ndarray of np.int32
         id for each field
 
-    cadence : string
+    cadence : list of string
         cadence for each field
 
     observations : list of ndarray of np.int32
         for each field, indices of observations
+
+
+    slots : ndarray of np.int32
+        Nx2x24, corresponding to robostrategy planned LST bright/dark plan
+
+    lstObserved : ndarray of np.int32
+        Nx24 observations in each lst per field;
+        respecting robostrategy plan leads to an efficient survey
+
+    cadencelist : robostrategy.cadence.CadenceList singleton
+        the cadenceList singleton, for easy access
+
     """
     def __init__(self, plan=None, observatory=None):
         self.plan = plan
@@ -91,12 +110,37 @@ class Fields(object, metaclass=FieldsSingleton):
         return
 
     def fromfits(self, filename=None):
+        """Load a fits file into this Fields object,
+           likely an RS-Assignments file.
+
+        Parameters:
+        ----------
+
+        filename : string
+            the full path to the fits file to be loaded
+        """
         self.fields_fits = fitsio.read(filename)
         self.fromarray(self.fields_fits)
         return
 
     def add_observations(self, mjd=None, fieldidx=None, iobs=None,
                          lst=None, epoch_idx=None):
+        # """Add an observation, used in simulations.
+
+        # Parameters:
+        # ----------
+
+        # mjd : float
+        #     MJD of the observation
+        # fieldidx : integer
+        #     index into Fields of the field observed
+        # iobs : integer
+        #     index into Scheduler.observations
+        # lst : float
+        #     lst at time of observation
+        # epoch_idx : integer
+        #     which epoch was being observed
+        # """
         self._hist[self.field_id[fieldidx]].append(mjd)
 
         self.observations[fieldidx] = np.append(self.observations[fieldidx], iobs)
@@ -123,20 +167,20 @@ class Fields(object, metaclass=FieldsSingleton):
                                            for c in self.cadence])
         return self._validCadance
 
-    @property
-    def obsPlan(self):
-        """Slots specify when the field should be observed
-        make that information useful.
+    # @property
+    # def obsPlan(self):
+    #     """Slots specify when the field should be observed
+    #     make that information useful.
 
-        Returns:
-        -------
+    #     Returns:
+    #     -------
 
-        obsPlan : list
-            a list containing lst and lunation for each field
-        """
-        if self._obsPlan is None:
-            self._obsPlan = [np.where(s > 0) for s in self.slots]
-        return self._obsPlan
+    #     obsPlan : list
+    #         a list containing lst and lunation for each field
+    #     """
+    #     if self._obsPlan is None:
+    #         self._obsPlan = [np.where(s > 0) for s in self.slots]
+    #     return self._obsPlan
 
     @property
     def lstPlan(self):
@@ -152,6 +196,16 @@ class Fields(object, metaclass=FieldsSingleton):
 
     @property
     def hist(self):
+        # """The observation history of the field. Unlike Fields.observations,
+        # this property will be used on sky.
+
+        # Attributes:
+        # ----------
+
+        # _hist : dict of lists
+        #     A dictionary with field_id keys containing lists of obs mjds for
+        #     each field.
+        # """
         if self._hist is None:
             self._hist = {f: list() for f in self.field_id}
             if _database:
@@ -180,7 +234,14 @@ class Fields(object, metaclass=FieldsSingleton):
         return self._hist
 
     def fromdb(self, version=None):
-        """Extract cadences into the targetdb
+        """Load this Fields object with fields from the targetdb
+
+        Parameters:
+        ----------
+
+        version : string
+            db version to grab, if Fields.plan is not set. If passed
+            Fields.plan will be reset to version
         """
         if(_database is False):
             print("No database available.")
