@@ -423,26 +423,36 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         if(not ok):
             return False
 
+        cadence_two = self.cadences[two]
+        cadence_one = self.cadences[one]
+
+        # Now count how many exposures there are at each epoch for this
+        # array of iexp
+        epochs_two_got, nexps_got = np.unique(cadence_two.epochs[iexp],
+                                              return_counts=True)
+        ngot = np.zeros(cadence_two.nepochs, dtype=np.int32)
+        ngot[epochs_two_got] = nexps_got
+
         # Check each solution and see if the current assignment satisfies
+
+        nneed = np.zeros(cadence_two.nepochs, dtype=np.int32)
         for epochs_two in epochs_list:
 
             # For this solution, count how many exposures are required
             # at each epoch of cadence two
-            nneed = np.zeros(self.cadences[two].nepochs, dtype=np.int32)
+            nneed[:] = 0
+            bad = False
             for epoch_one, epoch_two in enumerate(epochs_two):
-                nneed[epoch_two] = nneed[epoch_two] + self.cadences[one].nexp[epoch_one]
-
-            # Now count how many exposures there are at each epoch for this
-            # array of iexp
-            epochs_two_got, nexps_got = np.unique(self.cadences[two].epochs[iexp],
-                                                  return_counts=True)
-            ngot = np.zeros(self.cadences[two].nepochs, dtype=np.int32)
-            ngot[epochs_two_got] = nexps_got
+                nneed[epoch_two] = nneed[epoch_two] + cadence_one.nexp[epoch_one]
+                if(nneed[epoch_two] > ngot[epoch_two]):
+                    bad = True
+                    break
 
             # For each exposure in the solution, are there enough exposures?
-            nbad = (ngot < nneed).sum()
-            if(nbad == 0):
-                return True
+            if(not bad):
+                nbad = (ngot < nneed).sum()
+                if(nbad == 0):
+                    return True
 
         # If we have gotten here no working solution was found
         return False
