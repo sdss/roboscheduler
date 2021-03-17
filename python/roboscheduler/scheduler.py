@@ -142,7 +142,8 @@ class SchedulerBase(object):
 
 
 class Observer(SchedulerBase):
-    """Observer class to define different observatories.
+    """Observer class to define different observatories and compute useful 
+    quantities (lst, moon location, etc) at each observatory.
 
     Parameters:
     ----------
@@ -489,7 +490,7 @@ class Observer(SchedulerBase):
 
 
 class Master(Observer):
-    """Master class to interpret master schedule as an observer
+    """Master class to interpret master schedule as an observer. Inherits from Observer.
 
     Parameters:
     ----------
@@ -607,7 +608,8 @@ class Master(Observer):
 
 
 class Scheduler(Master):
-    """Scheduler class.
+    """Scheduler class to keep track of fields and schedule the optimal field at
+    a given time. Inherits from Master.
 
     Parameters:
     ----------
@@ -800,7 +802,10 @@ class Scheduler(Master):
 
     def prioritize(self, mjd=None, iobservable=None, nexp=None,
                    delta_priority=None):
-        """Return the fieldid to pick from using heuristic strategy
+        """Prioritize fields according to the Robostrategy LST plan
+        and accounting for priority adjustments from the cadence check (i.e. 
+        whether a field is inside an incomplete epoch or else how long 
+        before it fails cadence requirements.)
 
         Parameters:
         ----------
@@ -819,8 +824,8 @@ class Scheduler(Master):
         Returns:
         -------
 
-        pick_fieldid : ndarray of np.int32
-            fieldid
+        priority : ndarray of np.float64
+            calculated priority for each field
         """
 
         priority = np.ones(len(iobservable))*100
@@ -853,6 +858,27 @@ class Scheduler(Master):
         return priority
 
     def pick(self, priority=None, fieldid=None, nexp=None):
+        """Choose the next field
+
+        Parameters:
+        ----------
+
+        priority : ndarray of np.float64
+            calculated priority for each field
+        fieldid : ndarray of np.int32
+            field ids corresponding to prioritiea
+        nexp : ndarray  of np.int32
+            array of number of exp for each field
+
+        Returns:
+        -------
+
+        pick_fieldid : np.int32
+            the field id corresponding to the highest priority
+        pick_exp : integer
+            the number of exposures needed in the chosen field
+        
+        """
         assert len(priority) == len(fieldid) and len(priority) == len(nexp), \
             "inputs must be same size!"
         ipick = np.argmax(priority)
@@ -863,6 +889,20 @@ class Scheduler(Master):
 
     def designsNext(self, fieldid):
         """Figure out next designs on a field, i.e. which exposure are we on?
+
+        Parameters:
+        ----------
+
+        fieldid : ndarray of np.int32
+            field ids corresponding to prioritiea
+
+        Returns:
+        -------
+
+        designs : list of integer
+            a list of exposure numbers up next for "fieldid", corresponding 
+            to some designs.
+
         """
         fieldidx = self.fields.getidx(fieldid)
         mjd_past = self.fields.hist[fieldidx]
@@ -889,7 +929,6 @@ class Scheduler(Master):
 
         mjd : np.float64
             Current MJD (days)
-
         maxExp : int
             maximum number of full exposures before next event
         returnAll : boolean
@@ -903,8 +942,18 @@ class Scheduler(Master):
         Returns:
         --------
 
-        fieldid : np.int32, int
+        fieldid : np.int32, integer
             ID of field to observe
+        designs : list of integer
+            a list of exposure numbers up next for "fieldid", corresponding 
+            to some designs.
+        
+            OR if returnAll
+
+        sorted_fields : list of integer
+            a list of fields sorted by priority
+        sorted_exp : list of integer
+            a list of nexp sorted by priority
         """
         iobservable, nexp, delta_priority = self.observable(mjd=mjd, maxExp=maxExp,
                                                             ignore=ignore)
@@ -959,7 +1008,7 @@ class Scheduler(Master):
         return fieldid, designs
 
     def update(self, fieldid=None, result=None):
-        """Update the observation list with result of observations
+        """Update Scheduler.observations with result of observations, used for sims
 
         Parameters:
         -----------
@@ -969,9 +1018,6 @@ class Scheduler(Master):
 
         result : ndarray
             One element, contains 'mjd', 'duration', 'sn2'
-
-        Comments:
-        ---------
 
         """
 
