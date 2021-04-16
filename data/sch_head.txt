@@ -1,0 +1,26 @@
+# Degrees twilight to use
+dark_twilight -15.
+bright_twilight -8.
+
+# Whether events start ("on") or stop ("off") observing
+START_SURVEY on
+END_SURVEY off
+START_SHUTDOWN off
+END_SHUTDOWN on
+START_ENGINEERING off
+END_ENGINEERING on
+
+typedef enum {
+  START_SURVEY,
+  END_SURVEY,
+  START_SHUTDOWN,
+  END_SHUTDOWN,
+  START_ENGINEERING,
+  END_ENGINEERING
+} EVENT;
+
+typedef struct {
+  char date[10];
+  char time[5];
+  EVENT event;
+} SCHEDULE;

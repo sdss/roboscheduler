@@ -70,36 +70,48 @@ def makeSched(start, stop, outDir="", name="MS", observatory="apo"):
              "begin": "START_SURVEY",
              "end": "END_SURVEY"}
 
-    date = Time(mjds[0]-1, format="mjd").datetime
+    date = Time(mjds[0], format="mjd").datetime
 
-    sched_str = dateStr(date) + vocab["begin"]
+    prod_dir = os.path.abspath(__file__).split("/bin/")[0]
+    head_file = os.path.join(prod_dir, 'data', 'sch_head.txt')
+
+    with open(head_file, "r") as header:
+        local = "# Timezone offset in hours to apply to get to TAI \n# (i.e. Greenwich time)"
+        if observatory == "apo":
+            local += "\n to_tai 7  # Mountain Standard Time \n\n"
+        else:
+            local += "\n to_tai 4  # Chilean Standard Time \n\n"
+        sched_str = local + header.read() + "\n\n"
+
+    sched_str += dateStr(date) + vocab["begin"] + "\n"
 
     shutdown_duration = 7 * 6  # 6 weeks
 
     eng = sched_engineering(mjds, sched)
     delay = 0
-    for m in mjds:
+    for m in mjds[1:]:
         m = int(m)
         if m < delay:
             continue
         if m in eng:
-            start = Time(m-1, format="mjd").datetime
-            end = Time(m-1, format="mjd").datetime
-            sched_str += dateStr(start) + vocab["eng_start"]
-            sched_str += dateStr(end) + vocab["eng_end"]
+            start = Time(m, format="mjd").datetime
+            end = Time(m+1, format="mjd").datetime
+            sched_str += dateStr(start) + vocab["eng_start"] + "\n"
+            sched_str += dateStr(end) + vocab["eng_end"] + "\n"
+            delay = m + 1
         else:
             date = Time(m-1, format="mjd").datetime
             if date.month == 7:
                 if date.isoweekday() == 1:
                     end = Time(m + shutdown_duration - 1, format="mjd").datetime
-                    sched_str += dateStr(date) + vocab["shutdown_start"]
-                    sched_str += dateStr(end) + vocab["shutdown_end"]
+                    sched_str += dateStr(date) + vocab["shutdown_start"] + "\n"
+                    sched_str += dateStr(end) + vocab["shutdown_end"] + "\n"
                     delay = m + shutdown_duration
 
     # +2 for our previous safety buffer
     date = Time(stop+2, format="mjd").datetime
 
-    sched_str = dateStr(date) + vocab["end"]
+    sched_str += dateStr(date) + vocab["end"] + "\n"
 
     fname = os.path.join(outDir, name + ".dat")
     with open(fname, "w") as outFile:
@@ -114,12 +126,10 @@ if __name__ == "__main__":
         prog=os.path.basename(sys.argv[0]),
         description="""create master schedule""")
 
-    parser.add_argument("-s", "--start", dest="start", type=int,
-                        required=False, help="start date, YYYY-MM-DD",
-                        default=None)
-    parser.add_argument("-e", "--end", dest="end", type=int,
-                        required=False, help="end date, YYYY-MM-DD",
-                        default=None)
+    parser.add_argument("-s", "--start", dest="start", type=str,
+                        required=True, help="start date, YYYY-MM-DD")
+    parser.add_argument("-e", "--end", dest="end", type=str,
+                        required=True, help="end date, YYYY-MM-DD")
     parser.add_argument("-o", "--out", dest="out", type=str,
                         required=False, help="output directory, default current",
                         default="")
