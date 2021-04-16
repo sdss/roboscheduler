@@ -332,7 +332,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         return
 
     def cadence_consistency(self, one, two, return_solutions=True,
-                            epoch_level=True):
+                            epoch_level=True, merge_epochs=False):
         """Is cadence #1 consistent with cadence #2?
 
         Parameters:
@@ -351,19 +351,29 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             compare sequences at epoch level not exposure level (default True)
             [ignores this]
 
+        merge_epochs : bool
+            if epochs in the solutions are repeated, merge them
+
         Returns:
         -------
 
         ok : int
             1 if there is a solution, 0 otherwise
 
-        solutions : list of lists
-            list of solutions, where each solution is a list of epochs
+        solutions : list of ndarrays of np.int32
+            list of solutions, where each solution is an array
+        
+        nexps : list of ndarrays of np.int32
+            if epochs are merged, number of exposures for each epoch listed
 
         Notes:
         -----
+
+        When epochs are merged with merge_epochs you need to keep track
+        of how many exposures you are putting into each epoch. In this 
+        case 'nexps' is returned.
 """
-        cache_key = (one, two, epoch_level, return_solutions)
+        cache_key = (one, two, epoch_level, return_solutions, merge_epochs)
         if(cache_key in self._cadence_consistency):
             return(self._cadence_consistency[cache_key])
 
@@ -372,9 +382,29 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         success = len(possibles) > 0
 
         if(return_solutions):
-            self._cadence_consistency[cache_key] = (success, possibles)
+            if(merge_epochs):
+                possibles_merge = []
+                nexps_merge = []
+                for possible in possibles:
+                    possible_merge, possible_inverse = np.unique(possible,
+                                                                 return_inverse=True)
+                    nexp_one = self.cadences[one].nexp
+                    nexp_merge = np.zeros(len(possible_merge), dtype=np.int32)
+                    for i, nexp in zip(possible_inverse, nexp_one):
+                        nexp_merge[i] = nexp_merge[i] + nexp
+
+                    possibles_merge.append(possible_merge)
+                    nexps_merge.append(nexp_merge)
+
+
+                self._cadence_consistency[cache_key] = (success,
+                                                        possibles_merge,
+                                                        nexps_merge)
+            else:
+                self._cadence_consistency[cache_key] = (success, possibles)
         else:
             self._cadence_consistency[cache_key] = success
+
         return(self._cadence_consistency[cache_key])
 
     def exposure_consistency(self, one, two, iexp):
@@ -403,26 +433,36 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         if(not ok):
             return False
 
+        cadence_two = self.cadences[two]
+        cadence_one = self.cadences[one]
+
+        # Now count how many exposures there are at each epoch for this
+        # array of iexp
+        epochs_two_got, nexps_got = np.unique(cadence_two.epochs[iexp],
+                                              return_counts=True)
+        ngot = np.zeros(cadence_two.nepochs, dtype=np.int32)
+        ngot[epochs_two_got] = nexps_got
+
         # Check each solution and see if the current assignment satisfies
+
+        nneed = np.zeros(cadence_two.nepochs, dtype=np.int32)
         for epochs_two in epochs_list:
 
             # For this solution, count how many exposures are required
             # at each epoch of cadence two
-            nneed = np.zeros(self.cadences[two].nepochs, dtype=np.int32)
+            nneed[:] = 0
+            bad = False
             for epoch_one, epoch_two in enumerate(epochs_two):
-                nneed[epoch_two] = nneed[epoch_two] + self.cadences[one].nexp[epoch_one]
-
-            # Now count how many exposures there are at each epoch for this
-            # array of iexp
-            epochs_two_got, nexps_got = np.unique(self.cadences[two].epochs[iexp],
-                                                  return_counts=True)
-            ngot = np.zeros(self.cadences[two].nepochs, dtype=np.int32)
-            ngot[epochs_two_got] = nexps_got
+                nneed[epoch_two] = nneed[epoch_two] + cadence_one.nexp[epoch_one]
+                if(nneed[epoch_two] > ngot[epoch_two]):
+                    bad = True
+                    break
 
             # For each exposure in the solution, are there enough exposures?
-            nbad = (ngot < nneed).sum()
-            if(nbad == 0):
-                return True
+            if(not bad):
+                nbad = (ngot < nneed).sum()
+                if(nbad == 0):
+                    return True
 
         # If we have gotten here no working solution was found
         return False
