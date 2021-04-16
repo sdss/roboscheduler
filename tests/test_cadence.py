@@ -492,6 +492,76 @@ def test_cadence_consistency_4():
     assert ok is True
 
 
+def test_cadence_evaluate_next():
+    clist = cadence.CadenceList()
+    clist.reset()
+
+    clist.add_cadence(name='dark_2x2',
+                      nepochs=2,
+                      instrument='BOSS',
+                      skybrightness=[0.35, 0.35],
+                      delta=[0., 26.],
+                      delta_min=[0., 1.],
+                      delta_max=[0., 40.],
+                      nexp=[2, 2],
+                      max_length=[1., 1.])
+
+    test_cadence = clist.cadences["dark_2x2"]
+
+    idx = 0
+    mjd_past = 0  # this would be returned by epochs_completed
+    mjd_next = 59900
+    skybrightness_next = 0.2
+    observable, priority = \
+    test_cadence.evaluate_next(epoch_idx=idx,
+                               mjd_past=mjd_past,
+                               mjd_next=mjd_next,
+                               skybrightness_next=skybrightness_next)
+
+    assert observable
+
+    skybrightness_next = 0.5
+    observable, priority = \
+    test_cadence.evaluate_next(epoch_idx=idx,
+                               mjd_past=mjd_past,
+                               mjd_next=mjd_next,
+                               skybrightness_next=skybrightness_next)
+
+    assert not observable
+
+    idx = 1
+    mjd_past = 59895  # this would be returned by epochs_completed
+    mjd_next = 59900
+    skybrightness_next = 0.2
+    observable, priority1 = \
+    test_cadence.evaluate_next(epoch_idx=idx,
+                               mjd_past=mjd_past,
+                               mjd_next=mjd_next,
+                               skybrightness_next=skybrightness_next)
+
+    mjd_next = mjd_past + 25
+    observable, priority2 = \
+    test_cadence.evaluate_next(epoch_idx=idx,
+                               mjd_past=mjd_past,
+                               mjd_next=mjd_next,
+                               skybrightness_next=skybrightness_next)
+
+    assert observable
+    assert priority2 > priority1
+
+    idx = 1
+    mjd_past = 59800  # this would be returned by epochs_completed
+    mjd_next = 59900
+    skybrightness_next = 0.2
+    observable, priority = \
+    test_cadence.evaluate_next(epoch_idx=idx,
+                               mjd_past=mjd_past,
+                               mjd_next=mjd_next,
+                               skybrightness_next=skybrightness_next)
+
+    assert not observable
+
+
 def test_cadence_consistency_merge():
     clist = cadence.CadenceList()
     clist.reset()
