@@ -739,6 +739,9 @@ class Scheduler(Master):
                     if int(self.fields.field_id[indx]) in ignore:
                         observable[indx] = False
                         continue
+                    elif self.fields.flag[indx] == -1:
+                        observable[indx] = False
+                        continue
                     cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
                     iobservations = self.fields.observations[indx]
                     # mjd_past = self.observations.mjd[iobservations]
@@ -770,6 +773,12 @@ class Scheduler(Master):
                                               ignoreMax=ignoreMax)
                     if nexp[indx] > maxExp:
                         observable[indx] = False
+                    if self.fields.flag[indx] == 1:
+                        # flagged as top priority
+                        # if we're in this loop, it's above the horizon and moon OK
+                        # so override cadence eligibility and bump priority
+                        observable[indx] = True
+                        delta_priority[indx] += 1e6
                     #     if indx in whereRM and skybrightness <= 0.35:
                     #         print(indx, " kicked out for nexp")
                     # if indx in whereRM and skybrightness <= 0.35:

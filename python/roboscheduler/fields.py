@@ -79,6 +79,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.cadence = []
         self.observations = []
         self.slots = []
+        self.flag = []
         self.lstObserved = np.zeros(0, dtype=np.int32)
         self.cadencelist = roboscheduler.cadence.CadenceList()
         self._validCadance = None
@@ -106,6 +107,10 @@ class Fields(object, metaclass=FieldsSingleton):
         self.icadence = np.zeros(self.nfields, dtype=np.int32)
         self.nextmjd = np.zeros(self.nfields, dtype=np.float64)
         self.basePriority = np.ones(self.nfields) * 200
+        if "flag" in fields_array.dtype.names:
+            self.flag = fields_array["flag"]
+        else:
+            self.flag = np.zeros(self.nfields)
         self.setPriorities()
         return
 
@@ -167,32 +172,11 @@ class Fields(object, metaclass=FieldsSingleton):
                                            for c in self.cadence])
         return self._validCadance
 
-    # @property
-    # def obsPlan(self):
-    #     """Slots specify when the field should be observed
-    #     make that information useful.
-
-    #     Returns:
-    #     -------
-
-    #     obsPlan : list
-    #         a list containing lst and lunation for each field
-    #     """
-    #     if self._obsPlan is None:
-    #         self._obsPlan = [np.where(s > 0) for s in self.slots]
-    #     return self._obsPlan
-
     @property
     def lstPlan(self):
         if self._lstPlan is None:
             self._lstPlan = np.array([np.sum(s, axis=1) for s in self.slots])
         return self._lstPlan
-
-    # @property
-    # def lunationPlan(self):
-    #     if self._lunationPlan is None:
-    #         self._lunationPlan = np.array([np.mean(p[1]) for p in self.obsPlan])
-    #     return self._lunationPlan
 
     @property
     def hist(self):
@@ -257,6 +241,7 @@ class Fields(object, metaclass=FieldsSingleton):
                         ('racen', np.float64),
                         ('deccen', np.float64),
                         ('nfilled', np.int32),
+                        ('flag', np.int32),
                         ('slots_exposures', np.int32, (24, 2)),
                         ('cadence', np.dtype('a20'))]
 
@@ -275,6 +260,7 @@ class Fields(object, metaclass=FieldsSingleton):
         deccen = list()
         slots_exposures = list()
         cadence = list()
+        flags = list()
 
         for field in dbfields:
             fieldid.append(field.field_id)
@@ -282,12 +268,20 @@ class Fields(object, metaclass=FieldsSingleton):
             deccen.append(field.deccen)
             slots_exposures.append(field.slots_exposures)
             cadence.append(field.cadence.label)
+            if len(field.priority) > 0:
+                if field.priority[0].label == "top":
+                    flags.append(1)
+                elif field.priority[0].label == "disabled":
+                    flags.append(-1)
+            else:
+                flags.append(0)
 
         fields = np.zeros(len(dbfields), dtype=fields_model)
 
         fields["field_id"] = fieldid
         fields["racen"] = racen
         fields["deccen"] = deccen
+        fields["flag"] = flags
         fields["slots_exposures"] = slots_exposures
         fields["cadence"] = cadence
 
