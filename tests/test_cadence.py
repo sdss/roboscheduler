@@ -573,7 +573,8 @@ def test_cadence_consistency_merge():
                       delta=[-1., -1.],
                       delta_min=[-1., -1.],
                       delta_max=[-1., -1.],
-                      nexp=[2, 2])
+                      nexp=[2, 2],
+                      max_length=[1.] * 2)
 
     clist.add_cadence(name='dark_2x4',
                       nepochs=2,
@@ -582,7 +583,8 @@ def test_cadence_consistency_merge():
                       delta=[0., 26., 26., 26., 26., 26.],
                       delta_min=[0., 1., 1., 1., 1., 1.],
                       delta_max=[0., 3000., 3000., 3000., 3000., 3000.],
-                      nexp=[4] * 2)
+                      nexp=[4] * 2,
+                      max_length=[1.] * 2)
 
     ok, epochs_list, nexps_list = clist.cadence_consistency('dark_2x2',
                                                             'dark_2x4',
