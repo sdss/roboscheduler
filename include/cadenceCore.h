@@ -17,6 +17,7 @@ public:
 							py::array_t<float> delta,
 							py::array_t<float> delta_min, py::array_t<float> delta_max,
 							py::array_t<int> nexp,
+							py::array_t<float> max_length,
 							py::array_t<int> epoch_indx,
 							py::array_t<int> epochs);
 	std::string __str__();
@@ -33,6 +34,7 @@ public:
 	py::array_t<float> delta_min;
 	py::array_t<float> delta_max;
 	py::array_t<int> nexp;
+	py::array_t<float> max_length;
 	py::array_t<int> epoch_indx;
 	py::array_t<int> epochs;
 };

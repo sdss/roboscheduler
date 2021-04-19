@@ -10,6 +10,19 @@ Dependencies:
 """
 
 
+def wrapHA(ha):
+    """Force ha into range -180 to 180. Just to be sure.
+    """
+    if -180 < ha <= 180:
+        return ha
+    while ha > 180:
+        ha = ha - 360.
+    while ha <= -180:
+        ha = ha + 360.
+    assert -180 < ha <= 180, "ha = {:.2f}".format(ha)
+    return ha
+
+
 class Observations(object):
     """Observations class.
 
@@ -58,16 +71,24 @@ class Observations(object):
         self.nobservations = np.int32(0)
         self.observatory = observatory
         self.fieldid = np.zeros(0, dtype=np.int32)
+        self.racen = np.zeros(0, dtype=np.float64)
+        self.deccen = np.zeros(0, dtype=np.float64)
+        self.cadence = np.zeros(0, dtype=np.dtype('a20'))
+        self.nfilled = np.zeros(0, dtype=np.int32)
         self.mjd = np.zeros(0, dtype=np.float64)
         self.duration = np.zeros(0, dtype=np.float64)
         self.sn2 = np.zeros(0, dtype=np.float32)
         self.airmass = np.zeros(0, dtype=np.float32)
         self.skybrightness = np.zeros(0, dtype=np.float32)
         self.lst = np.zeros(0, dtype=np.float32)
+        self.ha = np.zeros(0, dtype=np.float64)
+        self.nexp_cumul = np.zeros(0, dtype=np.int32)
         return
 
     def add(self, fieldid=None, mjd=None, duration=None, sn2=None,
-            skybrightness=None, airmass=None, lst=None):
+            skybrightness=None, airmass=None, lst=None,
+            racen=None, deccen=None, cadence=None, nfilled=None,
+            nexp_cumul=None):
         self.fieldid = np.append(self.fieldid,
                                  np.array([np.float64(fieldid)]))
         self.mjd = np.append(self.mjd,
@@ -83,6 +104,22 @@ class Observations(object):
         self.lst = np.append(self.lst,
                              np.array([np.float32(lst)]))
         self.nobservations = len(self.fieldid)
+
+        self.racen = np.append(self.racen,
+                               np.array([np.float64(racen)]))
+        self.deccen = np.append(self.deccen,
+                                np.array([np.float64(deccen)]))
+        self.cadence = np.append(self.cadence,
+                                 np.array([cadence]))
+        self.nfilled = np.append(self.nfilled,
+                                 np.array([np.int32(nfilled)]))
+
+        ha = wrapHA(lst - racen)
+        self.ha = np.append(self.ha,
+                            np.array([np.float64(ha)]))
+        self.nexp_cumul = np.append(self.nexp_cumul,
+                                    np.array([np.int32(nexp_cumul)]))
+
         return(self.nobservations - 1)
 
     def forfield(self, mjd=None, fieldid=None):
@@ -111,7 +148,13 @@ class Observations(object):
                 ('sn2', np.float32),
                 ('airmass', np.float32),
                 ('skybrightness', np.float32),
-                ('lst', np.float32)]
+                ('lst', np.float32),
+                ('racen', np.float64),
+                ('deccen', np.float64),
+                ('cadence', np.dtype('a20')),
+                ('nfilled', np.int32),
+                ('ha', np.float32),
+                ('nexp_cumul', np.int32)]
         if(indx is None):
             indx = np.arange(self.nobservations)
         nobs = len(indx)
@@ -124,4 +167,10 @@ class Observations(object):
             obs['airmass'] = self.airmass[indx]
             obs['skybrightness'] = self.skybrightness[indx]
             obs['lst'] = self.lst[indx]
+            obs['racen'] = self.racen[indx]
+            obs['deccen'] = self.deccen[indx]
+            obs['cadence'] = self.cadence[indx]
+            obs['nfilled'] = self.nfilled[indx]
+            obs['ha'] = self.ha[indx]
+            obs['nexp_cumul'] = self.nexp_cumul[indx]
         return(obs)

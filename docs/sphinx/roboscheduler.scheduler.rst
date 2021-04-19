@@ -1,24 +1,24 @@
-observesim.scheduler package
+roboscheduler.scheduler package
 ============================
 
 Observer
 --------
 .. _Observer:
-.. autoclass:: observesim.scheduler.Observer
+.. autoclass:: roboscheduler.scheduler.Observer
     :inherited-members:
     :members:
 
 Master
 ------
 .. _Master:
-.. autoclass:: observesim.scheduler.Master
+.. autoclass:: roboscheduler.scheduler.Master
     :inherited-members:
     :members:
 
 Scheduler
 ---------
 .. _Scheduler:
-.. autoclass:: observesim.scheduler.Scheduler
+.. autoclass:: roboscheduler.scheduler.Scheduler
     :inherited-members:
     :members:
 

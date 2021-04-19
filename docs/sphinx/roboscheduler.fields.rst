@@ -1,10 +1,10 @@
-observesim.fields package
+roboscheduler.fields package
 =========================
 
 Fields
 ------
 .. _Fields:
-.. autoclass:: observesim.fields.Fields
+.. autoclass:: roboscheduler.fields.Fields
     :members:
 
 

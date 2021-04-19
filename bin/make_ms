@@ -1,0 +1,157 @@
+#!/usr/bin/env python
+# encoding: utf-8
+
+import argparse
+import os
+import sys
+
+import numpy as np
+from astropy.time import Time
+
+from roboscheduler.scheduler import Observer
+
+
+def lst_to_hhmm(lst):
+    hour = int(lst // 1)
+    minute = int((lst - hour) * 60 // 1)
+    return f"{hour:02d}:{minute:02d}"
+
+
+def sched_engineering(mjds, sched):
+    illum = sched.moon_illumination(mjds)
+
+    full = np.where(illum > 0.98)[0]
+
+    # days = list()
+    nights = list()
+    last_night = 0
+    for i in full:
+        m = int(mjds[i])
+        if m - last_night < 5:
+            continue
+        aTime = Time(m-1, format="mjd").datetime
+        if aTime.isoweekday() == 6:
+            nights.append(m-1)
+            # days.append(m-2)
+            last_night = m
+        elif aTime.isoweekday() == 7:
+            nights.append(m+1)
+            # days.append(m+2)
+            last_night = m
+        elif aTime.isoweekday() == 1:
+            nights.append(m)
+            # days.append(m+1)
+            last_night = m
+        else:
+            nights.append(m)
+            # days.append(m-1)
+            last_night = m
+
+    return nights
+
+
+def dateStr(date):
+    year = date.year
+    mon = date.month
+    day = date.day
+
+    return f"SCHEDULE {year:4d}-{mon:02d}-{day:02d} 12:00 "
+
+
+def makeSched(start, stop, outDir="", name="MS", observatory="apo"):
+    sched = Observer(observatory=observatory)
+
+    mjds = np.arange(start, stop, 1)
+
+    vocab = {"eng_start": "START_ENGINEERING # Engineering time",
+             "eng_end": "END_ENGINEERING",
+             "shutdown_start": "START_SHUTDOWN # SUMMER SHUTDOWN",
+             "shutdown_end": "END_SHUTDOWN",
+             "begin": "START_SURVEY",
+             "end": "END_SURVEY"}
+
+    date = Time(mjds[0], format="mjd").datetime
+
+    prod_dir = os.path.abspath(__file__).split("/bin/")[0]
+    head_file = os.path.join(prod_dir, 'data', 'sch_head.txt')
+
+    with open(head_file, "r") as header:
+        local = "# Timezone offset in hours to apply to get to TAI \n# (i.e. Greenwich time)"
+        if observatory == "apo":
+            local += "\n to_tai 7  # Mountain Standard Time \n\n"
+        else:
+            local += "\n to_tai 4  # Chilean Standard Time \n\n"
+        sched_str = local + header.read() + "\n\n"
+
+    sched_str += dateStr(date) + vocab["begin"] + "\n"
+
+    shutdown_duration = 7 * 6  # 6 weeks
+
+    eng = sched_engineering(mjds, sched)
+    delay = 0
+    for m in mjds[1:]:
+        m = int(m)
+        if m < delay:
+            continue
+        if m in eng:
+            start = Time(m, format="mjd").datetime
+            end = Time(m+1, format="mjd").datetime
+            sched_str += dateStr(start) + vocab["eng_start"] + "\n"
+            sched_str += dateStr(end) + vocab["eng_end"] + "\n"
+            delay = m + 1
+        else:
+            date = Time(m-1, format="mjd").datetime
+            if date.month == 7:
+                if date.isoweekday() == 1:
+                    end = Time(m + shutdown_duration - 1, format="mjd").datetime
+                    sched_str += dateStr(date) + vocab["shutdown_start"] + "\n"
+                    sched_str += dateStr(end) + vocab["shutdown_end"] + "\n"
+                    delay = m + shutdown_duration
+
+    # +2 for our previous safety buffer
+    date = Time(stop+2, format="mjd").datetime
+
+    sched_str += dateStr(date) + vocab["end"] + "\n"
+
+    fname = os.path.join(outDir, name + ".dat")
+    with open(fname, "w") as outFile:
+        print(sched_str, file=outFile)
+
+    print(f"schedule written to {fname}")
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(
+        prog=os.path.basename(sys.argv[0]),
+        description="""create master schedule""")
+
+    parser.add_argument("-s", "--start", dest="start", type=str,
+                        required=True, help="start date, YYYY-MM-DD")
+    parser.add_argument("-e", "--end", dest="end", type=str,
+                        required=True, help="end date, YYYY-MM-DD")
+    parser.add_argument("-o", "--out", dest="out", type=str,
+                        required=False, help="output directory, default current",
+                        default="")
+    parser.add_argument("-n", "--name", dest="name", type=str,
+                        required=False, help="file name, default MS",
+                        default="MS")
+    parser.add_argument("-l", "--loc", dest="loc", type=str,
+                        required=False, help="location, default apo",
+                        default="apo")
+
+    args = parser.parse_args()
+    start = args.start
+    end = args.end
+    outPath = args.out
+    name = args.name
+    loc = args.loc
+
+    try:
+        start_date = int(Time(start+"T00:00:00").mjd)
+        # - 2 in case engineering falls on or before that day
+        end_date = int(Time(end+"T00:00:00").mjd) - 2
+    except ValueError:
+        sys.exit("ERROR: dates must be in format YYYY-MM-DD")
+
+    makeSched(start_date, end_date, outDir=outPath, name=name, observatory=loc)

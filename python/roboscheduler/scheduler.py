@@ -52,7 +52,7 @@ class SchedulerBase(object):
     hadec2altaz(ha=, dec=, lat=) : convert HA, Dec, latitude to alt, az
     alt2airmass(alt=) : convert altitude to airmass
 
-"""
+    """
     def __init__(self):
         return
 
@@ -142,7 +142,8 @@ class SchedulerBase(object):
 
 
 class Observer(SchedulerBase):
-    """Observer class to define different observatories.
+    """Observer class to define different observatories and compute useful 
+    quantities (lst, moon location, etc) at each observatory.
 
     Parameters:
     ----------
@@ -167,29 +168,17 @@ class Observer(SchedulerBase):
     longitude : numpy.float64
         Longitude (E of Greenwich) of observatory
 
-    Methods:
-    -------
-
-    ralst2ha(ra=, lst=) : convert RA and LST to hour angle
-    hadec2altaz(ha=, dec=, lat=) : convert HA, Dec, latitude to alt, az
-    alt2airmass(alt=) : convert altitude to airmass
-    lst(mjd=) : return LST in degrees for observer at given MJD (days)
-    radec2altaz(mjd=, ra=, dec=) : return alt/az for ra/dec at given MJD
-    sun_radec(mjd=) : return position of Sun in Ra/Dec
-    sun_altaz(mjd=) : return position of Sun in Alt/AZ
-    moon_radec(mjd=) : return position of Moon in Ra/Dec
-    moon_altaz(mjd=) : return position of Moon in Alt/AZ
-    moon_illumination(mjd=) : return illumination of Moon at given MJD
-    evening_twilight(mjd=): return evening twilight on MJD
-    morning_twilight(mjd=): return morning twilight on MJD
-"""
+    """
     def __init__(self, observatory='apo', observatoryfile=None,
                  dark_twilight=-15., bright_twilight=-8.):
         """Create Observer object"""
         super().__init__()
         self.observatory = observatory
         if(observatoryfile is None):
-            observatoryfile = os.path.join(os.getenv('ROBOSCHEDULER_DIR'),
+            env_dir = os.getenv('ROBOSCHEDULER_DIR')
+            if env_dir is None:
+                env_dir = os.path.abspath(__file__).split("/python/roboscheduler/")[0]
+            observatoryfile = os.path.join(env_dir,
                                            'data', 'observatories.par')
         self._file = observatoryfile
         self._data = yanny.yanny(self._file)
@@ -267,6 +256,48 @@ class Observer(SchedulerBase):
         jd = self._mjd2jd(mjd=self._arrayify(mjd))
         ra, dec, dist, geolon, geolat = pyasl.moonpos(jd)
         return (ra, dec)
+
+    def moon_dist(self, mjd=None, ra=None, dec=None, threshold=None):
+        """Return distance to the moon in deg at MJD (days)
+
+        Parameters:
+        ----------
+
+        mjd : np.float64
+            Modified Julian Day (days)
+
+        ra : np.float64
+            right ascension, J2000 (deg)
+
+        dec : np.float64
+            declination, J2000 (deg)
+
+        threshold : np.float64
+            minimum allowed distance (deg); if provided a boolean array
+            of the distance check is returned, other the distance array is returned
+
+        Returns:
+        -------
+
+        distance : np.float64
+            angular distance to the moon (deg)
+
+        far_enough: np.bool
+            array of distance checks for input targets,
+            returned if threshold is passed
+        """
+        ra = self._arrayify(ra)
+        dec = self._arrayify(dec)
+
+        moonra, moondec = self.moon_radec(mjd)
+
+        moon_dist = np.power((ra - moonra)*np.cos(dec*np.pi / 180), 2)\
+                  + np.power((dec - moondec), 2)
+
+        if threshold:
+            return moon_dist > np.power(threshold, 2)
+        else:
+            return np.power(moon_dist, 0.5)
 
     def radec2altaz(self, mjd=None, ra=None, dec=None):
         """Return (alt, az) for (ra, dec) in deg J2000 at MJD (days)
@@ -390,7 +421,7 @@ class Observer(SchedulerBase):
         lunation, which if the Moon is above the horizon, is its
         fractional illumination, and if the Moon is below the horizon,
         is zero.
-"""
+        """
         (moon_alt, moon_az) = self.moon_altaz(mjd=mjd)
         (sun_alt, sun_az) = self.sun_altaz(mjd=mjd)
         if(sun_alt > self.dark_twilight):
@@ -459,11 +490,11 @@ class Observer(SchedulerBase):
 
 
 class Master(Observer):
-    """Master class to interpret master schedule as an observer
+    """Master class to interpret master schedule as an observer. Inherits from Observer.
 
     Parameters:
     ----------
-    schedulefile : str
+    schedule : str
         schedule file to use; default $ROBOSCHEDULER_DIR/data/master_schedule.par
 
     Attributes:
@@ -482,11 +513,7 @@ class Master(Observer):
         list of times in ISO format for events of note
     event_mjd : ndarray of numpy.float64
         MJDs (days) of events of note
-
-    Methods:
-    -------
-    on() : is the survey on
-"""
+    """
     def __init__(self, schedule='normal', observatory='apo',
                  observatoryfile=None):
         """Create Master object for schedule"""
@@ -494,7 +521,10 @@ class Master(Observer):
                          observatoryfile=observatoryfile)
         masterfile = 'master_schedule_{o}_{s}.par'.format(o=observatory,
                                                           s=schedule)
-        schedulefile = os.path.join(os.getenv('ROBOSCHEDULER_DIR'),
+        env_dir = os.getenv('ROBOSCHEDULER_DIR')
+        if env_dir is None:
+            env_dir = os.path.abspath(__file__).split("/python/roboscheduler/")[0]
+        schedulefile = os.path.join(env_dir,
                                     'data', masterfile)
         print(schedulefile)
         self._schedulefile = schedulefile
@@ -523,9 +553,9 @@ class Master(Observer):
         # should make sure:
         #  one start (first event)
         #  one end (last event)
-        #  start MJD is a daytime time 
-        #  START_SURVEY is "on" 
-        #  END_SURVEY is "off" 
+        #  start MJD is a daytime time
+        #  START_SURVEY is "on"
+        #  END_SURVEY is "off"
         return
 
     def on(self, mjd=None):
@@ -578,7 +608,8 @@ class Master(Observer):
 
 
 class Scheduler(Master):
-    """Scheduler class.
+    """Scheduler class to keep track of fields and schedule the optimal field at
+    a given time. Inherits from Master.
 
     Parameters:
     ----------
@@ -586,17 +617,19 @@ class Scheduler(Master):
     airmass_limit : float, np.float32
         airmass limit for observations
 
+    observatory : str
+        Name of observatory to use (must be in observatory file)
+        (default 'apo')
+
+    observatoryfile : str
+        Name of Yanny-format observatory file to read
+        (default $ROBOSCHEDULER_DIR/data/observatories.par)
+
     Attributes:
     ----------
 
     airmass_limit : float, np.float32
         airmass limit for observations
-
-    master : Master object
-        Master schedule to use for scheduling
-
-    observer : Observer object
-        Observer to use for scheduling
 
     fields : Fields object
         object for fields
@@ -604,27 +637,12 @@ class Scheduler(Master):
     observations : Observations object
         object accessing list of observations
 
-    Methods:
-    -------
-
-    initdb() : initialize field list and set to unobserved
-
-    nextfield(mjd=mjd) : return field to observe at mjd
-
-    observable(mjd=mjd) : return fieldids observable at mjd
-
-    update(fieldid=fieldid, result=result) : update observations with result
-
     Comments:
     --------
 
     Scheduling proceeds conceptually as follows
          - fields are limited to set that are conceivably observable
          - A strategy to optimize completion
-
-    In this default Scheduler, the strategy is a completely heuristic one
-         - take lowest HA cases in bins of 5 deg
-         - take lowest transit altitude case among those
 
     """
     def __init__(self, airmass_limit=2.,
@@ -636,26 +654,43 @@ class Scheduler(Master):
         self.airmass_limit = airmass_limit
         return
 
-    def initdb(self, designbase='plan-0'):
-        """Initialize Scheduler fields and observation lists
+    def initdb(self, designbase='plan-0', fromFits=True):
+        """Initialize Scheduler fields and observation lists.
+        Required before fields can be scheduled.
+
+        Parameters:
+        ----------
+
+        designbase : str
+            the name of the robostrategy version to load.
+
+        fromFits : boolean
+            For simulations we want to use a fits file, which should
+            exist in "$OBSERVING_PLAN_DIR" and be named using 'designbase'
         """
-        filebase = os.path.join(os.getenv('OBSERVING_PLAN_DIR'),
-                                designbase)
-        # base = os.getenv('OBSERVING_PLAN_DIR')
-        cadence_file = filebase + "/" + "rsCadences" + "-" + designbase + "-"\
-                       + self.observatory + ".fits"
-        fields_file = filebase + "/" + "rsAllocation" + "-" + designbase + "-"\
-                       + self.observatory + ".fits"
         self.cadencelist = roboscheduler.cadence.CadenceList()
-        self.cadencelist.fromfits(filename=cadence_file)
-        self.fields = roboscheduler.fields.Fields()
-        self.fields.fromfits(filename=fields_file)
+        self.fields = roboscheduler.fields.Fields(plan=designbase,
+                                                  observatory=self.observatory)
+        if fromFits:
+            filebase = os.path.join(os.getenv('OBSERVING_PLAN_DIR'),
+                                    designbase)
+            # base = os.getenv('OBSERVING_PLAN_DIR')
+            cadence_file = filebase + "/" + "rsCadences" + "-" + designbase + "-"\
+                           + self.observatory + ".fits"
+            fields_file = filebase + "/" + "rsAllocation" + "-" + designbase + "-"\
+                           + self.observatory + ".fits"
+
+            self.cadencelist.fromfits(filename=cadence_file)
+            self.fields.fromfits(filename=fields_file)
+        else:
+            self.cadencelist.fromdb()
+            self.fields.fromdb()
+
         self.observations = roboscheduler.observations.Observations(observatory=self.observatory)
         return
 
-
     def observable(self, mjd=None,  maxExp=None, check_skybrightness=True,
-                   check_cadence=True):
+                   check_cadence=True, ignore=[]):
         """Return array of fields observable
 
         Parameters:
@@ -663,6 +698,22 @@ class Scheduler(Master):
 
         mjd : np.float64
             current MJD
+
+        maxExp : integer
+            the maximum number of exposures to allow, useful towards
+
+        check_skybrightness : boolean
+            passed to cadence check, rarely used
+
+        check_cadence : boolean
+            if all else fails, just see if a field is up, don't worry
+            about cadence, rarely used
+
+        ignore : list
+            a list of fields to mark unobservable. Mostly used while
+            planning a night to avoid rescheduling the same field that
+            hasn't been marked done in the database.
+
         """
 
         (alt, az) = self.radec2altaz(mjd=mjd, ra=self.fields.racen,
@@ -670,9 +721,12 @@ class Scheduler(Master):
         airmass = self.alt2airmass(alt)
         skybrightness = self.skybrightness(mjd)
         # valid cadence checks against "none" cadence issue
-        observable = (alt > 0.) & (airmass < self.airmass_limit) & self.fields.validCadence
+        moon_check = self.moon_dist(mjd=mjd, ra=self.fields.racen,
+                                    dec=self.fields.deccen, threshold=15)
+        observable = (alt > 0.) & (airmass < self.airmass_limit)\
+                   & self.fields.validCadence & moon_check
         nexp = np.ones(len(observable), dtype=int)
-        delta_remaining = np.zeros(len(observable), dtype=np.float64)
+        delta_priority = np.zeros(len(observable), dtype=np.float64)
 
         whereRM = np.where(["bhm_rm" in c for c in self.fields.cadence])[0]
 
@@ -682,35 +736,69 @@ class Scheduler(Master):
             indxs = np.where(self.fields.nextmjd <= mjd)[0]
             for indx in indxs:
                 if(observable[indx]):
+                    if int(self.fields.field_id[indx]) in ignore:
+                        observable[indx] = False
+                        continue
+                    elif self.fields.flag[indx] == -1:
+                        observable[indx] = False
+                        continue
                     cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
                     iobservations = self.fields.observations[indx]
-                    mjd_past = self.observations.mjd[iobservations]
-                    nexp[indx] = cadence.smart_epoch_nexp(mjd_past)
+                    # mjd_past = self.observations.mjd[iobservations]
+                    mjd_past = self.fields.hist[self.fields.field_id[indx]]
+                    # epoch_idx is the *index* of the *next* epoch
+                    # for 0 indexed arrays, this equivalent to
+                    # "how many epochs have I done previously"
+                    epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=240)
+                    if epoch_idx >= cadence.nepochs:
+                        observable[indx] = False
+                        continue
+                    # how many exp/"designs" since start of last epoch?
+                    exp_epoch = np.sum(np.greater(mjd_past, mjd_prev))
+                    if exp_epoch < cadence.nexp[epoch_idx]:
+                        nexp[indx] = cadence.nexp[epoch_idx] - exp_epoch
+                        epoch_idx -= 1
+                        partial_epoch = True
+                    else:
+                        nexp[indx] = cadence.nexp[epoch_idx]
+                        partial_epoch = False
                     ignoreMax = indx in whereRM
-                    observable[indx], delta_remaining[indx] = cadence.evaluate_next(mjd_past=mjd_past,
-                                                             mjd_next=mjd,
-                                                             skybrightness_next=skybrightness,
-                                                             check_skybrightness=check_skybrightness,
-                                                             ignoreMax=ignoreMax)
-                    # if nexp[indx] > maxExp:
-                    #     observable[indx] = False
+                    observable[indx], delta_priority[indx] =\
+                        cadence.evaluate_next(epoch_idx=epoch_idx,
+                                              partial_epoch=partial_epoch,
+                                              mjd_past=mjd_prev,
+                                              mjd_next=mjd,
+                                              skybrightness_next=skybrightness,
+                                              check_skybrightness=check_skybrightness,
+                                              ignoreMax=ignoreMax)
+                    if nexp[indx] > maxExp:
+                        observable[indx] = False
+                    if self.fields.flag[indx] == 1:
+                        # flagged as top priority
+                        # if we're in this loop, it's above the horizon and moon OK
+                        # so override cadence eligibility and bump priority
+                        observable[indx] = True
+                        delta_priority[indx] += 1e6
                     #     if indx in whereRM and skybrightness <= 0.35:
                     #         print(indx, " kicked out for nexp")
                     # if indx in whereRM and skybrightness <= 0.35:
-                    #     print(mjd, indx, observable[indx], delta_remaining[indx])
+                    #     print(mjd, indx, observable[indx], delta_priority[indx])
         else:
             rejected = 0
             # print("lunation: ", lunation)
             iobservable = np.where(observable)[0]
             # 1,000,000 means it won't affect the weight
-            delta_remaining = np.ones(len(observable), dtype=np.float64)*1e6
+            delta_priority = np.ones(len(observable), dtype=np.float64)*1e6
             for indx in iobservable:
                 if(observable[indx]):
                     cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
                     iobservations = self.fields.observations[indx]
                     mjd_past = self.observations.mjd[iobservations]
-                    nexp[indx] = cadence.next_epoch_nexp(mjd_past)
-                    skybrightness_ok = cadence.skybrightness_check(mjd_past, skybrightness)
+                    epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=240)
+                    if epoch_idx >= cadence.nepochs:
+                        epoch_idx = cadence.nepochs - 1
+                    nexp[indx] = cadence.nexp[epoch_idx]
+                    skybrightness_ok = cadence.skybrightness_check(epoch_idx, skybrightness)
                     if nexp[indx] > maxExp or not skybrightness_ok:
                         rejected += 1
                         observable[indx] = False
@@ -719,30 +807,39 @@ class Scheduler(Master):
 
         iobservable = np.where(observable)[0]
 
-        return self.fields.fieldid[iobservable], nexp[iobservable], delta_remaining[iobservable]
+        return iobservable, nexp[iobservable], delta_priority[iobservable]
 
-
-    def prioritize(self, mjd=None, fieldid=None, nexp=None, delta_remaining=None):
-        """Return the fieldid to pick from using heuristic strategy
+    def prioritize(self, mjd=None, iobservable=None, nexp=None,
+                   delta_priority=None):
+        """Prioritize fields according to the Robostrategy LST plan
+        and accounting for priority adjustments from the cadence check (i.e. 
+        whether a field is inside an incomplete epoch or else how long 
+        before it fails cadence requirements.)
 
         Parameters:
         ----------
 
-        fieldid : ndarray  of np.int32
-            array of available fieldid values
-
-        nexp: ndarray  of np.int32, len of fieldid
-            array of nexp if field is chosen
+        mjd : float
+            mjd to check, for find current lst
+        iobservable : list of integer
+            index into Scheduler.fields of observable fields
+        nexp : ndarray  of np.int32
+            array of number of exp for each field
+        delta_priority : ndarray of np.float64
+            change to the default priority, from cadence check.
+            This accounts for time left in cadence or whether
+            the cadence is partially complete.
 
         Returns:
         -------
 
-        pick_fieldid : ndarray of np.int32
-            fieldid
+        priority : ndarray of np.float64
+            calculated priority for each field
         """
 
-        priority = np.ones(len(fieldid))*200
+        priority = np.ones(len(iobservable))*100
         # priority = self.fields.basePriority[fieldid]
+        priority += delta_priority
 
         priority += 5*nexp
 
@@ -752,27 +849,45 @@ class Scheduler(Master):
 
         # lstDiffs = lstDiff(self.fields.lstPlan[fieldid], np.ones(len(fieldid))*lstHrs)
 
-        lstDiffs = self.fields.lstWeight(lstHrs, fieldid)
+        lstDiffs = self.fields.lstWeight(lstHrs, iobservable)
 
-        assert lstDiffs.shape == fieldid.shape, "lst weight going poorly"
-        assert 0 not in delta_remaining, "some delta remaining not set properly!"
+        assert len(lstDiffs) == len(iobservable), "lst weight going poorly"
+        # assert 0 not in delta_remaining, "some delta remaining not set properly!"
 
-        ha = self.ralst2ha(ra=self.fields.racen[fieldid], lst=lst)
-        dec = self.fields.deccen[fieldid]
+        ha = self.ralst2ha(ra=self.fields.racen[iobservable], lst=lst)
+        dec = self.fields.deccen[iobservable]
 
         # gaussian weight, mean already 0, use 1 hr  std
-        priority += 20 * np.exp( -(lstDiffs)**2 / (2 * 0.5**2))
+        priority += 20 * np.exp(-(lstDiffs)**2 / (2 * 0.5**2))
         # gaussian weight, mean already 0, use 1 hr = 15 deg std
         # priority += 20 * np.exp( -(ha)**2 / (2 * 15**2))
         # gaussian weight, mean = obs lat, use 20 deg std
-        # priority -= 20 * np.exp( -(dec - self.latitude)**2 / (2 * 20**2))
-        # 1/sqrt(x) priority; at 1 day +100, at 10 days +30, at 30 days +18
-        priority += 15* np.clip(10/np.sqrt(delta_remaining), a_min=None, a_max=10)
+        priority -= 5 * np.exp( -(dec - self.latitude)**2 / (2 * 20**2))
 
         return priority
 
-
     def pick(self, priority=None, fieldid=None, nexp=None):
+        """Choose the next field
+
+        Parameters:
+        ----------
+
+        priority : ndarray of np.float64
+            calculated priority for each field
+        fieldid : ndarray of np.int32
+            field ids corresponding to prioritiea
+        nexp : ndarray  of np.int32
+            array of number of exp for each field
+
+        Returns:
+        -------
+
+        pick_fieldid : np.int32
+            the field id corresponding to the highest priority
+        pick_exp : integer
+            the number of exposures needed in the chosen field
+        
+        """
         assert len(priority) == len(fieldid) and len(priority) == len(nexp), \
             "inputs must be same size!"
         ipick = np.argmax(priority)
@@ -781,8 +896,41 @@ class Scheduler(Master):
 
         return(pick_fieldid, pick_exp)
 
+    def designsNext(self, fieldid):
+        """Figure out next designs on a field, i.e. which exposure are we on?
 
-    def nextfield(self, mjd=None, maxExp=None, returnAll=False):
+        Parameters:
+        ----------
+
+        fieldid : ndarray of np.int32
+            field ids corresponding to prioritiea
+
+        Returns:
+        -------
+
+        designs : list of integer
+            a list of exposure numbers up next for "fieldid", corresponding 
+            to some designs.
+
+        """
+        fieldidx = self.fields.getidx(fieldid)
+        mjd_past = self.fields.hist[fieldidx]
+        cadence = self.cadencelist.cadences[self.fields.cadence[fieldidx]]
+        epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=240)
+        nexp_next = cadence.nexp[epoch_idx]
+        # how many completed designs since start of epoch
+        # this assumes designs are marked incomplete when epoch_max_length
+        # is hit
+        exp_in_epoch = np.sum(np.greater(mjd_past, mjd_prev))
+
+        exp_to_do = nexp_next - exp_in_epoch
+
+        designs = list(len(mjd_past) + np.arange(exp_to_do))
+
+        return designs
+
+    def nextfield(self, mjd=None, maxExp=None, returnAll=False, live=False,
+                  ignore=[]):
         """Picks the next field to observe
 
         Parameters:
@@ -790,31 +938,62 @@ class Scheduler(Master):
 
         mjd : np.float64
             Current MJD (days)
-
         maxExp : int
             maximum number of full exposures before next event
+        returnAll : boolean
+            Return all the fields? For choosing backups
+        live : boolean
+            Are we live in Kronos? otherwise sim behavior slightly different
+        ignore : list
+            Fields to ignore temporarily, i.e. because they are already
+            scheduled but have no exposures in opsdb
 
         Returns:
         --------
 
-        fieldid : np.int32, int
+        fieldid : np.int32, integer
             ID of field to observe
+        designs : list of integer
+            a list of exposure numbers up next for "fieldid", corresponding 
+            to some designs.
+        
+            OR if returnAll
+
+        sorted_fields : list of integer
+            a list of fields sorted by priority
+        sorted_exp : list of integer
+            a list of nexp sorted by priority
         """
-        observable_fieldid, nexp, delta_remaining = self.observable(mjd=mjd, maxExp=maxExp)
-        if(len(observable_fieldid) == 0):
+        iobservable, nexp, delta_priority = self.observable(mjd=mjd, maxExp=maxExp,
+                                                            ignore=ignore)
+        if(len(iobservable) == 0):
             # print("Nothing observable")
-            observable_fieldid, nexp, delta_remaining = self.observable(mjd=mjd, maxExp=maxExp,
-                                                       check_cadence=False)
-        if len(observable_fieldid) == 0:
+            iobservable, nexp, delta_priority = self.observable(mjd=mjd, maxExp=maxExp,
+                                                                check_cadence=False,
+                                                                ignore=ignore)
+        if len(iobservable) == 0:
             # print("!! nothing to observe; {} exp left in the night".format(maxExp))
             if returnAll:
                 return None, -1, 0
             return None, -1
 
-        priority = self.prioritize(fieldid=observable_fieldid, mjd=mjd, 
-                                   nexp=nexp, delta_remaining=delta_remaining)
+        priority = self.prioritize(iobservable=iobservable, mjd=mjd,
+                                   nexp=nexp, delta_priority=delta_priority)
 
-        considered = False
+        if returnAll:
+            # inverse priority, highest first
+            sorted_priority = np.argsort(priority)[::-1]
+            # for i in sorted_priority:
+            #     field_idx = iobservable[i]
+            #     print(i, priority[i], nexp[i],
+            #           self.fields.field_id[field_idx],
+            #           self.fields.cadence[field_idx])
+            sorted_idx = [iobservable[i] for i in sorted_priority]
+            sorted_fields = [self.fields.field_id[i] for i in sorted_idx]
+            sorted_exp = [nexp[i] for i in sorted_priority]
+            return sorted_fields, sorted_exp
+
+        # considered = False
         # print(observable_fieldid)
         # print(priority, self.fields.cadence[observable_fieldid])
         # for p, c, i in zip(priority, np.array(self.fields.cadence)[observable_fieldid], observable_fieldid):
@@ -822,16 +1001,23 @@ class Scheduler(Master):
         #         print(c, i, p, np.max(priority))
         #         considered = True
 
-        if returnAll:
-            return observable_fieldid, nexp, priority
+        observable_fieldid = self.fields.field_id[iobservable]
 
-        fieldid, next_exp = self.pick(priority=priority, fieldid=observable_fieldid, nexp=nexp)
+        fieldid, next_exp = self.pick(priority=priority,
+                                      fieldid=observable_fieldid,
+                                      nexp=nexp)
 
+        if not live:
+            # just a sim return number of designs
+            return(fieldid, next_exp)
 
-        return(fieldid, next_exp)
+        # its live, return list of exp indices
+        designs = self.designsNext(fieldid)
+
+        return fieldid, designs
 
     def update(self, fieldid=None, result=None):
-        """Update the observation list with result of observations
+        """Update Scheduler.observations with result of observations, used for sims
 
         Parameters:
         -----------
@@ -842,13 +1028,19 @@ class Scheduler(Master):
         result : ndarray
             One element, contains 'mjd', 'duration', 'sn2'
 
-        Comments:
-        ---------
-
         """
+
+        fieldidx = int(np.where(self.fields.field_id == fieldid)[0])
+
+        racen = self.fields.racen[fieldidx]
+        deccen = self.fields.deccen[fieldidx]
+        cadence = self.fields.cadence[fieldidx]
+        nfilled = self.fields.nfilled[fieldidx]
+        nexp_cumul = len(self.fields.observations[fieldidx]) + 1
+
         (alt, az) = self.radec2altaz(mjd=result['mjd'],
-                                     ra=self.fields.racen[fieldid],
-                                     dec=self.fields.deccen[fieldid])
+                                     ra=racen,
+                                     dec=deccen)
         airmass = self.alt2airmass(alt)
         skybrightness = self.skybrightness(result['mjd'])
         lst = self.lst(result['mjd'])
@@ -858,9 +1050,49 @@ class Scheduler(Master):
                                      sn2=result['sn2'],
                                      skybrightness=skybrightness,
                                      airmass=airmass,
-                                     lst=lst)
-        self.fields.add_observations(result['mjd'], fieldid, iobs, lst)
+                                     lst=lst,
+                                     racen=racen,
+                                     deccen=deccen,
+                                     cadence=cadence,
+                                     nfilled=nfilled,
+                                     nexp_cumul=nexp_cumul)
+
+        iobservations = self.fields.observations[fieldidx]
+        mjd_past = self.observations.mjd[iobservations]
+        # epoch_idx is the *index* of the *next* epoch
+        # for 0 indexed arrays, this equivalent to
+        # "how many epochs have I done previously"
+        epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=45)
+
+        self.fields.add_observations(result['mjd'], fieldidx, iobs, lst,
+                                     epoch_idx)
         return
+
+
+def epochs_completed(mjd_past, tolerance=240):
+    """Calculate # of observed epochs, allowing
+    for more exposures than planned.
+
+    tolerance is in minutes
+    """
+    if len(mjd_past) == 0:
+        return 0, 0
+
+    tolerance = tolerance / 60. / 24.
+    begin_last_epoch = mjd_past[0]
+
+    obs_epochs = 1
+    prev = begin_last_epoch
+    for m in mjd_past:
+        delta = m - prev
+        if delta < tolerance:
+            continue
+        else:
+            obs_epochs += 1
+            begin_last_epoch = m
+        prev = m
+
+    return obs_epochs, begin_last_epoch
 
 
 def lstDiffSingle(a, b):
@@ -891,6 +1123,7 @@ def lstDiffSingle(a, b):
     else:
         # a must be bigger
         return min(a - b, (b + 24) - a)
+
 
 def lstDiff(a, b):
     """wrap lst math to handle arrays

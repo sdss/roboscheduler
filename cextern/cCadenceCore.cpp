@@ -15,7 +15,8 @@ PYBIND11_MODULE(cCadenceCore, m) {
     py::class_<CadenceCore, std::shared_ptr<CadenceCore>>(m, "CadenceCore")
 			.def(py::init<std::string, int, Instrument, py::array_t<float>,
 					 py::array_t<float>, py::array_t<float>, py::array_t<float>,
-					 py::array_t<int>, py::array_t<int>, py::array_t<int>>())
+					 py::array_t<int>, py::array_t<float>, py::array_t<int>,
+					 py::array_t<int>>())
 			.def("epoch_text", &CadenceCore::epochText)
 			.def("__str__", &CadenceCore::__str__)
 			.def("epochs_consistency", &CadenceCore::epochsConsistency,
@@ -32,5 +33,6 @@ PYBIND11_MODULE(cCadenceCore, m) {
 			.def_readwrite("delta_max", &CadenceCore::delta_max)
 			.def_readwrite("epoch_indx", &CadenceCore::epoch_indx)
 			.def_readwrite("epochs", &CadenceCore::epochs)
-			.def_readwrite("nexp", &CadenceCore::nexp);
+			.def_readwrite("nexp", &CadenceCore::nexp)
+			.def_readwrite("max_length", &CadenceCore::max_length);
 }

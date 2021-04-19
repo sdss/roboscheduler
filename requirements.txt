@@ -5,6 +5,7 @@ ortools
 astropy
 scipy
 fitsio<=1.0.5
+peewee
 pydl
 pyyaml
 pygments

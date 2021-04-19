@@ -3,6 +3,14 @@ import fitsio
 import roboscheduler.cadence
 import sys
 
+try:
+    import sdssdb.peewee.sdss5db.targetdb as targetdb
+    import sdssdb.peewee.sdss5db.opsdb as opsdb
+    _database = True
+except:
+    _database = False
+
+
 # Class to define a singleton
 class FieldsSingleton(type):
     _instances = {}
@@ -14,10 +22,17 @@ class FieldsSingleton(type):
 
 
 class Fields(object, metaclass=FieldsSingleton):
-    """List of fields
+    """List of fields. Initialized empty; attributes will be set
+    via fromfits() or fromdb().
 
     Parameters:
     ----------
+
+    plan : string
+        robostrategy version, used for db access
+
+    observatory : string
+        APO or LCO, used for db access
 
     Attributes:
     ----------
@@ -31,77 +46,122 @@ class Fields(object, metaclass=FieldsSingleton):
     deccen : ndarray of np.float64
         declination of each design (J2000 deg)
 
-    fieldid : ndarray of np.int32
+    field_id : ndarray of np.int32
         id for each field
 
-    cadence : string
+    cadence : list of string
         cadence for each field
 
     observations : list of ndarray of np.int32
         for each field, indices of observations
-"""
-    def __init__(self):
+
+
+    slots : ndarray of np.int32
+        Nx2x24, corresponding to robostrategy planned LST bright/dark plan
+
+    lstObserved : ndarray of np.int32
+        Nx24 observations in each lst per field;
+        respecting robostrategy plan leads to an efficient survey
+
+    cadencelist : robostrategy.cadence.CadenceList singleton
+        the cadenceList singleton, for easy access
+
+    """
+    def __init__(self, plan=None, observatory=None):
+        self.plan = plan
+        self.observatory = observatory
         self.nfields = 0
         self.racen = np.zeros(0, dtype=np.float64)
         self.deccen = np.zeros(0, dtype=np.float64)
-        self.fieldid = np.zeros(0, dtype=np.int32)
+        self.nfilled = np.zeros(0, dtype=np.float64)
+        self.field_id = np.zeros(0, dtype=np.int32)
         self.nextmjd = np.zeros(0, dtype=np.float64)
         self.cadence = []
         self.observations = []
         self.slots = []
+        self.flag = []
         self.lstObserved = np.zeros(0, dtype=np.int32)
         self.cadencelist = roboscheduler.cadence.CadenceList()
         self._validCadance = None
         self._obsPlan = None
         self._lstPlan = None
         self._lunationPlan = None
+        self._hist = None
         return
-
 
     def setPriorities(self):
         scale = [10 if "bhm_rm" in c else 1 for c in self.cadence]
         self.basePriority = self.basePriority * np.array(scale)
         return
 
-
     def fromarray(self, fields_array=None):
         self.nfields = len(fields_array)
         self.racen = fields_array['racen']
         self.deccen = fields_array['deccen']
-        self.fieldid = np.arange(self.nfields, dtype=np.int32)
-        self.cadence = [c.decode().strip() for c in fields_array['cadence']]
+        self.nfilled = fields_array['nfilled']
+        self.field_id = fields_array['field_id']
+        self.cadence = [c.strip().decode() for c in fields_array['cadence']]
         self.slots = fields_array['slots_exposures']
         self.lstObserved = np.zeros((len(self.slots), 24), dtype=np.int32)
         self.observations = [np.zeros(0, dtype=np.int32)] * self.nfields
         self.icadence = np.zeros(self.nfields, dtype=np.int32)
         self.nextmjd = np.zeros(self.nfields, dtype=np.float64)
         self.basePriority = np.ones(self.nfields) * 200
+        if "flag" in fields_array.dtype.names:
+            self.flag = fields_array["flag"]
+        else:
+            self.flag = np.zeros(self.nfields)
         self.setPriorities()
         return
 
-
     def fromfits(self, filename=None):
+        """Load a fits file into this Fields object,
+           likely an RS-Assignments file.
+
+        Parameters:
+        ----------
+
+        filename : string
+            the full path to the fits file to be loaded
+        """
         self.fields_fits = fitsio.read(filename)
         self.fromarray(self.fields_fits)
         return
 
+    def add_observations(self, mjd=None, fieldidx=None, iobs=None,
+                         lst=None, epoch_idx=None):
+        # """Add an observation, used in simulations.
 
-    def add_observations(self, mjd=None, fieldid=None, iobs=None, lst=None):
-        self.observations[fieldid] = np.append(self.observations[fieldid],
-                                               iobs)
-        self.icadence[fieldid] = self.icadence[fieldid] + 1
-        cadence = self.cadencelist.cadences[self.cadence[fieldid]]
-        if(self.icadence[fieldid] < cadence.nexposures):
-            self.nextmjd[fieldid] = (mjd +
-                                     cadence.delta_min[self.icadence[fieldid]])
+        # Parameters:
+        # ----------
+
+        # mjd : float
+        #     MJD of the observation
+        # fieldidx : integer
+        #     index into Fields of the field observed
+        # iobs : integer
+        #     index into Scheduler.observations
+        # lst : float
+        #     lst at time of observation
+        # epoch_idx : integer
+        #     which epoch was being observed
+        # """
+        self._hist[self.field_id[fieldidx]].append(mjd)
+
+        self.observations[fieldidx] = np.append(self.observations[fieldidx], iobs)
+        self.icadence[fieldidx] = epoch_idx
+        cadence = self.cadencelist.cadences[self.cadence[fieldidx]]
+        if(self.icadence[fieldidx] < cadence.nepochs):
+            self.nextmjd[fieldidx] = (mjd +
+                                      cadence.delta_min[self.icadence[fieldidx]])
         else:
-            self.nextmjd[fieldid] = 100000.
+            self.nextmjd[fieldidx] = 100000.
+            self.icadence[fieldidx] = cadence.nepochs - 1
         int_lst = int(np.round(lst/15, 0))
         if int_lst == 24:
             int_lst = 0
-        self.lstObserved[fieldid][int_lst] += 1
+        self.lstObserved[fieldidx][int_lst] += 1
         return
-
 
     @property
     def validCadence(self):
@@ -112,46 +172,131 @@ class Fields(object, metaclass=FieldsSingleton):
                                            for c in self.cadence])
         return self._validCadance
 
-
-    @property
-    def obsPlan(self):
-        """Slots specify when the field should be observed
-        make that information useful.
-
-        Returns:
-        -------
-
-        obsPlan : list
-            a list containing lst and lunation for each field
-        """
-        if self._obsPlan is None:
-            self._obsPlan = [np.where(s > 0)  for s in self.slots]
-        return self._obsPlan
-
-
     @property
     def lstPlan(self):
         if self._lstPlan is None:
-            # self._lstPlan = np.array([np.mean(p[0]) for p in self.obsPlan])
             self._lstPlan = np.array([np.sum(s, axis=1) for s in self.slots])
         return self._lstPlan
 
+    @property
+    def hist(self):
+        # """The observation history of the field. Unlike Fields.observations,
+        # this property will be used on sky.
 
-    # @property
-    # def lunationPlan(self):
-    #     if self._lunationPlan is None:
-    #         self._lunationPlan = np.array([np.mean(p[1]) for p in self.obsPlan])
-    #     return self._lunationPlan
+        # Attributes:
+        # ----------
 
+        # _hist : dict of lists
+        #     A dictionary with field_id keys containing lists of obs mjds for
+        #     each field.
+        # """
+        if self._hist is None:
+            self._hist = {f: list() for f in self.field_id}
+            if _database:
+                versionDB = targetdb.Version()
+                ver = versionDB.get(plan=self.plan)
 
-    def lstWeight(self, lst, fields=None):
+                obsDB = targetdb.Observatory()
+                obs = obsDB.get(label=self.observatory.upper())
+
+                Field = targetdb.Field
+                Design = targetdb.Design
+                Status = opsdb.CompletionStatus
+                d2s = opsdb.DesignToStatus
+                done = Status.get(label="done")
+
+                dbfields = Field.select(d2s.mjd, Field.field_id)\
+                                .join(Design)\
+                                .join(d2s, on=(Design.pk == d2s.design_pk))\
+                                .where((Field.version == ver) &
+                                       (Field.observatory == obs),
+                                       (d2s.status == done)).dicts()
+
+                for d in dbfields:
+                    self._hist[d["field_id"]].append(d["mjd"])
+
+        return self._hist
+
+    def fromdb(self, version=None):
+        """Load this Fields object with fields from the targetdb
+
+        Parameters:
+        ----------
+
+        version : string
+            db version to grab, if Fields.plan is not set. If passed
+            Fields.plan will be reset to version
+        """
+        if(_database is False):
+            print("No database available.")
+            return()
+
+        if version is None:
+            version = self.plan
+        else:
+            self.plan = version
+        assert version is not None, "must specify version!"
+
+        fields_model = [('field_id', np.int32),
+                        ('racen', np.float64),
+                        ('deccen', np.float64),
+                        ('nfilled', np.int32),
+                        ('flag', np.int32),
+                        ('slots_exposures', np.int32, (24, 2)),
+                        ('cadence', np.dtype('a20'))]
+
+        versionDB = targetdb.Version()
+        ver = versionDB.get(plan=version)
+
+        obsDB = targetdb.Observatory()
+        obs = obsDB.get(label=self.observatory.upper())
+
+        Field = targetdb.Field
+        dbfields = Field.select().where(Field.version == ver,
+                                        Field.observatory == obs)
+
+        fieldid = list()
+        racen = list()
+        deccen = list()
+        slots_exposures = list()
+        cadence = list()
+        flags = list()
+
+        for field in dbfields:
+            fieldid.append(field.field_id)
+            racen.append(field.racen)
+            deccen.append(field.deccen)
+            slots_exposures.append(field.slots_exposures)
+            cadence.append(field.cadence.label)
+            if len(field.priority) > 0:
+                if field.priority[0].label == "top":
+                    flags.append(1)
+                elif field.priority[0].label == "disabled":
+                    flags.append(-1)
+            else:
+                flags.append(0)
+
+        fields = np.zeros(len(dbfields), dtype=fields_model)
+
+        fields["field_id"] = fieldid
+        fields["racen"] = racen
+        fields["deccen"] = deccen
+        fields["flag"] = flags
+        fields["slots_exposures"] = slots_exposures
+        fields["cadence"] = cadence
+
+        self.fromarray(fields_array=fields)
+
+        self.cadencelist.fromdb()
+
+    def lstWeight(self, lst, field_idx=None):
         # field id corresponds to indx, so fields is id/indx
         # as is everywhere, but just to keep reminding me...
         assert lst > 0 and lst < 24, "lst must be in hours!"
         diffs = []
-        if fields is not None:
-            lst_obs = self.lstObserved[fields]
-            lst_plan = self.lstPlan[fields]
+        if field_idx is not None:
+            lst_obs = self.lstObserved[field_idx]
+            lst_plan = self.lstPlan[field_idx]
         else:
             lst_obs = self.lstObserved
             lst_plan = self.lstPlan
@@ -169,7 +314,6 @@ class Fields(object, metaclass=FieldsSingleton):
 
         return np.array(diffs)
 
-
     def toarray(self):
         """Return cadences as a record array
 
@@ -178,7 +322,7 @@ class Fields(object, metaclass=FieldsSingleton):
 
         fields : ndarray
             information on each field
-"""
+        """
         maxn = np.array([len(x) for x in self.observations]).max()
         if(maxn == 1):
             maxn = 2
@@ -198,6 +342,10 @@ class Fields(object, metaclass=FieldsSingleton):
             if(fields['nobservations'][indx] > 0):
                 fields['observations'][indx][0:fields['nobservations'][indx]] = self.observations[indx]
         return(fields)
+
+    def getidx(self, fieldid):
+        # return idx into array of fieldid
+        return int(np.where(self.field_id == fieldid)[0])
 
 
 def lstDiffSingle(a, b):
