@@ -574,15 +574,16 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         cads = np.zeros(self.ncadences, dtype=cadence0)
         names = self.cadences.keys()
         for indx, name in enumerate(names):
+            print(name)
             nepochs = self.cadences[name].nepochs
             cads['CADENCE'][indx] = name
             cads['NEPOCHS'][indx] = nepochs
-            cads['DELTA'][indx, 0:nepochs] = self.cadences[name].delta
-            cads['DELTA_MIN'][indx, 0:nepochs] = self.cadences[name].delta_min
-            cads['DELTA_MAX'][indx, 0:nepochs] = self.cadences[name].delta_max
-            cads['NEXP'][indx, 0:nepochs] = self.cadences[name].nexp
-            cads['MAX_LENGTH'][indx, 0:nepochs] = self.cadences[name].max_length
-            cads['SKYBRIGHTNESS'][indx, 0:nepochs] = self.cadences[name].skybrightness
+            cads['DELTA'][indx, 0:nepochs] = self.cadences[name].delta[0:nepochs]
+            cads['DELTA_MIN'][indx, 0:nepochs] = self.cadences[name].delta_min[0:nepochs]
+            cads['DELTA_MAX'][indx, 0:nepochs] = self.cadences[name].delta_max[0:nepochs]
+            cads['NEXP'][indx, 0:nepochs] = self.cadences[name].nexp[0:nepochs]
+            cads['MAX_LENGTH'][indx, 0:nepochs] = self.cadences[name].max_length[0:nepochs]
+            cads['SKYBRIGHTNESS'][indx, 0:nepochs] = self.cadences[name].skybrightness[0:nepochs]
             cads['INSTRUMENT'][indx] = _instrument_name(self.cadences[name].instrument)
         return(cads)
 
