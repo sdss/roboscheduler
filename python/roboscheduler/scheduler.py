@@ -812,8 +812,8 @@ class Scheduler(Master):
     def prioritize(self, mjd=None, iobservable=None, nexp=None,
                    delta_priority=None):
         """Prioritize fields according to the Robostrategy LST plan
-        and accounting for priority adjustments from the cadence check (i.e. 
-        whether a field is inside an incomplete epoch or else how long 
+        and accounting for priority adjustments from the cadence check (i.e.
+        whether a field is inside an incomplete epoch or else how long
         before it fails cadence requirements.)
 
         Parameters:
@@ -886,7 +886,7 @@ class Scheduler(Master):
             the field id corresponding to the highest priority
         pick_exp : integer
             the number of exposures needed in the chosen field
-        
+
         """
         assert len(priority) == len(fieldid) and len(priority) == len(nexp), \
             "inputs must be same size!"
@@ -954,9 +954,9 @@ class Scheduler(Master):
         fieldid : np.int32, integer
             ID of field to observe
         designs : list of integer
-            a list of exposure numbers up next for "fieldid", corresponding 
+            a list of exposure numbers up next for "fieldid", corresponding
             to some designs.
-        
+
             OR if returnAll
 
         sorted_fields : list of integer

@@ -127,7 +127,7 @@ def makeSched(start, stop, outDir="", name="MS", observatory="apo"):
             if date.month == 12:
                 if date.day == 24:
                     if (date.year - 2000) % 3 == 0:
-                        # re-illuminize
+                        # realuminization
                         dur = 10
                     else:
                         dur = 2
