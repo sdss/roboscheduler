@@ -196,18 +196,15 @@ class Cadence(cCadenceCore.CadenceCore):
 
     def skybrightness_check(self, epoch_idx, skybrightness_next):
         """check lunation for mjd_past against lunation_next"""
+        down_weight = False
         if(epoch_idx >= self.nepochs):
             if self.skybrightness[-1] > 0.4:
                 if skybrightness_next < 0.4:
                     down_weight = True
-                else:
-                    down_weight = False
             return skybrightness_next <= self.skybrightness[-1], down_weight
         if self.skybrightness[epoch_idx] > 0.4:
             if skybrightness_next < 0.4:
                 down_weight = True
-            else:
-                down_weight = False
         return skybrightness_next <= self.skybrightness[epoch_idx], down_weight
 
     def evaluate_next(self, epoch_idx=None, partial_epoch=False,
