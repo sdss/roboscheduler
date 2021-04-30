@@ -974,7 +974,7 @@ class Scheduler(Master):
         if len(iobservable) == 0:
             # print("!! nothing to observe; {} exp left in the night".format(maxExp))
             if returnAll:
-                return None, -1, 0
+                return None, -1
             return None, -1
 
         priority = self.prioritize(iobservable=iobservable, mjd=mjd,
