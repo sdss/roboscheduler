@@ -10,6 +10,8 @@ import roboscheduler.observations
 import roboscheduler.cadence
 from roboscheduler.moonphase import moonphase2
 from roboscheduler.sunpos2 import sunpos2
+from roboscheduler.ks91 import KS91_deltaV
+
 
 """Scheduler module class.
 
@@ -487,6 +489,55 @@ class Observer(SchedulerBase):
                               midnight_ish, nextnoon_ish,
                               args=twilight)
         return(np.float64(twi))
+
+    def deltaV_sky_pos(self, mjd, targ_ra, targ_dec):
+        """create inputs to KS91 from convenient params, return deltaV array
+
+        Parameters:
+        ----------
+        mjd: np.float64
+            decimal mjd to compute delta for
+
+        targ_ra: np.float64 (or array)
+            target ra
+
+        targ_dec: np.float64 (or array)
+            target dec
+
+        Returns:
+        -------
+        deltaV : np.float64 (or array)
+            change in V mag at targ location due to moon
+        """
+
+        moon_pos = self.moon_radec(mjd=mjd)
+        lunar_phase = self.moon_illumination(mjd=mjd)
+
+        alpha = 180.*np.arccos(2*lunar_phase-1)/3.1415
+
+        moon_targ_dist = pyasl.getAngDist(moon_pos[0], moon_pos[1], targ_ra, targ_dec)
+
+        malt, maz = self.radec2altaz(mjd=mjd, ra=moon_pos[0], dec=moon_pos[1])
+
+        talt, taz = self.radec2altaz(mjd=mjd, ra=targ_ra, dec=targ_dec)
+
+        zee = 90 - talt
+
+        zee_m = 90 - malt
+
+        print(moon_pos)
+
+        deltaV = KS91_deltaV(alpha, moon_targ_dist, zee, zee_m)
+
+        if len(moon_targ_dist) > 1:
+            for m, d in zip(moon_targ_dist, deltaV):
+                print(mjd, f"{float(lunar_phase):.2f} {float(alpha):3.1f} {float(m):.1f} {d}")
+            for tt, z in zip(talt, zee):
+                print(f"{float(tt):.1f} *{float(z):.1f}* {float(malt):.1f} *{float(zee_m):.1f}*")
+        else:
+            print(mjd, f"{float(lunar_phase):.2f} {float(alpha):3.1f} {float(moon_targ_dist):.1f} {deltaV}")
+
+        return deltaV
 
 
 class Master(Observer):
