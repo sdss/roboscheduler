@@ -525,17 +525,17 @@ class Observer(SchedulerBase):
 
         zee_m = 90 - malt
 
-        print(moon_pos)
+        # print(moon_pos)
 
         deltaV = KS91_deltaV(alpha, moon_targ_dist, zee, zee_m)
 
-        if len(moon_targ_dist) > 1:
-            for m, d in zip(moon_targ_dist, deltaV):
-                print(mjd, f"{float(lunar_phase):.2f} {float(alpha):3.1f} {float(m):.1f} {d}")
-            for tt, z in zip(talt, zee):
-                print(f"{float(tt):.1f} *{float(z):.1f}* {float(malt):.1f} *{float(zee_m):.1f}*")
-        else:
-            print(mjd, f"{float(lunar_phase):.2f} {float(alpha):3.1f} {float(moon_targ_dist):.1f} {deltaV}")
+        # if len(moon_targ_dist) > 1:
+        #     for m, d in zip(moon_targ_dist, deltaV):
+        #         print(mjd, f"{float(lunar_phase):.2f} {float(alpha):3.1f} {float(m):.1f} {d}")
+        #     for tt, z in zip(talt, zee):
+        #         print(f"{float(tt):.1f} *{float(z):.1f}* {float(malt):.1f} *{float(zee_m):.1f}*")
+        # else:
+        #     print(mjd, f"{float(lunar_phase):.2f} {float(alpha):3.1f} {float(moon_targ_dist):.1f} {deltaV}")
 
         return deltaV
 
