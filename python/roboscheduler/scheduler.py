@@ -490,6 +490,52 @@ class Observer(SchedulerBase):
                               args=twilight)
         return(np.float64(twi))
 
+    def _moon_rise_set(self, mjd=None):
+        """Utility function for root-finding to get moon rise/set times"""
+        (alt, az) = self.moon_altaz(mjd=mjd)
+        return alt
+
+    def moon_rise_set(self, mjd=None):
+        """Return MJD (days) of next moon traverse of the horizon
+           and whether it was rise or set.
+
+        Parameters:
+        ----------
+
+        mjd : np.int32, int
+            Modified Julian Day (days)
+
+        Returns:
+        -------
+
+        moon_rise_set : np.float64
+            time of moon_rise_set in MJD (days)
+        """
+        alt, az = self.moon_altaz(mjd=mjd)
+
+        # by default it should traverse once in the next 12 hrs
+        rise = False
+        if alt < 0:
+            rise = True
+            if az < 180:
+                # it's gonna rise soon, be safe, don't get the set too
+                guess = 0.3
+            else:
+                # it set recently
+                guess = 0.5
+
+        elif az > 180:
+            # it's on the setting side
+            guess = 0.4
+        else:
+            # it's on the rising side, be up awhile
+            guess = 0.5
+
+        event = optimize.brenth(self._moon_rise_set,
+                                mjd, mjd+guess)
+
+        return np.float64(event), rise
+
     def deltaV_sky_pos(self, mjd, targ_ra, targ_dec):
         """create inputs to KS91 from convenient params, return deltaV array
 
@@ -538,6 +584,30 @@ class Observer(SchedulerBase):
         #     print(mjd, f"{float(lunar_phase):.2f} {float(alpha):3.1f} {float(moon_targ_dist):.1f} {deltaV}")
 
         return deltaV
+
+    def next_change(self, mjd):
+        """How long before sky brightness changes drastically?
+           Keep from observing a field too long and stealing dark/bright time
+
+        Parameters:
+        ----------
+        mjd: np.float64
+            decimal mjd to compute next for
+
+        Returns:
+        -------
+        change : np.float64 (or array)
+            mjd of next change
+        """
+
+        change, rise = self.moon_rise_set(mjd)
+
+        twi = self.morning_twilight(int(np.round(mjd)), twilight=self.dark_twilight)
+
+        if twi < change:
+            change = twi
+
+        return change, rise
 
 
 class Master(Observer):
@@ -697,12 +767,17 @@ class Scheduler(Master):
 
     """
     def __init__(self, airmass_limit=2.,
-                 schedule='normal', observatory='apo', observatoryfile=None):
+                 schedule='normal', observatory='apo', observatoryfile=None,
+                 exp_time=None):
         """Return Scheduler object
         """
         super().__init__(schedule=schedule, observatory=observatory,
                          observatoryfile=observatoryfile)
         self.airmass_limit = airmass_limit
+        if exp_time is None:
+            self.exp_time = 18 / 60 / 24
+        else:
+            self.exp_time = exp_time
         return
 
     def initdb(self, designbase='plan-0', fromFits=True):
@@ -767,6 +842,8 @@ class Scheduler(Master):
 
         """
 
+        print(ignore)
+
         (alt, az) = self.radec2altaz(mjd=mjd, ra=self.fields.racen,
                                      dec=self.fields.deccen)
         airmass = self.alt2airmass(alt)
@@ -780,6 +857,16 @@ class Scheduler(Master):
         delta_priority = np.zeros(len(observable), dtype=np.float64)
 
         whereRM = np.where(["bhm_rm" in c for c in self.fields.cadence])[0]
+
+        next_change, rise = self.next_change(mjd)
+
+        nexp_change = int((next_change - mjd) / self.exp_time)
+
+        if skybrightness < 0.35 and not rise:
+            # it's dark and moonset, who cares
+            nexp_change = 1e3
+
+        print("NEXP CHANGE", nexp_change)
 
         if(check_cadence):
             indxs = np.where(self.fields.nextmjd > mjd)[0]
@@ -802,11 +889,12 @@ class Scheduler(Master):
                     # "how many epochs have I done previously"
                     epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=240)
                     if epoch_idx >= cadence.nepochs:
+                        # print(epoch_idx, cadence.nepochs, int(self.fields.field_id[indx]))
                         observable[indx] = False
                         continue
                     # how many exp/"designs" since start of last epoch?
                     exp_epoch = np.sum(np.greater(mjd_past, mjd_prev))
-                    if exp_epoch < cadence.nexp[epoch_idx]:
+                    if exp_epoch < cadence.nexp[epoch_idx] and exp_epoch != 0:
                         nexp[indx] = cadence.nexp[epoch_idx] - exp_epoch
                         epoch_idx -= 1
                         partial_epoch = True
@@ -822,26 +910,39 @@ class Scheduler(Master):
                                               skybrightness_next=skybrightness,
                                               check_skybrightness=check_skybrightness,
                                               ignoreMax=ignoreMax)
+                    if not observable[indx] and skybrightness < 1.0:
+                        print("CAD ", self.fields.cadence[indx])
                     if nexp[indx] > maxExp:
                         observable[indx] = False
+                        if maxExp > 4:
+                            print("TOO LONG ", self.fields.cadence[indx])
                     if self.fields.flag[indx] == 1:
                         # flagged as top priority
                         # if we're in this loop, it's above the horizon and moon OK
                         # so override cadence eligibility and bump priority
                         observable[indx] = True
                         delta_priority[indx] += 1e6
+                    if nexp[indx] > nexp_change:
+                        # change between bright/dark, field doesn't fit
+                        observable[indx] = False
+                        # print("MOON RISE/SET ", self.fields.cadence[indx])
                     #     if indx in whereRM and skybrightness <= 0.35:
                     #         print(indx, " kicked out for nexp")
                     # if indx in whereRM and skybrightness <= 0.35:
                     #     print(mjd, indx, observable[indx], delta_priority[indx])
         else:
             rejected = 0
-            # print("lunation: ", lunation)
+            print("AHHHHHHH")
             iobservable = np.where(observable)[0]
-            # 1,000,000 means it won't affect the weight
-            delta_priority = np.ones(len(observable), dtype=np.float64)*1e6
+            delta_priority = np.zeros(len(observable), dtype=np.float64)
             for indx in iobservable:
                 if(observable[indx]):
+                    if int(self.fields.field_id[indx]) in ignore:
+                        observable[indx] = False
+                        continue
+                    elif self.fields.flag[indx] == -1:
+                        observable[indx] = False
+                        continue
                     cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
                     iobservations = self.fields.observations[indx]
                     mjd_past = self.observations.mjd[iobservations]
