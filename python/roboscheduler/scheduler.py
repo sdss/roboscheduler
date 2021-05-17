@@ -508,7 +508,7 @@ class Observer(SchedulerBase):
         Returns:
         -------
 
-        moon_rise_set : np.float64
+        event : np.float64
             time of moon_rise_set in MJD (days)
         """
         alt, az = self.moon_altaz(mjd=mjd)
@@ -534,7 +534,12 @@ class Observer(SchedulerBase):
         event = optimize.brenth(self._moon_rise_set,
                                 mjd, mjd+guess)
 
-        return np.float64(event), rise
+        if rise:
+            next_brightness = np.float64(self.moon_illumination(mjd=event))
+        else:
+            next_brightness = np.float64(0)
+
+        return np.float64(event), next_brightness
 
     def deltaV_sky_pos(self, mjd, targ_ra, targ_dec):
         """create inputs to KS91 from convenient params, return deltaV array
@@ -600,14 +605,27 @@ class Observer(SchedulerBase):
             mjd of next change
         """
 
-        change, rise = self.moon_rise_set(mjd)
+        e_twi = self.evening_twilight(int(np.round(mjd)), twilight=self.dark_twilight)
+
+        if mjd < e_twi:
+            brightness = self.skybrightness(mjd + 1 / 24)
+            if brightness < 0.35:
+                return e_twi, np.float64(brightness)
+
+        change, next_brightness = self.moon_rise_set(mjd)
 
         twi = self.morning_twilight(int(np.round(mjd)), twilight=self.dark_twilight)
 
         if twi < change:
-            change = twi
+            change = np.float64(twi)
+            next_brightness = np.float64(1)
 
-        return change, rise
+        if twi < mjd:
+            twi = self.morning_twilight(int(np.round(mjd)), twilight=self.bright_twilight)
+            change = np.float64(twi)
+            next_brightness = np.float64(1)
+
+        return change, next_brightness
 
 
 class Master(Observer):
@@ -842,8 +860,6 @@ class Scheduler(Master):
 
         """
 
-        print(ignore)
-
         (alt, az) = self.radec2altaz(mjd=mjd, ra=self.fields.racen,
                                      dec=self.fields.deccen)
         airmass = self.alt2airmass(alt)
@@ -858,15 +874,19 @@ class Scheduler(Master):
 
         whereRM = np.where(["bhm_rm" in c for c in self.fields.cadence])[0]
 
-        next_change, rise = self.next_change(mjd)
+        next_change, next_brightness = self.next_change(mjd)
 
         nexp_change = int((next_change - mjd) / self.exp_time)
 
-        if skybrightness < 0.35 and not rise:
-            # it's dark and moonset, who cares
-            nexp_change = 1e3
-
-        print("NEXP CHANGE", nexp_change)
+        if next_brightness <= 0.35:
+            if skybrightness <= 0.35:
+                # it's still dark
+                nexp_change = 1e3
+        else:
+            # next is bright
+            if skybrightness > 0.35:
+                # it's bright now, don't change
+                nexp_change = 1e3
 
         if(check_cadence):
             indxs = np.where(self.fields.nextmjd > mjd)[0]
@@ -910,12 +930,8 @@ class Scheduler(Master):
                                               skybrightness_next=skybrightness,
                                               check_skybrightness=check_skybrightness,
                                               ignoreMax=ignoreMax)
-                    if not observable[indx] and skybrightness < 1.0:
-                        print("CAD ", self.fields.cadence[indx])
                     if nexp[indx] > maxExp:
                         observable[indx] = False
-                        if maxExp > 4:
-                            print("TOO LONG ", self.fields.cadence[indx])
                     if self.fields.flag[indx] == 1:
                         # flagged as top priority
                         # if we're in this loop, it's above the horizon and moon OK
@@ -925,14 +941,12 @@ class Scheduler(Master):
                     if nexp[indx] > nexp_change:
                         # change between bright/dark, field doesn't fit
                         observable[indx] = False
-                        # print("MOON RISE/SET ", self.fields.cadence[indx])
                     #     if indx in whereRM and skybrightness <= 0.35:
                     #         print(indx, " kicked out for nexp")
                     # if indx in whereRM and skybrightness <= 0.35:
                     #     print(mjd, indx, observable[indx], delta_priority[indx])
         else:
             rejected = 0
-            print("AHHHHHHH")
             iobservable = np.where(observable)[0]
             delta_priority = np.zeros(len(observable), dtype=np.float64)
             for indx in iobservable:
