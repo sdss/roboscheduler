@@ -87,6 +87,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self._lstPlan = None
         self._lunationPlan = None
         self._hist = None
+        self._database = _database
         return
 
     def setPriorities(self):
@@ -124,7 +125,26 @@ class Fields(object, metaclass=FieldsSingleton):
         filename : string
             the full path to the fits file to be loaded
         """
-        self.fields_fits = fitsio.read(filename)
+        self._database = False
+        fields_model = [('field_id', np.int32),
+                        ('racen', np.float64),
+                        ('deccen', np.float64),
+                        ('nfilled', np.int32),
+                        ('flag', np.int32),
+                        ('slots_exposures', np.int32, (24, 2)),
+                        ('cadence', np.dtype('a20'))]
+
+        fits_dat = fitsio.read(filename)
+
+        self.fields_fits = np.zeros(len(fits_dat["fieldid"]), dtype=fields_model)
+
+        self.fields_fits["field_id"] = fits_dat["fieldid"]
+        self.fields_fits["racen"] = fits_dat["racen"]
+        self.fields_fits["deccen"] = fits_dat["deccen"]
+        self.fields_fits["nfilled"] = fits_dat["nfilled"]
+        self.fields_fits["slots_exposures"] = fits_dat["slots_exposures"]
+        self.fields_fits["cadence"] = fits_dat["cadence"]
+
         self.fromarray(self.fields_fits)
         return
 
@@ -192,7 +212,7 @@ class Fields(object, metaclass=FieldsSingleton):
         # """
         if self._hist is None:
             self._hist = {f: list() for f in self.field_id}
-            if _database:
+            if self._database:
                 versionDB = targetdb.Version()
                 ver = versionDB.get(plan=self.plan)
 
@@ -227,7 +247,7 @@ class Fields(object, metaclass=FieldsSingleton):
             db version to grab, if Fields.plan is not set. If passed
             Fields.plan will be reset to version
         """
-        if(_database is False):
+        if(self._database is False):
             print("No database available.")
             return()
 
@@ -333,7 +353,7 @@ class Fields(object, metaclass=FieldsSingleton):
                    ('nobservations', np.int32),
                    ('observations', np.int32, maxn)]
         fields = np.zeros(self.nfields, dtype=fields0)
-        fields['fieldid'] = self.fieldid
+        fields['fieldid'] = self.field_id
         fields['racen'] = self.racen
         fields['deccen'] = self.deccen
         for indx in np.arange(self.nfields):

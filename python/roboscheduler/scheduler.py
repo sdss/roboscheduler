@@ -513,26 +513,40 @@ class Observer(SchedulerBase):
         """
         alt, az = self.moon_altaz(mjd=mjd)
 
+        if np.isclose(alt, 0, atol=0.1):
+            next_brightness = np.float64(self.moon_illumination(mjd=mjd+0.05))
+            return mjd, next_brightness
+
         # by default it should traverse once in the next 12 hrs
         rise = False
         if alt < 0:
             rise = True
             if az < 180:
-                # it's gonna rise soon, be safe, don't get the set too
-                guess = 0.3
+                # print(f"{float(alt):.1f}, {float(az):.1f} it's gonna rise soon, be safe, don't get the set too")
+                guess = 0.4
             else:
-                # it set recently
-                guess = 0.5
+                # print(f"{float(alt):.1f}, {float(az):.1f} it set recently")
+                guess = 0.7
 
         elif az > 180:
-            # it's on the setting side
+            # print(f"{float(alt):.1f}, {float(az):.1f} it's on the setting side")
             guess = 0.4
         else:
-            # it's on the rising side, be up awhile
-            guess = 0.5
+            # print(f"{float(alt):.1f}, {float(az):.1f} it's on the rising side, be up awhile")
+            guess = 0.7
 
         event = optimize.brenth(self._moon_rise_set,
                                 mjd, mjd+guess)
+
+        # try:
+        #     event = optimize.brenth(self._moon_rise_set,
+        #                         mjd, mjd+guess)
+        # except:
+        #     guesses = np.arange(0, 1, 0.05)
+        #     for g in guesses:
+        #         alt, az = self.moon_altaz(mjd=mjd+g)
+        #         print(g, alt)
+        #     raise Exception()
 
         if rise:
             next_brightness = np.float64(self.moon_illumination(mjd=event))
@@ -1157,6 +1171,11 @@ class Scheduler(Master):
             sorted_idx = [iobservable[i] for i in sorted_priority]
             sorted_fields = [self.fields.field_id[i] for i in sorted_idx]
             sorted_exp = [nexp[i] for i in sorted_priority]
+
+            if not live:
+                # for observesim for now I'm sorry!
+                return np.array(sorted_idx), np.array(sorted_exp)
+
             return sorted_fields, sorted_exp
 
         # considered = False
