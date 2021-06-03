@@ -166,7 +166,7 @@ class Fields(object, metaclass=FieldsSingleton):
         # epoch_idx : integer
         #     which epoch was being observed
         # """
-        self._hist[self.field_id[fieldidx]].append(mjd)
+        # self._hist[self.field_id[fieldidx]].append(mjd)
 
         self.observations[fieldidx] = np.append(self.observations[fieldidx], iobs)
         self.icadence[fieldidx] = epoch_idx
@@ -236,6 +236,11 @@ class Fields(object, metaclass=FieldsSingleton):
                     self._hist[d["field_id"]].append(d["mjd"])
 
         return self._hist
+
+    def completeDesign(self, field_id, mjd):
+        """Maybe just for sims but need a way to add mjds to _hist[field_id]
+        """
+        self._hist[field_id].append(mjd)
 
     def fromdb(self, version=None):
         """Load this Fields object with fields from the targetdb

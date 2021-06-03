@@ -901,6 +901,12 @@ class Scheduler(Master):
             if skybrightness > 0.35:
                 # it's bright now, don't change
                 nexp_change = 1e3
+            elif nexp_change == 0:
+                # don't waste time, make it bright
+                nexp_change = 1
+                skybrightness = next_brightness
+
+        # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
 
         if(check_cadence):
             indxs = np.where(self.fields.nextmjd > mjd)[0]
@@ -935,6 +941,11 @@ class Scheduler(Master):
                     else:
                         nexp[indx] = cadence.nexp[epoch_idx]
                         partial_epoch = False
+                    if nexp[indx] == 1:
+                        check = True
+                        # print("OBS", cadence.name)
+                    else:
+                        check = False
                     ignoreMax = indx in whereRM
                     observable[indx], delta_priority[indx] =\
                         cadence.evaluate_next(epoch_idx=epoch_idx,
@@ -945,6 +956,8 @@ class Scheduler(Master):
                                               check_skybrightness=check_skybrightness,
                                               ignoreMax=ignoreMax)
                     if nexp[indx] > maxExp:
+                        # if observable[indx] and nexp[indx] == 1:
+                        #     print("maxExp", cadence.name)
                         observable[indx] = False
                     if self.fields.flag[indx] == 1:
                         # flagged as top priority
@@ -954,11 +967,15 @@ class Scheduler(Master):
                         delta_priority[indx] += 1e6
                     if nexp[indx] > nexp_change:
                         # change between bright/dark, field doesn't fit
+                        # if observable[indx] and nexp[indx] == 1:
+                        #     print("nexp_change", cadence.name)
                         observable[indx] = False
                     #     if indx in whereRM and skybrightness <= 0.35:
                     #         print(indx, " kicked out for nexp")
                     # if indx in whereRM and skybrightness <= 0.35:
                     #     print(mjd, indx, observable[indx], delta_priority[indx])
+                    # if check:
+                    #     print(observable[indx])
         else:
             rejected = 0
             iobservable = np.where(observable)[0]
@@ -984,7 +1001,7 @@ class Scheduler(Master):
                         observable[indx] = False
 
             # print("{} rejected {} of {} for time/moon".format(mjd, rejected, len(iobservable)))
-
+        # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
         iobservable = np.where(observable)[0]
 
         return iobservable, nexp[iobservable], delta_priority[iobservable]
@@ -1146,7 +1163,8 @@ class Scheduler(Master):
         """
         iobservable, nexp, delta_priority = self.observable(mjd=mjd, maxExp=maxExp,
                                                             ignore=ignore)
-        if(len(iobservable) == 0):
+        if(len(iobservable) == 0) and live:
+            # in a sim we'll take the dead time, should write something to track this better
             # print("Nothing observable")
             iobservable, nexp, delta_priority = self.observable(mjd=mjd, maxExp=maxExp,
                                                                 check_cadence=False,
@@ -1232,7 +1250,9 @@ class Scheduler(Master):
         iobs = self.observations.add(fieldid=fieldid,
                                      mjd=result['mjd'],
                                      duration=result['duration'],
-                                     sn2=result['sn2'],
+                                     apgSN2=result['apgSN2'],
+                                     rSN2=result['rSN2'],
+                                     bSN2=result['bSN2'],
                                      skybrightness=skybrightness,
                                      airmass=airmass,
                                      lst=lst,

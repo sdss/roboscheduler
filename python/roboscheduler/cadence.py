@@ -233,6 +233,8 @@ class Cadence(cCadenceCore.CadenceCore):
             base_priority = -100
 
         if(epoch_idx == 0):
+            # if "x1" in self.name:
+                # print(self.name, "FIRST!", ok_skybrightness)
             return(ok_skybrightness, base_priority)
 
         delta_curr = mjd_next - mjd_past
@@ -241,7 +243,8 @@ class Cadence(cCadenceCore.CadenceCore):
         dnom = self.delta[epoch_idx]
         if(dlo == -1):
             return(ok_skybrightness, base_priority)
-        # print("delta {} dhi {} dlo {}".format(delta, dhi, dlo))
+        # if "x1" in self.name:
+        #     print("delta {} dhi {} dlo {} curr {:.2f}".format(dnom, dhi, dlo, float(delta_curr)), self.name)
         # 1/sqrt(x) priority; at 1 day +100, at 10 days +30, at 30 days +18
         remain_priority = 15 * np.clip(10/np.sqrt(np.abs(dhi - delta_curr)),
                                        a_min=None, a_max=10)
