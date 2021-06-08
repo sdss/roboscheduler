@@ -7,13 +7,8 @@ namespace py = pybind11;
 using namespace pybind11::literals;
 
 PYBIND11_MODULE(cCadenceCore, m) {
-    py::enum_<Instrument>(m, "Instrument", py::arithmetic())
-        .value("ApogeeInstrument", ApogeeInstrument)
-        .value("BossInstrument", BossInstrument)
-        .export_values();
-
     py::class_<CadenceCore, std::shared_ptr<CadenceCore>>(m, "CadenceCore")
-			.def(py::init<std::string, int, Instrument, py::array_t<float>,
+			.def(py::init<std::string, int, py::array_t<float>,
 					 py::array_t<float>, py::array_t<float>, py::array_t<float>,
 					 py::array_t<int>, py::array_t<float>, py::array_t<int>,
 					 py::array_t<int>>())
@@ -27,7 +22,6 @@ PYBIND11_MODULE(cCadenceCore, m) {
 			.def_readwrite("nepochs", &CadenceCore::nepochs)
 			.def_readwrite("nexp_total", &CadenceCore::nexp_total)
 			.def_readwrite("skybrightness", &CadenceCore::skybrightness)
-			.def_readwrite("instrument", &CadenceCore::instrument)
 			.def_readwrite("delta", &CadenceCore::delta)
 			.def_readwrite("delta_min", &CadenceCore::delta_min)
 			.def_readwrite("delta_max", &CadenceCore::delta_max)
