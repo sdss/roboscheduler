@@ -577,19 +577,80 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             #print(name)
             nepochs = self.cadences[name].nepochs
             nepochs_to_fill = max_nexp - nepochs
-            fillers = -1.*np.ones(nepochs_to_fill)
+            fillers = np.empty(nepochs_to_fill)
+            fillers[:] = np.NaN
+            int_fillers = np.empty(nepochs_to_fill)
+            int_fillers[:] = np.ma.masked
             cads['CADENCE'][indx] = name
             cads['NEPOCHS'][indx] = nepochs
             cads['DELTA'][indx, 0:nepochs] = self.cadences[name].delta[0:nepochs]
             cads['DELTA'][indx, nepochs:(nepochs+nepochs_to_fill)] = fillers
             cads['DELTA_MIN'][indx, 0:nepochs] = self.cadences[name].delta_min[0:nepochs]
+            cads['DELTA_MIN'][indx, nepochs:(nepochs+nepochs_to_fill)] = fillers
             cads['DELTA_MAX'][indx, 0:nepochs] = self.cadences[name].delta_max[0:nepochs]
+            cads['DELTA_MAX'][indx, nepochs:(nepochs+nepochs_to_fill)] = fillers
             cads['NEXP'][indx, 0:nepochs] = self.cadences[name].nexp[0:nepochs]
+            cads['NEXP'][indx, nepochs:(nepochs+nepochs_to_fill)] = int_fillers
             cads['MAX_LENGTH'][indx, 0:nepochs] = self.cadences[name].max_length[0:nepochs]
+            cads['MAX_LENGTH'][indx, nepochs:(nepochs+nepochs_to_fill)] = fillers
             cads['SKYBRIGHTNESS'][indx, 0:nepochs] = self.cadences[name].skybrightness[0:nepochs]
+            cads['SKYBRIGHTNESS'][indx, nepochs:(nepochs+nepochs_to_fill)] = fillers
  #           cads['INSTRUMENT'][indx] = _instrument_name(self.cadences[name].instrument)
         return(cads)
 
+    
+    def tocsv(self, filename=None):
+        """write cadences to a csv file
+
+        Parameters:
+        -----------
+
+        filename : str
+            File name to write csv file to
+
+        Returns:
+        -------
+
+        cadences : ndarray
+            information on each cadence
+        """
+        nepochs = np.array([c.nepochs for c in self.cadences.values()])
+        max_nexp = nepochs.max()
+        cadence0 = [('CADENCE', np.unicode_, 40),
+                    ('NEPOCHS', np.int32),
+                    ('DELTA', np.float64, max_nexp),
+                    ('SKYBRIGHTNESS', np.float32, max_nexp),
+                    ('DELTA_MAX', np.float32, max_nexp),
+                    ('DELTA_MIN', np.float32, max_nexp),
+                    ('NEXP', np.int32, max_nexp),
+                    ('MAX_LENGTH', np.float32, max_nexp)] #,
+#                    ('INSTRUMENT', np.unicode_, 40)]
+        cads = np.zeros(self.ncadences, dtype=cadence0)
+        names = self.cadences.keys()
+        with open(filename, 'w', encoding='utf-8-sig', newline='') as csvfile:
+            for indx, name in enumerate(names):
+                nepochs = self.cadences[name].nepochs
+                delta_string = np.array2string(self.cadences[name].delta[0:nepochs], precision = 3, separator = ',')
+                delta_trim = delta_string.strip("[] ")
+                delta_min_string = np.array2string(self.cadences[name].delta_min[0:nepochs], precision = 3, separator = ',')
+                delta_min_trim = delta_min_string.strip("[] ")
+                delta_max_string = np.array2string(self.cadences[name].delta_max[0:nepochs], precision = 3, separator = ',')
+                delta_max_trim = delta_max_string.strip("[] ")
+                nexp_string = np.array2string(self.cadences[name].nexp[0:nepochs], precision = 3, separator = ',')
+                nexp_trim = nexp_string.strip("[] ")
+                max_length_string = np.array2string(self.cadences[name].max_length[0:nepochs], precision = 3, separator = ',')
+                max_length_trim = max_length_string.strip("[] ")
+                sky_brightness_string = np.array2string(self.cadences[name].skybrightness[0:nepochs], precision = 3, separator = ',')
+                sky_brightness_trim = sky_brightness_string.strip("[] ")
+                #print(name+';'+str(nepochs)+';{'+delta_trim+'}')
+                print_string = name+';'+str(nepochs)+';{'+delta_trim+'}'+';{'+sky_brightness_trim+'}'+';{'+delta_max_trim+'}'+';{'+delta_min_trim+'}'+';{'+nexp_trim+'}'+';{'+max_length_trim+'}'
+                clean_string = print_string.replace("\r","")
+                cleaner_string = clean_string.replace("\n","")
+                csvfile.write(cleaner_string+' \n')
+        #return(cads)
+
+
+    
     def todb(self):
         """Insert all cadences into the targetdb
 """
