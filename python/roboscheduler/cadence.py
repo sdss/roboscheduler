@@ -251,9 +251,11 @@ class Cadence(cCadenceCore.CadenceCore):
         nom_priority = 5 * np.clip(10/np.sqrt(np.abs(dnom - delta_curr)),
                                        a_min=None, a_max=10)
         priority = base_priority + remain_priority + nom_priority
-        if ignoreMax:
-            return(ok_skybrightness & (delta_curr >= dlo), priority)
-        return(ok_skybrightness & (delta_curr >= dlo) & (delta_curr <= dhi), priority)
+        if delta_curr <= dhi:
+            priority *= 10
+        # if ignoreMax:
+        #     return(ok_skybrightness & (delta_curr >= dlo), priority)
+        return(ok_skybrightness & (delta_curr >= dlo), priority)
 
 
 class CadenceList(object, metaclass=CadenceListSingleton):
