@@ -943,9 +943,12 @@ class Scheduler(Master):
                     else:
                         nexp[indx] = cadence.nexp[epoch_idx]
                         partial_epoch = False
-                    # if nexp[indx] == 1:
-                    #     check = True
-                    #     # print("OBS", cadence.name)
+                    # if "x8" in cadence.name:
+                    #     if skybrightness <= 0.35:
+                    #         check = True
+                    #         print(indx, epoch_idx, mjd_prev)
+                    #         print(mjd_past)
+                    #         # print("OBS", cadence.name)
                     # else:
                     #     check = False
                     ignoreMax = indx in whereRM
@@ -957,9 +960,13 @@ class Scheduler(Master):
                                               skybrightness_next=skybrightness,
                                               check_skybrightness=check_skybrightness,
                                               ignoreMax=ignoreMax)
+                    # if check:
+                    #     print("A", observable[indx], indx, f"    {float(mjd):.1f}" "\n \n")
                     if nexp[indx] > maxExp:
                         # if observable[indx] and nexp[indx] == 1:
                         #     print("maxExp", cadence.name)
+                        # if check:
+                        #     print("maxExp", cadence.name, indx)
                         observable[indx] = False
                     if self.fields.flag[indx] == 1:
                         # flagged as top priority
@@ -972,12 +979,14 @@ class Scheduler(Master):
                         # if observable[indx] and nexp[indx] == 1:
                         #     print("nexp_change", cadence.name)
                         observable[indx] = False
+                        # if check:
+                        #     print("nexp_change", cadence.name, indx)
                     #     if indx in whereRM and skybrightness <= 0.35:
                     #         print(indx, " kicked out for nexp")
                     # if indx in whereRM and skybrightness <= 0.35:
                     #     print(mjd, indx, observable[indx], delta_priority[indx])
                     # if check:
-                    #     print(observable[indx])
+                    #     print("B", observable[indx], indx, "\n \n")
         else:
             rejected = 0
             iobservable = np.where(observable)[0]
@@ -1040,7 +1049,7 @@ class Scheduler(Master):
         # priority = self.fields.basePriority[fieldid]
         priority += delta_priority
 
-        priority += 5*nexp
+        priority += 20*nexp  # 160 for RM
 
         lst = self.lst(mjd)
 
@@ -1057,11 +1066,11 @@ class Scheduler(Master):
         dec = self.fields.deccen[iobservable]
 
         # gaussian weight, mean already 0, use 1 hr  std
-        priority += 20 * np.exp(-(lstDiffs)**2 / (2 * 0.5**2))
+        priority += 50 * np.exp(-(lstDiffs)**2 / (2 * 0.5**2))
         # gaussian weight, mean already 0, use 1 hr = 15 deg std
-        # priority += 20 * np.exp( -(ha)**2 / (2 * 15**2))
+        priority += 50 * np.exp(-(ha)**2 / (2 * 15**2))
         # gaussian weight, mean = obs lat, use 20 deg std
-        priority -= 5 * np.exp( -(dec - self.latitude)**2 / (2 * 20**2))
+        priority -= 20 * np.exp(-(dec - self.latitude)**2 / (2 * 20**2))
 
         return priority
 
@@ -1264,14 +1273,17 @@ class Scheduler(Master):
                                      nfilled=nfilled,
                                      nexp_cumul=nexp_cumul)
 
-        iobservations = self.fields.observations[fieldidx]
-        mjd_past = self.observations.mjd[iobservations]
+        # iobservations = self.fields.observations[fieldidx]
+        # mjd_past = self.observations.mjd[iobservations]
         # epoch_idx is the *index* of the *next* epoch
         # for 0 indexed arrays, this equivalent to
         # "how many epochs have I done previously"
         # epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=45)
         if finish:
-            self.fields.completeDesign(fieldidx, result['mjd'], lst, iobs)
+            # if fieldidx == 4906:
+            #     print(self.fields.hist[fieldid])
+            #     print("UPDATE", float(result['mjd']))
+            self.fields.completeDesign(fieldidx, float(result['mjd']), lst, iobs)
         # self.fields.add_observations(result['mjd'], fieldidx, iobs, lst,
         #                              epoch_idx)
         return

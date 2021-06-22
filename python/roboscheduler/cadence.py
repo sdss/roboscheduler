@@ -233,8 +233,8 @@ class Cadence(cCadenceCore.CadenceCore):
             base_priority = -100
 
         if(epoch_idx == 0):
-            # if "x1" in self.name:
-                # print(self.name, "FIRST!", ok_skybrightness)
+            # if "x8" in self.name:
+            #     print(self.name, "FIRST!", ok_skybrightness)
             return(ok_skybrightness, base_priority)
 
         delta_curr = mjd_next - mjd_past
@@ -242,6 +242,8 @@ class Cadence(cCadenceCore.CadenceCore):
         dhi = self.delta_max[epoch_idx]
         dnom = self.delta[epoch_idx]
         if(dlo == -1):
+            # if "x8" in self.name:
+            #     print(self.name, "-1?", ok_skybrightness)
             return(ok_skybrightness, base_priority)
         # if "x1" in self.name:
         #     print("delta {} dhi {} dlo {} curr {:.2f}".format(dnom, dhi, dlo, float(delta_curr)), self.name)
@@ -249,12 +251,14 @@ class Cadence(cCadenceCore.CadenceCore):
         remain_priority = 15 * np.clip(10/np.sqrt(np.abs(dhi - delta_curr)),
                                        a_min=None, a_max=10)
         nom_priority = 5 * np.clip(10/np.sqrt(np.abs(dnom - delta_curr)),
-                                       a_min=None, a_max=10)
+                                   a_min=None, a_max=10)
         priority = base_priority + remain_priority + nom_priority
         if delta_curr <= dhi:
-            priority *= 10
+            priority += 500
         # if ignoreMax:
         #     return(ok_skybrightness & (delta_curr >= dlo), priority)
+        # if "x8" in self.name:
+        #     print(self.name, "norm", ok_skybrightness, delta_curr, dlo)
         return(ok_skybrightness & (delta_curr >= dlo), priority)
 
 
