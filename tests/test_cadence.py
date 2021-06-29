@@ -521,17 +521,18 @@ def test_cadence_evaluate_next():
     assert observable
     assert priority2 > priority1
 
-    idx = 1
-    mjd_past = 59800  # this would be returned by epochs_completed
-    mjd_next = 59900
-    skybrightness_next = 0.2
-    observable, priority = \
-    test_cadence.evaluate_next(epoch_idx=idx,
-                               mjd_past=mjd_past,
-                               mjd_next=mjd_next,
-                               skybrightness_next=skybrightness_next)
+    # no longer valid because delta_max isn't strictly respected anymore
+    # idx = 1
+    # mjd_past = 59800  # this would be returned by epochs_completed
+    # mjd_next = 59900
+    # skybrightness_next = 0.2
+    # observable, priority = \
+    # test_cadence.evaluate_next(epoch_idx=idx,
+    #                            mjd_past=mjd_past,
+    #                            mjd_next=mjd_next,
+    #                            skybrightness_next=skybrightness_next)
 
-    assert not observable
+    # assert not observable
 
 
 def test_cadence_consistency_merge():
