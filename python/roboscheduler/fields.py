@@ -261,11 +261,7 @@ class Fields(object, metaclass=FieldsSingleton):
 
         field_id = self.field_id[field_idx]
 
-        if field_idx == 4906:
-            print("BEFORE", self._hist[field_id])
         self._hist[field_id].append(mjd)
-        if field_idx == 4906:
-            print("AFTER", self._hist[field_id])
 
         int_lst = int(np.round(lst/15, 0))
         if int_lst == 24:

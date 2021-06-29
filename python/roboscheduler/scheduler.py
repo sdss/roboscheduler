@@ -1049,7 +1049,7 @@ class Scheduler(Master):
         # priority = self.fields.basePriority[fieldid]
         priority += delta_priority
 
-        priority += 20*nexp  # 160 for RM
+        priority += np.power(2, nexp) * 5  # 1280 for RM
 
         lst = self.lst(mjd)
 
