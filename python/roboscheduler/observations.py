@@ -77,7 +77,9 @@ class Observations(object):
         self.nfilled = np.zeros(0, dtype=np.int32)
         self.mjd = np.zeros(0, dtype=np.float64)
         self.duration = np.zeros(0, dtype=np.float64)
-        self.sn2 = np.zeros(0, dtype=np.float32)
+        self.apgSN2 = np.zeros(0, dtype=np.float32)
+        self.rSN2 = np.zeros(0, dtype=np.float32)
+        self.bSN2 = np.zeros(0, dtype=np.float32)
         self.airmass = np.zeros(0, dtype=np.float32)
         self.skybrightness = np.zeros(0, dtype=np.float32)
         self.lst = np.zeros(0, dtype=np.float32)
@@ -85,9 +87,9 @@ class Observations(object):
         self.nexp_cumul = np.zeros(0, dtype=np.int32)
         return
 
-    def add(self, fieldid=None, mjd=None, duration=None, sn2=None,
-            skybrightness=None, airmass=None, lst=None,
-            racen=None, deccen=None, cadence=None, nfilled=None,
+    def add(self, fieldid=None, mjd=None, duration=None, apgSN2=None,
+            rSN2=None, bSN2=None, skybrightness=None, airmass=None,
+            lst=None, racen=None, deccen=None, cadence=None, nfilled=None,
             nexp_cumul=None):
         self.fieldid = np.append(self.fieldid,
                                  np.array([np.float64(fieldid)]))
@@ -95,8 +97,12 @@ class Observations(object):
                              np.array([np.float64(mjd)]))
         self.duration = np.append(self.duration,
                                   np.array([np.float64(duration)]))
-        self.sn2 = np.append(self.sn2,
-                             np.array([np.float32(sn2)]))
+        self.apgSN2 = np.append(self.apgSN2,
+                                np.array([np.float32(apgSN2)]))
+        self.rSN2 = np.append(self.rSN2,
+                              np.array([np.float32(rSN2)]))
+        self.bSN2 = np.append(self.bSN2,
+                              np.array([np.float32(bSN2)]))
         self.skybrightness = np.append(self.skybrightness,
                                        np.array([np.float32(skybrightness)]))
         self.airmass = np.append(self.airmass,
@@ -141,11 +147,13 @@ class Observations(object):
 
         observations : record array
             observation information
-"""
+        """
         obs0 = [('fieldid', np.int32),
                 ('mjd', np.float64),
                 ('duration', np.float64),
-                ('sn2', np.float32),
+                ('apgSN2', np.float32),
+                ('rSN2', np.float32),
+                ('bSN2', np.float32),
                 ('airmass', np.float32),
                 ('skybrightness', np.float32),
                 ('lst', np.float32),
@@ -163,7 +171,9 @@ class Observations(object):
             obs['fieldid'] = self.fieldid[indx]
             obs['mjd'] = self.mjd[indx]
             obs['duration'] = self.duration[indx]
-            obs['sn2'] = self.sn2[indx]
+            obs['apgSN2'] = self.apgSN2[indx]
+            obs['rSN2'] = self.rSN2[indx]
+            obs['bSN2'] = self.bSN2[indx]
             obs['airmass'] = self.airmass[indx]
             obs['skybrightness'] = self.skybrightness[indx]
             obs['lst'] = self.lst[indx]

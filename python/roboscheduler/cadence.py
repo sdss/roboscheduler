@@ -196,9 +196,16 @@ class Cadence(cCadenceCore.CadenceCore):
 
     def skybrightness_check(self, epoch_idx, skybrightness_next):
         """check lunation for mjd_past against lunation_next"""
+        down_weight = False
         if(epoch_idx >= self.nepochs):
-            return skybrightness_next <= self.skybrightness[-1]
-        return skybrightness_next <= self.skybrightness[epoch_idx]
+            if self.skybrightness[-1] > 0.4:
+                if skybrightness_next < 0.4:
+                    down_weight = True
+            return skybrightness_next <= self.skybrightness[-1], down_weight
+        if self.skybrightness[epoch_idx] > 0.4:
+            if skybrightness_next < 0.4:
+                down_weight = True
+        return skybrightness_next <= self.skybrightness[epoch_idx], down_weight
 
     def evaluate_next(self, epoch_idx=None, partial_epoch=False,
                       mjd_past=None, mjd_next=None,
@@ -218,27 +225,41 @@ class Cadence(cCadenceCore.CadenceCore):
         else:
             base_priority = 0
 
-        ok_skybrightness = (self.skybrightness_check(epoch_idx, skybrightness_next)|
-                                                    (check_skybrightness is False))
+        ok_skybrightness, down_weight = self.skybrightness_check(epoch_idx,
+                                                                 skybrightness_next)
+        ok_skybrightness = ok_skybrightness | (check_skybrightness is False)
+
+        if down_weight:
+            base_priority = -100
+
         if(epoch_idx == 0):
-            return(ok_skybrightness, 0)
+            # if "x8" in self.name:
+            #     print(self.name, "FIRST!", ok_skybrightness)
+            return(ok_skybrightness, base_priority)
 
         delta_curr = mjd_next - mjd_past
         dlo = self.delta_min[epoch_idx]
         dhi = self.delta_max[epoch_idx]
         dnom = self.delta[epoch_idx]
         if(dlo == -1):
-            return(ok_skybrightness, 0)
-        # print("delta {} dhi {} dlo {}".format(delta, dhi, dlo))
+            # if "x8" in self.name:
+            #     print(self.name, "-1?", ok_skybrightness)
+            return(ok_skybrightness, base_priority)
+        # if "x1" in self.name:
+        #     print("delta {} dhi {} dlo {} curr {:.2f}".format(dnom, dhi, dlo, float(delta_curr)), self.name)
         # 1/sqrt(x) priority; at 1 day +100, at 10 days +30, at 30 days +18
         remain_priority = 15 * np.clip(10/np.sqrt(np.abs(dhi - delta_curr)),
                                        a_min=None, a_max=10)
         nom_priority = 5 * np.clip(10/np.sqrt(np.abs(dnom - delta_curr)),
-                                       a_min=None, a_max=10)
+                                   a_min=None, a_max=10)
         priority = base_priority + remain_priority + nom_priority
-        if ignoreMax:
-            return(ok_skybrightness & (delta_curr >= dlo), priority)
-        return(ok_skybrightness & (delta_curr >= dlo) & (delta_curr <= dhi), priority)
+        if delta_curr <= dhi:
+            priority += 500
+        # if ignoreMax:
+        #     return(ok_skybrightness & (delta_curr >= dlo), priority)
+        # if "x8" in self.name:
+        #     print(self.name, "norm", ok_skybrightness, delta_curr, dlo)
+        return(ok_skybrightness & (delta_curr >= dlo), priority)
 
 
 class CadenceList(object, metaclass=CadenceListSingleton):
