@@ -8,11 +8,9 @@
 namespace py = pybind11;
 using namespace pybind11::literals;
 
-enum Instrument {ApogeeInstrument, BossInstrument};
-
 class CadenceCore {
 public:
-	CadenceCore(std::string name, int nepochs, Instrument instrument,
+	CadenceCore(std::string name, int nepochs,
 							py::array_t<float> skybrightness,
 							py::array_t<float> delta,
 							py::array_t<float> delta_min, py::array_t<float> delta_max,
@@ -28,7 +26,6 @@ public:
 	std::string name;
 	int nepochs;
 	int nexp_total;
-	Instrument instrument;
 	py::array_t<float> skybrightness;
 	py::array_t<float> delta;
 	py::array_t<float> delta_min;

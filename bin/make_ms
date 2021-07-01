@@ -17,7 +17,7 @@ def lst_to_hhmm(lst):
     return f"{hour:02d}:{minute:02d}"
 
 
-def sched_engineering(mjds, sched):
+def sched_engineering(mjds, sched, apo=True):
     illum = sched.moon_illumination(mjds)
 
     full = np.where(illum > 0.98)[0]
@@ -30,22 +30,30 @@ def sched_engineering(mjds, sched):
         if m - last_night < 5:
             continue
         aTime = Time(m-1, format="mjd").datetime
-        if aTime.isoweekday() == 6:
-            nights.append(m-1)
-            # days.append(m-2)
-            last_night = m
-        elif aTime.isoweekday() == 7:
-            nights.append(m+1)
-            # days.append(m+2)
-            last_night = m
-        elif aTime.isoweekday() == 1:
-            nights.append(m)
-            # days.append(m+1)
-            last_night = m
+        if apo:
+            # apo doesn't want weekends
+            if aTime.isoweekday() == 6:
+                nights.append(m-1)
+                # days.append(m-2)
+                last_night = m
+            elif aTime.isoweekday() == 7:
+                nights.append(m+1)
+                # days.append(m+2)
+                last_night = m
+            elif aTime.isoweekday() == 1:
+                nights.append(m)
+                # days.append(m+1)
+                last_night = m
+            else:
+                nights.append(m)
+                # days.append(m-1)
+                last_night = m
         else:
-            nights.append(m)
-            # days.append(m-1)
-            last_night = m
+            # LCO doesn't want it on Mon->Tue
+            if aTime.isoweekday() == 1:
+                nights.append(m+1)
+            else:
+                nights.append(m)
 
     return nights
 
@@ -60,6 +68,8 @@ def dateStr(date):
 
 def makeSched(start, stop, outDir="", name="MS", observatory="apo"):
     sched = Observer(observatory=observatory)
+
+    apo = observatory == "apo"
 
     mjds = np.arange(start, stop, 1)
 
@@ -77,7 +87,7 @@ def makeSched(start, stop, outDir="", name="MS", observatory="apo"):
 
     with open(head_file, "r") as header:
         local = "# Timezone offset in hours to apply to get to TAI \n# (i.e. Greenwich time)"
-        if observatory == "apo":
+        if apo:
             local += "\n to_tai 7  # Mountain Standard Time \n\n"
         else:
             local += "\n to_tai 4  # Chilean Standard Time \n\n"
@@ -87,19 +97,23 @@ def makeSched(start, stop, outDir="", name="MS", observatory="apo"):
 
     shutdown_duration = 7 * 6  # 6 weeks
 
-    eng = sched_engineering(mjds, sched)
+    eng = sched_engineering(mjds, sched, apo)
     delay = 0
     for m in mjds[1:]:
         m = int(m)
         if m < delay:
             continue
         if m in eng:
+            if apo:
+                dur = 1
+            else:
+                dur = 2
             start = Time(m, format="mjd").datetime
-            end = Time(m+1, format="mjd").datetime
+            end = Time(m+dur, format="mjd").datetime
             sched_str += dateStr(start) + vocab["eng_start"] + "\n"
             sched_str += dateStr(end) + vocab["eng_end"] + "\n"
-            delay = m + 1
-        else:
+            delay = m + dur
+        elif apo:
             date = Time(m-1, format="mjd").datetime
             if date.month == 7:
                 if date.isoweekday() == 1:
@@ -107,6 +121,21 @@ def makeSched(start, stop, outDir="", name="MS", observatory="apo"):
                     sched_str += dateStr(date) + vocab["shutdown_start"] + "\n"
                     sched_str += dateStr(end) + vocab["shutdown_end"] + "\n"
                     delay = m + shutdown_duration
+        else:
+            # LCO
+            date = Time(m-1, format="mjd").datetime
+            if date.month == 12:
+                if date.day == 24:
+                    if (date.year - 2000) % 3 == 0:
+                        # realuminization
+                        dur = 10
+                    else:
+                        dur = 2
+                    end = Time(m + dur - 1, format="mjd").datetime
+                    sched_str += dateStr(date) + vocab["eng_start"] + " Christmas" "\n"
+                    sched_str += dateStr(end) + vocab["eng_end"] + " Christmas" "\n"
+                    delay = m + dur
+
 
     # +2 for our previous safety buffer
     date = Time(stop+2, format="mjd").datetime

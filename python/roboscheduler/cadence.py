@@ -4,7 +4,6 @@ import numpy as np
 import fitsio
 import roboscheduler.cCadenceCore as cCadenceCore
 
-Instrument = cCadenceCore.Instrument
 
 try:
     import sdssdb.peewee.sdss5db.targetdb as targetdb
@@ -15,24 +14,6 @@ except:
 
 def basename(cadence):
     return("_".join(cadence.split('-')[0].split('_')[0:-1]))
-
-
-def _instrument_name(instrument):
-    instrument_name = 'UNKNOWN'
-    if(instrument == Instrument.BossInstrument):
-        instrument_name = 'BOSS'
-    if(instrument == Instrument.ApogeeInstrument):
-        instrument_name = 'APOGEE'
-    return(instrument_name)
-
-
-def _name_instrument(name):
-    name_instrument = None
-    if(name == 'BOSS'):
-        name_instrument = Instrument.BossInstrument
-    if(name == 'APOGEE'):
-        name_instrument = Instrument.ApogeeInstrument
-    return(name_instrument)
 
 
 # Class to define a singleton
@@ -60,9 +41,6 @@ class Cadence(cCadenceCore.CadenceCore):
 
     nepochs : np.int32
         number of epochs
-
-    instrument : str
-            instrument
 
     skybrightness : ndarray of np.float32
         maximum sky brightness for each exposure
@@ -100,9 +78,6 @@ class Cadence(cCadenceCore.CadenceCore):
     delta_max : ndarray of np.float32
         maximum delta to allow (days)
 
-    instrument : str
-        instrument ('APOGEE' or 'BOSS')
-
     nepochs : np.int32
         number of epochs
 
@@ -133,17 +108,12 @@ class Cadence(cCadenceCore.CadenceCore):
 """
     def __init__(self, name=None, nepochs=None, skybrightness=None,
                  delta=None, delta_min=None, delta_max=None, nexp=None,
-                 max_length=None, obsmode_pk = None, label_root = None, label_version = None,
-                 epoch_indx = None, epochs = None,  instrument=None, cfg=None):
+                 max_length=None, obsmode_pk = None, label_root = None, label_version = None, cfg=None):
         if(cfg is not None):
             self._from_cfg(name=name, cfg=cfg)
             return
         nepochs = np.int32(nepochs)
         skybrightness = self._arrayify(skybrightness, dtype=np.float32)
-        if(instrument == 'APOGEE'):
-            instrument = cCadenceCore.ApogeeInstrument
-        else:
-            instrument = cCadenceCore.BossInstrument
         delta = self._arrayify(delta, dtype=np.float32)
         delta_min = self._arrayify(delta_min, dtype=np.float32)
         delta_max = self._arrayify(delta_max, dtype=np.float32)
@@ -154,7 +124,7 @@ class Cadence(cCadenceCore.CadenceCore):
         self.label_version = np.str(label_version)
         epoch_indx = np.zeros(nepochs + 1, dtype=np.int32)
         epochs = np.zeros(nexp.sum(), dtype=np.int32)
-        super().__init__(name, nepochs, instrument,
+        super().__init__(name, nepochs,
                          skybrightness, delta, delta_min,
                          delta_max, nexp, max_length,
                          epoch_indx, epochs)
@@ -162,7 +132,6 @@ class Cadence(cCadenceCore.CadenceCore):
 
     def _from_cfg(self, name=None, cfg=None):
         nepochs = np.int32(cfg.get(name, 'nepochs'))
-        instrument = cfg.get(name, 'nepochs')
         skybrightness = np.array(cfg.get(name, 'skybrightness').split(),
                                  dtype=np.float32)
         delta = np.array(cfg.get(name, 'delta').split(),
@@ -179,18 +148,16 @@ class Cadence(cCadenceCore.CadenceCore):
                               dtype=np.str)
         label_root = np.str(cfg.get(name, 'label_root'))
         label_version = np.str(cfg.get(name, 'label_version'))
-        epoch_indx = np.zeros(nepochs + 1, dtype=np.int32)
-        epochs = np.zeros(nexp.sum(), dtype=np.int32)
 
-        self.__init__(name=name, nepochs=nepochs, instrument=instrument, skybrightness=skybrightness, 
+        self.__init__(name=name, nepochs=nepochs, skybrightness=skybrightness,
                       delta=delta, delta_min=delta_min, delta_max=delta_max,
                       nexp=nexp, max_length=max_length, obsmode_pk = obsmode_pk,
-                      label_root = label_root, label_version = label_version, epoch_indx = epoch_indx, epochs = epochs)
+                      label_root = label_root, label_version = label_version)
 
         return
 
     def as_cadencecore(self):
-        cc = cCadenceCore.CadenceCore(self.name, self.nepochs, self.instrument,
+        cc = cCadenceCore.CadenceCore(self.name, self.nepochs,
                                       self.skybrightness, self.delta,
                                       self.delta_min, self.delta_max, self.nexp,
                                       self.max_length, self.label_root, self.label_version,
@@ -207,9 +174,16 @@ class Cadence(cCadenceCore.CadenceCore):
     
     def skybrightness_check(self, epoch_idx, skybrightness_next):
         """check lunation for mjd_past against lunation_next"""
+        down_weight = False
         if(epoch_idx >= self.nepochs):
-            return skybrightness_next <= self.skybrightness[-1]
-        return skybrightness_next <= self.skybrightness[epoch_idx]
+            if self.skybrightness[-1] > 0.4:
+                if skybrightness_next < 0.4:
+                    down_weight = True
+            return skybrightness_next <= self.skybrightness[-1], down_weight
+        if self.skybrightness[epoch_idx] > 0.4:
+            if skybrightness_next < 0.4:
+                down_weight = True
+        return skybrightness_next <= self.skybrightness[epoch_idx], down_weight
 
     def evaluate_next(self, epoch_idx=None, partial_epoch=False,
                       mjd_past=None, mjd_next=None,
@@ -229,27 +203,41 @@ class Cadence(cCadenceCore.CadenceCore):
         else:
             base_priority = 0
 
-        ok_skybrightness = (self.skybrightness_check(epoch_idx, skybrightness_next)|
-                                                    (check_skybrightness is False))
+        ok_skybrightness, down_weight = self.skybrightness_check(epoch_idx,
+                                                                 skybrightness_next)
+        ok_skybrightness = ok_skybrightness | (check_skybrightness is False)
+
+        if down_weight:
+            base_priority = -100
+
         if(epoch_idx == 0):
-            return(ok_skybrightness, 0)
+            # if "x8" in self.name:
+            #     print(self.name, "FIRST!", ok_skybrightness)
+            return(ok_skybrightness, base_priority)
 
         delta_curr = mjd_next - mjd_past
         dlo = self.delta_min[epoch_idx]
         dhi = self.delta_max[epoch_idx]
         dnom = self.delta[epoch_idx]
         if(dlo == -1):
-            return(ok_skybrightness, 0)
-        # print("delta {} dhi {} dlo {}".format(delta, dhi, dlo))
+            # if "x8" in self.name:
+            #     print(self.name, "-1?", ok_skybrightness)
+            return(ok_skybrightness, base_priority)
+        # if "x1" in self.name:
+        #     print("delta {} dhi {} dlo {} curr {:.2f}".format(dnom, dhi, dlo, float(delta_curr)), self.name)
         # 1/sqrt(x) priority; at 1 day +100, at 10 days +30, at 30 days +18
         remain_priority = 15 * np.clip(10/np.sqrt(np.abs(dhi - delta_curr)),
                                        a_min=None, a_max=10)
         nom_priority = 5 * np.clip(10/np.sqrt(np.abs(dnom - delta_curr)),
-                                       a_min=None, a_max=10)
+                                   a_min=None, a_max=10)
         priority = base_priority + remain_priority + nom_priority
-        if ignoreMax:
-            return(ok_skybrightness & (delta_curr >= dlo), priority)
-        return(ok_skybrightness & (delta_curr >= dlo) & (delta_curr <= dhi), priority)
+        if delta_curr <= dhi:
+            priority += 500
+        # if ignoreMax:
+        #     return(ok_skybrightness & (delta_curr >= dlo), priority)
+        # if "x8" in self.name:
+        #     print(self.name, "norm", ok_skybrightness, delta_curr, dlo)
+        return(ok_skybrightness & (delta_curr >= dlo), priority)
 
 
 class CadenceList(object, metaclass=CadenceListSingleton):
@@ -309,9 +297,6 @@ class CadenceList(object, metaclass=CadenceListSingleton):
 
         nepochs : np.int32
             number of epochs (default 1)
-
-        instrument : str
-            instrument to use
 
         skybrightness : ndarray of np.float32
             maximum sky brightness for each exposure (default [1.])
@@ -486,13 +471,12 @@ class CadenceList(object, metaclass=CadenceListSingleton):
 
         cadences_array : ndarray
             ndarray with columns 'NEPOCHS', 'SKYBRIGHTNESS', 'DELTA',
-            'DELTA_MIN', 'DELTA_MAX', 'NEXP', 'CADENCE', 'INSTRUMENT',
+            'DELTA_MIN', 'DELTA_MAX', 'NEXP', 'CADENCE',
             'MAX_LENGTH'
 
 """
         for ccadence in cadences_array:
             nepochs = ccadence['NEPOCHS']
-            instrument = ccadence['INSTRUMENT']
 
             self.add_cadence(name=ccadence['CADENCE'],
                              nepochs=ccadence['NEPOCHS'],
@@ -504,8 +488,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                              max_length=ccadence['MAX_LENGTH'][0:nepochs],
                              obsmode_pk=ccadence['OBSMODE_PK'][0:nepochs],
                              label_root=ccadence['LABEL_ROOT'],
-                             label_version=ccadence['LABEL_VERSION'],
-                             instrument=instrument)
+                             label_version=ccadence['LABEL_VERSION'])
         return
 
     def fromfits(self, filename=None, unpickle=False):
@@ -522,7 +505,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
 
         Expects a valid FITS file with columns 'NEPOCHS',
             'SKYBRIGHTNESS', 'DELTA', 'DELTA_MIN', 'DELTA_MAX', 'CADENCE',
-            'NEXP', 'INSTRUMENT'
+            'NEXP'
         """
         self.cadences_fits = fitsio.read(filename)
         self.fromarray(self.cadences_fits)
@@ -550,7 +533,6 @@ class CadenceList(object, metaclass=CadenceListSingleton):
 
         [cadence_name]
         nepochs = <N>
-        instrument = <instrument name>
         skybrightness = <sb1> .. <sbN>
         delta = <delta1> .. <deltaN>
         delta_min = <dmin1> .. <dminN>
@@ -586,13 +568,10 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                     ('MAX_LENGTH', np.float32, max_nexp),
                     ('OBSMODE_PK', np.str, max_nexp),
                     ('LABEL_ROOT', np.unicode_, 40),
-                    ('LABEL_VERSION', np.unicode_, 40)] #,
-#                    ('INSTRUMENT', np.unicode_, 40)]
+                    ('LABEL_VERSION', np.unicode_, 40)] 
         cads = np.zeros(self.ncadences, dtype=cadence0)
-        print(cads['OBSMODE_PK'])
         names = self.cadences.keys()
         for indx, name in enumerate(names):
-            #print(name)
             nepochs = self.cadences[name].nepochs
             cads['CADENCE'][indx] = name
             cads['NEPOCHS'][indx] = nepochs
@@ -601,13 +580,10 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             cads['DELTA_MAX'][indx, 0:nepochs] = self.cadences[name].delta_max[0:nepochs]
             cads['NEXP'][indx, 0:nepochs] = self.cadences[name].nexp[0:nepochs]
             cads['MAX_LENGTH'][indx, 0:nepochs] = self.cadences[name].max_length[0:nepochs]
-            if nepochs > 1:
-                print((np.asarray(np.char.split(self.cadences[name].obsmode_pk))))
-                cads['OBSMODE_PK'][indx, 0:nepochs] = np.char.split(self.cadences[name].obsmode_pk)
+            cads['OBSMODE_PK'][indx, 0:nepochs] = np.char.split(self.cadences[name].obsmode_pk)   #note: this line is still broken!
             cads['SKYBRIGHTNESS'][indx][0:nepochs] = self.cadences[name].skybrightness[0:nepochs]
             cads['LABEL_ROOT'][indx] = self.cadences[name].label_root
             cads['LABEL_VERSION'][indx] = self.cadences[name].label_version
- #           cads['INSTRUMENT'][indx] = _instrument_name(self.cadences[name].instrument)
         return(cads)
 
     
@@ -638,8 +614,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                     ('MAX_LENGTH', np.float32, max_nexp),
                     ('OBSMODE_PK', np.str, max_nexp),
                     ('LABEL_ROOT', np.unicode_, 40),
-                    ('LABEL_VERSION', np.unicode_, 40)] #,
-#                    ('INSTRUMENT', np.unicode_, 40)]
+                    ('LABEL_VERSION', np.unicode_, 40)] 
         cads = np.zeros(self.ncadences, dtype=cadence0)
         names = self.cadences.keys()
         with open(filename, 'w', encoding='utf-8-sig', newline='') as csvfile:
@@ -661,13 +636,10 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                 obsmode_pk_trim = obsmode_pk_string.strip("[] ")
                 sky_brightness_string = np.array2string(self.cadences[name].skybrightness[0:nepochs], precision = 3, separator = ',')
                 sky_brightness_trim = sky_brightness_string.strip("[] ")
-                #print(name+';'+str(nepochs)+';{'+delta_trim+'}')
                 print_string = name+';'+str(nepochs)+';{'+delta_trim+'}'+';{'+sky_brightness_trim+'}'+';{'+delta_max_trim+'}'+';{'+delta_min_trim+'}'+';{'+nexp_trim+'}'+';{'+max_length_trim+'}'+';{'+obsmode_pk_trim+'};'+label_root+';'+label_version
                 clean_string = print_string.replace("\r","")
                 cleaner_string = clean_string.replace("\n","")
                 csvfile.write(cleaner_string+' \n')
-        #return(cads)
-
 
     
     def todb(self):
@@ -677,12 +649,6 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         if(_database is False):
             print("No database available.")
             return()
-
-        # Create dictionary to look up instrument pk from instrument name
-        instruments = targetdb.Instrument.select().dicts()
-        instrument_pk = dict()
-        for instrument in instruments:
-            instrument_pk[instrument['label']] = instrument['pk']
 
         pkdict = targetdb.Cadence.select(targetdb.Cadence.pk).dicts()
         pks = np.array([p['pk'] for p in pkdict])
@@ -695,8 +661,6 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             delta_max = [float(n) for n in self.cadences[cadence].delta_max]
             skybrightness = [float(n) for n in self.cadences[cadence].skybrightness]
             max_length = [float(n) for n in self.cadences[cadence].max_length]
-            # instrument = [instrument_pk[n]
-            #               for n in self.cadences[cadence].instrument]
             targetdb.Cadence.insert(pk=pk, label=cadence,
                                     nexp=nexposures,
                                     nepochs=self.cadences[cadence].nepochs,
@@ -711,12 +675,6 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         if(_database is False):
             print("No database available.")
             return()
-
-        # Create dictionary to look up instrument pk from instrument name
-        # instruments = targetdb.Instrument.select().dicts()
-        # instrument_pk = dict()
-        # for instrument in instruments:
-        #     instrument_pk[instrument['label']] = instrument['pk']
 
         for cadence in self.cadences:
             update_dict = {targetdb.Cadence.nexposures:
@@ -745,23 +703,12 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             print("No database available.")
             return()
 
-        # Create dictionary to look up instrument pk from instrument name
-        # instruments = targetdb.Instrument.select().dicts()
-        # instrument = dict()
-        # for cinstrument in instruments:
-        #     instrument[cinstrument['pk']] = cinstrument['label']
-
         cadences = targetdb.Cadence.select().dicts()
 
         for cadence in cadences:
             if(cadence['delta'] is None or len(cadence['delta']) == 0):
                 continue
 
-            # instruments = np.array([instrument[pk]
-            #                         for pk in cadence['instrument_pk']])
-            # if(len(instruments) == 0):
-            #     print("No instruments, defaulting to APOGEE")
-            #     instruments = ['APOGEE'] * cadence['nexposures']
             self.add_cadence(name=str(cadence['label'].strip()),
                              nexp=cadence['nexp'],
                              nepochs=cadence['nepochs'],
