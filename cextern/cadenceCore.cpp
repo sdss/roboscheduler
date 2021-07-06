@@ -20,11 +20,14 @@ CadenceCore::CadenceCore(std::string name,
 												 py::array_t<int> nexp,
 												 py::array_t<float> max_length,
 												 py::array_t<int> epoch_indx,
-												 py::array_t<int> epochs) :
+												 py::array_t<int> epochs,
+												 py::array_t<float> min_deltav,
+												 py::array_t<float> max_airmass) :
 	name(name), nepochs(nepochs),
 	skybrightness(skybrightness), delta(delta), delta_min(delta_min),
 	delta_max(delta_max), nexp(nexp), max_length(max_length),
-	epoch_indx(epoch_indx), epochs(epochs)
+	epoch_indx(epoch_indx), epochs(epochs), min_deltav(min_deltav),
+	max_airmass(max_airmass)
 {
 	int *nexp_a = (int *) nexp.request().ptr;
 	int *epoch_indx_a = (int *) epoch_indx.request().ptr;
@@ -118,18 +121,23 @@ bool CadenceCore::epochsConsistency(CadenceCore target_cadence,
 		nexp_count[i] = 0;
 
 	int *t_nexp_a = (int *) target_cadence.nexp.request().ptr;
-	float *t_skybrightness_a = (float *) target_cadence.skybrightness.request().ptr;
+	// float *t_skybrightness_a = (float *) target_cadence.skybrightness.request().ptr;
+	float *t_min_deltav_a = (float *) target_cadence.min_deltav.request().ptr;
+	float *t_max_airmass_a = (float *) target_cadence.max_airmass.request().ptr;
 	float *t_delta_a = (float *) target_cadence.delta.request().ptr;
 	float *t_delta_min_a = (float *) target_cadence.delta_min.request().ptr;
 	float *t_delta_max_a = (float *) target_cadence.delta_max.request().ptr;
 
 	int *nexp_a = (int *) nexp.request().ptr;
-	float *skybrightness_a = (float *) skybrightness.request().ptr;
+	// float *skybrightness_a = (float *) skybrightness.request().ptr;
+	float *min_deltav_a = (float *) min_deltav.request().ptr;
+	float *max_airmass_a = (float *) max_airmass.request().ptr;
 	float *delta_min_a = (float *) delta_min.request().ptr;
 	float *delta_max_a = (float *) delta_max.request().ptr;
 
 	ok = (t_nexp_a[0] <= nexp_a[epochs[0]] - nexp_count[epochs[0]]) &
-		(t_skybrightness_a[0] >= skybrightness_a[epochs[0]]);
+		(t_min_deltav_a[0] <= min_deltav_a[epochs[0]]) &
+		(t_max_airmass_a[0] >= max_airmass_a[epochs[0]]);
 	if(!ok)
 		return(false);
 
@@ -146,10 +154,12 @@ bool CadenceCore::epochsConsistency(CadenceCore target_cadence,
 			ok = (t_delta_min_a[i] <= dtotmin) &
 				(t_delta_max_a[i] >= dtotmax) &
 				(t_nexp_a[i] <= nexp_a[epochs[i]] - nexp_count[epochs[i]]) &
-				(t_skybrightness_a[i] >= skybrightness_a[epochs[i]]);
+				(t_min_deltav_a[0] <= min_deltav_a[epochs[0]]) &
+				(t_max_airmass_a[0] >= max_airmass_a[epochs[0]]);
 		} else {
 			ok = (t_nexp_a[i] <= nexp_a[epochs[i]] - nexp_count[epochs[i]]) &
-				(t_skybrightness_a[i] >= skybrightness_a[epochs[i]]);
+				(t_min_deltav_a[0] <= min_deltav_a[epochs[0]]) &
+				(t_max_airmass_a[0] >= max_airmass_a[epochs[0]]);
 		}
 		if(!ok)
 			return(false);

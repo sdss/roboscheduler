@@ -137,7 +137,7 @@ class Cadence(cCadenceCore.CadenceCore):
         super().__init__(name, nepochs,
                          skybrightness, delta, delta_min,
                          delta_max, nexp, max_length,
-                         epoch_indx, epochs)
+                         epoch_indx, epochs, min_deltav, max_airmass)
         return
 
     def _from_cfg(self, name=None, cfg=None, obs_modes=None):
@@ -179,8 +179,8 @@ class Cadence(cCadenceCore.CadenceCore):
         cc = cCadenceCore.CadenceCore(self.name, self.nepochs,
                                       self.skybrightness, self.delta,
                                       self.delta_min, self.delta_max, self.nexp,
-                                      self.max_length,
-                                      self.epoch_indx, self.epochs)
+                                      self.max_length, self.epoch_indx, self.epochs,
+                                      self.min_deltav, self.max_airmass)
         return(cc)
 
     def _arrayify(self, quantity=None, dtype=np.float64):
