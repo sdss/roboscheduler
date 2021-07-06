@@ -151,8 +151,8 @@ class Cadence(cCadenceCore.CadenceCore):
 
         self.__init__(name=name, nepochs=nepochs, skybrightness=skybrightness,
                       delta=delta, delta_min=delta_min, delta_max=delta_max,
-                      nexp=nexp, max_length=max_length, obsmode_pk = obsmode_pk,
-                      label_root = label_root, label_version = label_version)
+                      nexp=nexp, max_length=max_length, obsmode_pk=obsmode_pk,
+                      label_root=label_root, label_version=label_version)
 
         return
 
@@ -160,7 +160,7 @@ class Cadence(cCadenceCore.CadenceCore):
         cc = cCadenceCore.CadenceCore(self.name, self.nepochs,
                                       self.skybrightness, self.delta,
                                       self.delta_min, self.delta_max, self.nexp,
-                                      self.max_length, self.label_root, self.label_version,
+                                      self.max_length,
                                       self.epoch_indx, self.epochs)
         return(cc)
 
