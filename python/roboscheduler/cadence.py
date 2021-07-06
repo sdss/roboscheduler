@@ -105,10 +105,10 @@ class Cadence(cCadenceCore.CadenceCore):
 
     The last epochs in the list may have delta = -1. These will be
     treated as unconstrained. Only single epoch cadences will be allowed.
-"""
+    """
     def __init__(self, name=None, nepochs=None, skybrightness=None,
                  delta=None, delta_min=None, delta_max=None, nexp=None,
-                 max_length=None, cfg=None):
+                 max_length=None, obsmode_pk = None, label_root = None, label_version = None, cfg=None):
         if(cfg is not None):
             self._from_cfg(name=name, cfg=cfg)
             return
@@ -119,6 +119,9 @@ class Cadence(cCadenceCore.CadenceCore):
         delta_max = self._arrayify(delta_max, dtype=np.float32)
         nexp = self._arrayify(nexp, dtype=np.int32)
         max_length = self._arrayify(max_length, dtype=np.float32)
+        self.obsmode_pk = np.array(obsmode_pk, dtype=np.str)
+        self.label_root = np.str(label_root)
+        self.label_version = np.str(label_version)
         epoch_indx = np.zeros(nepochs + 1, dtype=np.int32)
         epochs = np.zeros(nexp.sum(), dtype=np.int32)
         super().__init__(name, nepochs,
@@ -141,10 +144,15 @@ class Cadence(cCadenceCore.CadenceCore):
                         dtype=np.int32)
         max_length = np.array(cfg.get(name, 'max_length').split(),
                               dtype=np.float32)
-        self.__init__(name=name, nepochs=nepochs,
+        obsmode_pk = np.array(cfg.get(name, 'obsmode_pk').split(),
+                              dtype=np.str)
+        label_root = np.str(cfg.get(name, 'label_root'))
+        label_version = np.str(cfg.get(name, 'label_version'))
+
+        self.__init__(name=name, nepochs=nepochs, skybrightness=skybrightness,
                       delta=delta, delta_min=delta_min, delta_max=delta_max,
-                      nexp=nexp, max_length=max_length,
-                      skybrightness=skybrightness)
+                      nexp=nexp, max_length=max_length, obsmode_pk=obsmode_pk,
+                      label_root=label_root, label_version=label_version)
 
         return
 
@@ -265,7 +273,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
 
     This is a singleton, so there can only be one CadenceList defined
     within any session.
-"""
+    """
     def __init__(self):
         self.reset()
         self.max_nsolns = 100
@@ -313,7 +321,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
 
         The last epochs in the list may have delta = -1. These will be
         treated as unconstrained. Only single epoch cadences will be allowed.
-"""
+        """
         cadence = Cadence(name=name, *args, **kwargs)
         self.cadences[name] = cadence
         self.ncadences = len(self.cadences.keys())
@@ -350,7 +358,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
 
         solutions : list of ndarrays of np.int32
             list of solutions, where each solution is an array
-        
+
         nexps : list of ndarrays of np.int32
             if epochs are merged, number of exposures for each epoch listed
 
@@ -360,7 +368,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         When epochs are merged with merge_epochs you need to keep track
         of how many exposures you are putting into each epoch. In this 
         case 'nexps' is returned.
-"""
+        """
         cache_key = (one, two, epoch_level, return_solutions, merge_epochs)
         if(cache_key in self._cadence_consistency):
             return(self._cadence_consistency[cache_key])
@@ -415,7 +423,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
 
         ok : bool
             True if these exposures under cadence #2 satisfy cadence #1
-"""
+        """
         # Are there any ways cadence one fits into cadence two?
         ok, epochs_list = self.cadence_consistency(one, two)
         if(not ok):
@@ -466,7 +474,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             'DELTA_MIN', 'DELTA_MAX', 'NEXP', 'CADENCE',
             'MAX_LENGTH'
 
-"""
+        """
         for ccadence in cadences_array:
             nepochs = ccadence['NEPOCHS']
 
@@ -477,7 +485,10 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                              delta_min=ccadence['DELTA_MIN'][0:nepochs],
                              delta_max=ccadence['DELTA_MAX'][0:nepochs],
                              nexp=ccadence['NEXP'][0:nepochs],
-                             max_length=ccadence['MAX_LENGTH'][0:nepochs])
+                             max_length=ccadence['MAX_LENGTH'][0:nepochs],
+                             obsmode_pk=ccadence['OBSMODE_PK'][0:nepochs],
+                             label_root=ccadence['LABEL_ROOT'],
+                             label_version=ccadence['LABEL_VERSION'])
         return
 
     def fromfits(self, filename=None, unpickle=False):
@@ -554,11 +565,13 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                     ('DELTA_MAX', np.float32, max_nexp),
                     ('DELTA_MIN', np.float32, max_nexp),
                     ('NEXP', np.int32, max_nexp),
-                    ('MAX_LENGTH', np.float32, max_nexp)]
+                    ('MAX_LENGTH', np.float32, max_nexp),
+                    ('OBSMODE_PK', np.dtype("|S15"), max_nexp),
+                    ('LABEL_ROOT', np.unicode_, 40),
+                    ('LABEL_VERSION', np.unicode_, 40)]
         cads = np.zeros(self.ncadences, dtype=cadence0)
         names = self.cadences.keys()
         for indx, name in enumerate(names):
-            print(name)
             nepochs = self.cadences[name].nepochs
             cads['CADENCE'][indx] = name
             cads['NEPOCHS'][indx] = nepochs
@@ -567,12 +580,60 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             cads['DELTA_MAX'][indx, 0:nepochs] = self.cadences[name].delta_max[0:nepochs]
             cads['NEXP'][indx, 0:nepochs] = self.cadences[name].nexp[0:nepochs]
             cads['MAX_LENGTH'][indx, 0:nepochs] = self.cadences[name].max_length[0:nepochs]
-            cads['SKYBRIGHTNESS'][indx, 0:nepochs] = self.cadences[name].skybrightness[0:nepochs]
+            cads['OBSMODE_PK'][indx, 0:nepochs] = self.cadences[name].obsmode_pk
+            cads['SKYBRIGHTNESS'][indx][0:nepochs] = self.cadences[name].skybrightness[0:nepochs]
+            cads['LABEL_ROOT'][indx] = self.cadences[name].label_root
+            cads['LABEL_VERSION'][indx] = self.cadences[name].label_version
         return(cads)
+
+    def tocsv(self, filename=None):
+        """write cadences to a csv file
+
+        Parameters:
+        -----------
+
+        filename : str
+            File name to write csv file to
+
+        Returns:
+        -------
+
+        cadences : ndarray
+            information on each cadence
+        """
+        names = self.cadences.keys()
+        with open(filename, 'w', encoding='utf-8-sig', newline='') as csvfile:
+            for indx, name in enumerate(names):
+                nepochs = self.cadences[name].nepochs
+                label_root = self.cadences[name].label_root
+                label_version = self.cadences[name].label_version
+                delta_string = np.array2string(self.cadences[name].delta[0:nepochs], precision=3, separator=',')
+                delta_trim = delta_string.strip("[] ")
+                delta_min_string = np.array2string(self.cadences[name].delta_min[0:nepochs], precision=3, separator=',')
+                delta_min_trim = delta_min_string.strip("[] ")
+                delta_max_string = np.array2string(self.cadences[name].delta_max[0:nepochs], precision=3, separator=',')
+                delta_max_trim = delta_max_string.strip("[] ")
+                nexp_string = np.array2string(self.cadences[name].nexp[0:nepochs], precision=3, separator=',')
+                nexp_trim = nexp_string.strip("[] ")
+                max_length_string = np.array2string(self.cadences[name].max_length[0:nepochs], precision=3, separator=',')
+                max_length_trim = max_length_string.strip("[] ")
+                obsmode_pk_string = np.array2string(self.cadences[name].obsmode_pk[0:nepochs], separator=',')
+                obsmode_pk_trim = obsmode_pk_string.strip("[] ")
+                sky_brightness_string = np.array2string(self.cadences[name].skybrightness[0:nepochs], precision=3, separator=',')
+                sky_brightness_trim = sky_brightness_string.strip("[] ")
+                print_string = name + ';' + str(nepochs) + ';{' + delta_trim + '}' +\
+                                      ';{' + sky_brightness_trim + '}' +\
+                                      ';{' + delta_max_trim+'}' +\
+                                      ';{' + delta_min_trim+'}' + ';{'+nexp_trim+'}' +\
+                                      ';{' + max_length_trim+'}' + ';{'+obsmode_pk_trim+'};' +\
+                                      label_root+';'+label_version
+                clean_string = print_string.replace("\r","")
+                cleaner_string = clean_string.replace("\n","")
+                csvfile.write(cleaner_string+' \n')
 
     def todb(self):
         """Insert all cadences into the targetdb
-"""
+        """
 
         if(_database is False):
             print("No database available.")
@@ -599,7 +660,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
 
     def updatedb(self):
         """Update the cadences in the targetdb by name
-"""
+        """
         if(_database is False):
             print("No database available.")
             return()
@@ -626,7 +687,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
 
     def fromdb(self):
         """Extract cadences into the targetdb
-"""
+        """
         if(_database is False):
             print("No database available.")
             return()
