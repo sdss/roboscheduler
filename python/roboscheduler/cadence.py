@@ -6,6 +6,7 @@ import roboscheduler.cCadenceCore as cCadenceCore
 
 
 try:
+    import sdssdb.peewee.sdss5db.opsdb as opsdb
     import sdssdb.peewee.sdss5db.targetdb as targetdb
     _database = True
 except:
@@ -108,9 +109,12 @@ class Cadence(cCadenceCore.CadenceCore):
     """
     def __init__(self, name=None, nepochs=None, skybrightness=None,
                  delta=None, delta_min=None, delta_max=None, nexp=None,
-                 max_length=None, obsmode_pk = None, label_root = None, label_version = None, cfg=None):
+                 max_length=None, obsmode_pk=None, label_root=None,
+                 label_version=None, min_twilight_ang=None,
+                 min_deltav=None, max_airmass=None, min_moon_sep=None,
+                 cfg=None, obs_modes=None):
         if(cfg is not None):
-            self._from_cfg(name=name, cfg=cfg)
+            self._from_cfg(name=name, cfg=cfg, obs_modes=obs_modes)
             return
         nepochs = np.int32(nepochs)
         skybrightness = self._arrayify(skybrightness, dtype=np.float32)
@@ -119,6 +123,12 @@ class Cadence(cCadenceCore.CadenceCore):
         delta_max = self._arrayify(delta_max, dtype=np.float32)
         nexp = self._arrayify(nexp, dtype=np.int32)
         max_length = self._arrayify(max_length, dtype=np.float32)
+        # next 4 lines are for obsmode
+        min_deltav = self._arrayify(min_deltav, dtype=np.float32)
+        max_airmass = self._arrayify(max_airmass, dtype=np.float32)
+        self.min_twilight_ang = self._arrayify(min_twilight_ang, dtype=np.float32)
+        self.min_moon_sep = self._arrayify(min_moon_sep, dtype=np.float32)
+
         self.obsmode_pk = np.array(obsmode_pk, dtype=np.str)
         self.label_root = np.str(label_root)
         self.label_version = np.str(label_version)
@@ -130,7 +140,7 @@ class Cadence(cCadenceCore.CadenceCore):
                          epoch_indx, epochs)
         return
 
-    def _from_cfg(self, name=None, cfg=None):
+    def _from_cfg(self, name=None, cfg=None, obs_modes=None):
         nepochs = np.int32(cfg.get(name, 'nepochs'))
         skybrightness = np.array(cfg.get(name, 'skybrightness').split(),
                                  dtype=np.float32)
@@ -149,10 +159,19 @@ class Cadence(cCadenceCore.CadenceCore):
         label_root = np.str(cfg.get(name, 'label_root'))
         label_version = np.str(cfg.get(name, 'label_version'))
 
+        min_deltav = [obs_modes[o]["min_deltaV_KS91"] for o in obsmode_pk]
+        max_airmass = [obs_modes[o]["max_airmass"] for o in obsmode_pk]
+        min_twilight_ang = [obs_modes[o]["min_twilight_ang"] for o in obsmode_pk]
+        min_moon_sep = [obs_modes[o]["min_moon_sep"] for o in obsmode_pk]
+
         self.__init__(name=name, nepochs=nepochs, skybrightness=skybrightness,
                       delta=delta, delta_min=delta_min, delta_max=delta_max,
                       nexp=nexp, max_length=max_length, obsmode_pk=obsmode_pk,
-                      label_root=label_root, label_version=label_version)
+                      label_root=label_root, label_version=label_version,
+                      min_twilight_ang=np.array(min_twilight_ang),
+                      min_deltav=np.array(min_deltav),
+                      max_airmass=np.array(max_airmass),
+                      min_moon_sep=np.array(min_moon_sep))
 
         return
 
@@ -366,7 +385,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         -----
 
         When epochs are merged with merge_epochs you need to keep track
-        of how many exposures you are putting into each epoch. In this 
+        of how many exposures you are putting into each epoch. In this
         case 'nexps' is returned.
         """
         cache_key = (one, two, epoch_level, return_solutions, merge_epochs)
@@ -472,7 +491,8 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         cadences_array : ndarray
             ndarray with columns 'NEPOCHS', 'SKYBRIGHTNESS', 'DELTA',
             'DELTA_MIN', 'DELTA_MAX', 'NEXP', 'CADENCE',
-            'MAX_LENGTH'
+            'MAX_LENGTH' 'MIN_DELTAV', 'MAX_AIRMASS', 'MIN_TWILIGHT_ANG',
+            'MIN_MOON_SEP'
 
         """
         for ccadence in cadences_array:
@@ -488,7 +508,11 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                              max_length=ccadence['MAX_LENGTH'][0:nepochs],
                              obsmode_pk=ccadence['OBSMODE_PK'][0:nepochs],
                              label_root=ccadence['LABEL_ROOT'],
-                             label_version=ccadence['LABEL_VERSION'])
+                             label_version=ccadence['LABEL_VERSION'],
+                             min_deltav=ccadence["MIN_DELTAV"][0:nepochs],
+                             max_airmass=ccadence["MAX_AIRMASS"][0:nepochs],
+                             min_twilight_ang=ccadence["MIN_TWILIGHT_ANG"][0:nepochs],
+                             min_moon_sep=ccadence["MIN_MOON_SEP"][0:nepochs])
         return
 
     def fromfits(self, filename=None, unpickle=False):
@@ -543,8 +567,19 @@ class CadenceList(object, metaclass=CadenceListSingleton):
 
         cfg = configparser.ConfigParser()
         cfg.read(filename)
+
+        cfg_modes = cfg.get("obsmodes", "modes").split()
+
+        obs_modes = dict()
+        for o in cfg_modes:
+            # John did this, sorry. open to better solutions but needed to work
+            m = cfg.get("obsmodes", o).splitlines()
+            obs_modes[o] = {i[0]: float(i[1]) for i in [j.split(":") for j in m]}
+
         for name in cfg.sections():
-            self.add_cadence(name=name, cfg=cfg)
+            if name == "obsmodes":
+                continue
+            self.add_cadence(name=name, cfg=cfg, obs_modes=obs_modes)
         return
 
     def toarray(self):
@@ -692,11 +727,20 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             print("No database available.")
             return()
 
+        obsModes = targetdb.ObsMode.select().dicts()
+
+        modes = {o.label: o for o in obsModes}
+
         cadences = targetdb.Cadence.select().dicts()
 
         for cadence in cadences:
             if(cadence['delta'] is None or len(cadence['delta']) == 0):
                 continue
+
+            min_deltav = [modes[o]["min_deltaV_KS91"] for o in cadence["obsmode_pk"]]
+            max_airmass = [modes[o]["max_airmass"] for o in cadence["obsmode_pk"]]
+            min_twilight_ang = [modes[o]["min_twilight_ang"] for o in cadence["obsmode_pk"]]
+            min_moon_sep = [modes[o]["min_moon_sep"] for o in cadence["obsmode_pk"]]
 
             self.add_cadence(name=str(cadence['label'].strip()),
                              nexp=cadence['nexp'],
@@ -705,4 +749,8 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                              delta_min=np.array(cadence['delta_min']),
                              delta_max=np.array(cadence['delta_max']),
                              skybrightness=np.array(cadence['skybrightness']),
-                             max_length=np.array(cadence["max_length"]))
+                             max_length=np.array(cadence["max_length"]),
+                             min_deltav=np.array(min_deltav),
+                             max_airmass=np.array(max_airmass),
+                             min_twilight_ang=np.array(min_twilight_ang),
+                             min_moon_sep=np.array(min_moon_sep))

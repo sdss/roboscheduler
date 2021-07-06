@@ -16,7 +16,11 @@ def test_add_cadence():
                       delta_min=[-1.],
                       delta_max=[-1.],
                       nexp=[1],
-                      max_length=[1.])
+                      max_length=[1.],
+                      min_deltav=[-2.5],
+                      max_airmass=[2],
+                      min_twilight_ang=[8],
+                      min_moon_sep=[15])
 
     clist.add_cadence(name='single_2x1',
                       nepochs=2,
@@ -25,7 +29,11 @@ def test_add_cadence():
                       delta_min=[-1., -1.],
                       delta_max=[-1., -1.],
                       nexp=[1, 1],
-                      max_length=[1., 1.])
+                      max_length=[1., 1.],
+                      min_deltav=[-2.5, 2.5],
+                      max_airmass=[2, 2],
+                      min_twilight_ang=[8, 8],
+                      min_moon_sep=[15, 15])
 
     clist.add_cadence(name='single_2x2',
                       nepochs=2,
@@ -34,7 +42,11 @@ def test_add_cadence():
                       delta_min=[-1., -1.],
                       delta_max=[-1., -1.],
                       nexp=[2, 2],
-                      max_length=[1., 1.])
+                      max_length=[1., 1.],
+                      min_deltav=[-2.5, 2.5],
+                      max_airmass=[2, 2],
+                      min_twilight_ang=[8, 8],
+                      min_moon_sep=[15, 15])
 
     assert len(clist.cadences) == 3
     assert clist.cadences['single_2x2'].nexp[1] == 2
@@ -101,7 +113,11 @@ def test_epochs_consistency_1():
                       delta_min=[0., 1.],
                       delta_max=[0., 20.],
                       nexp=[1, 1],
-                      max_length=[1., 1.])
+                      max_length=[1., 1.],
+                      min_deltav=[-2.5, 2.5],
+                      max_airmass=[2, 2],
+                      min_twilight_ang=[8, 8],
+                      min_moon_sep=[15, 15])
 
     clist.add_cadence(name='timed_3x1',
                       nepochs=3,
@@ -110,7 +126,11 @@ def test_epochs_consistency_1():
                       delta_min=[0., 1., 1.],
                       delta_max=[0., 20., 20.],
                       nexp=[1, 1, 1],
-                      max_length=[1., 1., 1.])
+                      max_length=[1., 1., 1.],
+                      min_deltav=[-2.5, 2.5, -2.5],
+                      max_airmass=[2, 2, 2],
+                      min_twilight_ang=[8, 8, 8],
+                      min_moon_sep=[15, 15, 15])
 
     tcore = clist.cadences['timed_2x1'].as_cadencecore()
     assert clist.cadences['timed_3x1'].epochs_consistency(tcore,
@@ -132,7 +152,11 @@ def test_epochs_consistency_2():
                       delta_min=[-1., -1.],
                       delta_max=[-1., -1.],
                       nexp=[1, 1],
-                      max_length=[1., 1.])
+                      max_length=[1., 1.],
+                      min_deltav=[-2.5, 2.5],
+                      max_airmass=[2, 2],
+                      min_twilight_ang=[8, 8],
+                      min_moon_sep=[15, 15])
 
     clist.add_cadence(name='single_2x2',
                       nepochs=2,
@@ -141,7 +165,11 @@ def test_epochs_consistency_2():
                       delta_min=[-1., -1.],
                       delta_max=[-1., -1.],
                       nexp=[2, 2],
-                      max_length=[1., 1.])
+                      max_length=[1., 1.],
+                      min_deltav=[-2.5, 2.5],
+                      max_airmass=[2, 2],
+                      min_twilight_ang=[8, 8],
+                      min_moon_sep=[15, 15])
 
     clist.add_cadence(name='timed_3x1',
                       nepochs=3,
@@ -150,7 +178,11 @@ def test_epochs_consistency_2():
                       delta_min=[0., 1., 1.],
                       delta_max=[0., 20., 20.],
                       nexp=[1, 1, 1],
-                      max_length=[1., 1., 1.])
+                      max_length=[1., 1., 1.],
+                      min_deltav=[-2.5, 2.5, -2.5],
+                      max_airmass=[2, 2, 2],
+                      min_twilight_ang=[8, 8, 8],
+                      min_moon_sep=[15, 15, 15])
 
     tcore = clist.cadences['single_2x1'].as_cadencecore()
     assert clist.cadences['timed_3x1'].epochs_consistency(tcore,
@@ -178,7 +210,11 @@ def test_epochs_consistency_3():
                       delta_min=[-1., -1.],
                       delta_max=[-1., -1.],
                       nexp=[1, 1],
-                      max_length=[1., 1.])
+                      max_length=[1., 1.],
+                      min_deltav=[-2.5, 2.5],
+                      max_airmass=[2, 2],
+                      min_twilight_ang=[8, 8],
+                      min_moon_sep=[15, 15])
 
     clist.add_cadence(name='dark_2x1',
                       nepochs=2,
@@ -187,7 +223,11 @@ def test_epochs_consistency_3():
                       delta_min=[-1., -1.],
                       delta_max=[-1., -1.],
                       nexp=[1, 1],
-                      max_length=[1., 1.])
+                      max_length=[1., 1.],
+                      min_deltav=[-1.5, 1.5],
+                      max_airmass=[1.4, 1.4],
+                      min_twilight_ang=[15, 15],
+                      min_moon_sep=[35, 35])
 
     tcore = clist.cadences['bright_2x1'].as_cadencecore()
     assert clist.cadences['dark_2x1'].epochs_consistency(tcore,
@@ -209,7 +249,11 @@ def test_epochs_consistency_4():
                       delta_min=[-1., -1., -1.],
                       delta_max=[-1., -1., -1.],
                       nexp=[2, 2, 2],
-                      max_length=[1., 1., 1.])
+                      max_length=[1., 1., 1.],
+                      min_deltav=[-2.5, 2.5, -2.5],
+                      max_airmass=[2, 2, 2],
+                      min_twilight_ang=[8, 8, 8],
+                      min_moon_sep=[15, 15, 15])
 
     clist.add_cadence(name='bright_3x1',
                       nepochs=3,
@@ -218,7 +262,11 @@ def test_epochs_consistency_4():
                       delta_min=[-1., -1., -1.],
                       delta_max=[-1., -1., -1.],
                       nexp=[1, 1, 1],
-                      max_length=[1., 1., 1.])
+                      max_length=[1., 1., 1.],
+                      min_deltav=[-2.5, 2.5, -2.5],
+                      max_airmass=[2, 2, 2],
+                      min_twilight_ang=[8, 8, 8],
+                      min_moon_sep=[15, 15, 15])
 
     tcore = clist.cadences['bright_3x1'].as_cadencecore()
     assert clist.cadences['bright_3x2'].epochs_consistency(tcore,
@@ -248,7 +296,11 @@ def test_exposure_consistency():
                       delta_min=[-1., -1., -1.],
                       delta_max=[-1., -1., -1.],
                       nexp=[2, 2, 2],
-                      max_length=[1., 1., 1.])
+                      max_length=[1., 1., 1.],
+                      min_deltav=[-2.5, 2.5, -2.5],
+                      max_airmass=[2, 2, 2],
+                      min_twilight_ang=[8, 8, 8],
+                      min_moon_sep=[15, 15, 15])
 
     clist.add_cadence(name='bright_3x1',
                       nepochs=3,
@@ -257,7 +309,11 @@ def test_exposure_consistency():
                       delta_min=[-1., -1., -1.],
                       delta_max=[-1., -1., -1.],
                       nexp=[1, 1, 1],
-                      max_length=[1., 1., 1.])
+                      max_length=[1., 1., 1.],
+                      min_deltav=[-2.5, 2.5, -2.5],
+                      max_airmass=[2, 2, 2],
+                      min_twilight_ang=[8, 8, 8],
+                      min_moon_sep=[15, 15, 15])
 
     assert clist.exposure_consistency('bright_3x1', 'bright_3x2',
                                       [0, 1, 2]) is True
@@ -286,7 +342,11 @@ def test_cadence_consistency_1():
                       delta_min=[-1., -1.],
                       delta_max=[-1., -1.],
                       nexp=[1, 1],
-                      max_length=[1., 1.])
+                      max_length=[1., 1.],
+                      min_deltav=[-2.5, 2.5],
+                      max_airmass=[2, 2],
+                      min_twilight_ang=[8, 8],
+                      min_moon_sep=[15, 15])
 
     clist.add_cadence(name='timed_2x1',
                       nepochs=2,
@@ -295,7 +355,11 @@ def test_cadence_consistency_1():
                       delta_min=[0., 1.],
                       delta_max=[0., 20.],
                       nexp=[1, 1],
-                      max_length=[1., 1.])
+                      max_length=[1., 1.],
+                      min_deltav=[-2.5, 2.5],
+                      max_airmass=[2, 2],
+                      min_twilight_ang=[8, 8],
+                      min_moon_sep=[15, 15])
 
     clist.add_cadence(name='timed_3x1',
                       nepochs=3,
@@ -304,7 +368,11 @@ def test_cadence_consistency_1():
                       delta_min=[0., 1., 1.],
                       delta_max=[0., 20., 20.],
                       nexp=[1, 1, 1],
-                      max_length=[1., 1., 1.])
+                      max_length=[1., 1., 1.],
+                      min_deltav=[-2.5, 2.5, -2.5],
+                      max_airmass=[2, 2, 2],
+                      min_twilight_ang=[8, 8, 8],
+                      min_moon_sep=[15, 15, 15])
 
     ok, epochs_list = clist.cadence_consistency('single_2x1', 'timed_2x1')
     assert ok is True
@@ -332,7 +400,11 @@ def test_cadence_consistency_2():
                       delta_min=[-1.] * 100,
                       delta_max=[-1.] * 100,
                       nexp=[1] * 100,
-                      max_length=[1.] * 100)
+                      max_length=[1.] * 100,
+                      min_deltav=[-2.5] * 100,
+                      max_airmass=[2] * 100,
+                      min_twilight_ang=[8] * 100,
+                      min_moon_sep=[15] * 100)
 
     clist.add_cadence(name='single_1x1',
                       nepochs=1,
@@ -341,7 +413,11 @@ def test_cadence_consistency_2():
                       delta_min=[-1.] * 1,
                       delta_max=[-1.] * 1,
                       nexp=[1] * 1,
-                      max_length=[1.] * 1)
+                      max_length=[1.] * 1,
+                      min_deltav=[-2.5] * 1,
+                      max_airmass=[2] * 1,
+                      min_twilight_ang=[8] * 1,
+                      min_moon_sep=[15] * 1)
 
     clist.add_cadence(name='single_4x1',
                       nepochs=4,
@@ -350,7 +426,11 @@ def test_cadence_consistency_2():
                       delta_min=[-1.] * 4,
                       delta_max=[-1.] * 4,
                       nexp=[1] * 4,
-                      max_length=[1.] * 4)
+                      max_length=[1.] * 4,
+                      min_deltav=[-2.5] * 4,
+                      max_airmass=[2] * 4,
+                      min_twilight_ang=[8] * 4,
+                      min_moon_sep=[15] * 4)
 
     clist.add_cadence(name='single_10x1',
                       nepochs=10,
@@ -359,7 +439,11 @@ def test_cadence_consistency_2():
                       delta_min=[-1.] * 10,
                       delta_max=[-1.] * 10,
                       nexp=[1] * 10,
-                      max_length=[1.] * 10)
+                      max_length=[1.] * 10,
+                      min_deltav=[-2.5] * 10,
+                      max_airmass=[2] * 10,
+                      min_twilight_ang=[8] * 10,
+                      min_moon_sep=[15] * 10)
 
     ok, epochs_list = clist.cadence_consistency('single_1x1', 'single_100x1')
     assert ok is True
@@ -385,7 +469,11 @@ def test_cadence_consistency_3():
                       delta_min=[0., 1.],
                       delta_max=[0., 3000.],
                       nexp=[1, 1],
-                      max_length=[1., 1.])
+                      max_length=[1., 1.],
+                      min_deltav=[-2.5, -2.5],
+                      max_airmass=[2, 2],
+                      min_twilight_ang=[8, 8],
+                      min_moon_sep=[15, 15])
 
     clist.add_cadence(name='csc_faint_boss_1x4',
                       nepochs=1,
@@ -394,7 +482,11 @@ def test_cadence_consistency_3():
                       delta_min=[-1.],
                       delta_max=[-1.],
                       nexp=[4],
-                      max_length=[1.])
+                      max_length=[1.],
+                      min_deltav=[-1.5],
+                      max_airmass=[1.4],
+                      min_twilight_ang=[15],
+                      min_moon_sep=[35])
 
     ok, epochs_list = clist.cadence_consistency('mwm_tess_rgb_2x1', 'csc_faint_boss_1x4')
     assert ok is False
@@ -411,7 +503,11 @@ def test_cadence_consistency_4():
                       delta_min=[0., 1.],
                       delta_max=[0., 3000.],
                       nexp=[2, 2],
-                      max_length=[1., 1.])
+                      max_length=[1., 1.],
+                      min_deltav=[-1.5] * 2,
+                      max_airmass=[1.4] * 2,
+                      min_twilight_ang=[15] * 2,
+                      min_moon_sep=[35] * 2)
 
     clist.add_cadence(name='dark_6x3',
                       nepochs=6,
@@ -420,7 +516,11 @@ def test_cadence_consistency_4():
                       delta_min=[0., 1., 1., 1., 1., 1.],
                       delta_max=[0., 3000., 3000., 3000., 3000., 3000.],
                       nexp=[3] * 6,
-                      max_length=[1.] * 6)
+                      max_length=[1.] * 6,
+                      min_deltav=[-1.5] * 6,
+                      max_airmass=[1.4] * 6,
+                      min_twilight_ang=[15] * 6,
+                      min_moon_sep=[35] * 6)
 
     clist.add_cadence(name='dark_4x1',
                       nepochs=4,
@@ -429,7 +529,11 @@ def test_cadence_consistency_4():
                       delta_min=[-1.] * 4,
                       delta_max=[-1.] * 4,
                       nexp=[1] * 4,
-                      max_length=[1.] * 4)
+                      max_length=[1.] * 4,
+                      min_deltav=[-1.5] * 4,
+                      max_airmass=[1.4] * 4,
+                      min_twilight_ang=[15] * 4,
+                      min_moon_sep=[35] * 4)
 
     clist.add_cadence(name='dark_8x1',
                       nepochs=8,
@@ -438,7 +542,11 @@ def test_cadence_consistency_4():
                       delta_min=[-1.] * 8,
                       delta_max=[-1.] * 8,
                       nexp=[1] * 8,
-                      max_length=[1.] * 8)
+                      max_length=[1.] * 8,
+                      min_deltav=[-1.5] * 8,
+                      max_airmass=[1.4] * 8,
+                      min_twilight_ang=[15] * 8,
+                      min_moon_sep=[35] * 8)
 
     ok, epochs_list = clist.cadence_consistency('dark_4x1',
                                                 'dark_2x2')
@@ -476,7 +584,11 @@ def test_cadence_evaluate_next():
                       delta_min=[0., 1.],
                       delta_max=[0., 40.],
                       nexp=[2, 2],
-                      max_length=[1., 1.])
+                      max_length=[1., 1.],
+                      min_deltav=[-1.5] * 2,
+                      max_airmass=[1.4] * 2,
+                      min_twilight_ang=[15] * 2,
+                      min_moon_sep=[35] * 2)
 
     test_cadence = clist.cadences["dark_2x2"]
 
@@ -546,7 +658,11 @@ def test_cadence_consistency_merge():
                       delta_min=[-1., -1.],
                       delta_max=[-1., -1.],
                       nexp=[2, 2],
-                      max_length=[1.] * 2)
+                      max_length=[1.] * 2,
+                      min_deltav=[-1.5] * 2,
+                      max_airmass=[1.4] * 2,
+                      min_twilight_ang=[15] * 2,
+                      min_moon_sep=[35] * 2)
 
     clist.add_cadence(name='dark_2x4',
                       nepochs=2,
@@ -555,7 +671,11 @@ def test_cadence_consistency_merge():
                       delta_min=[0., 1., 1., 1., 1., 1.],
                       delta_max=[0., 3000., 3000., 3000., 3000., 3000.],
                       nexp=[4] * 2,
-                      max_length=[1.] * 2)
+                      max_length=[1.] * 2,
+                      min_deltav=[-1.5] * 2,
+                      max_airmass=[1.4] * 2,
+                      min_twilight_ang=[15] * 2,
+                      min_moon_sep=[35] * 2)
 
     ok, epochs_list, nexps_list = clist.cadence_consistency('dark_2x2',
                                                             'dark_2x4',

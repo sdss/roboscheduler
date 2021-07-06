@@ -4,8 +4,8 @@ import roboscheduler.cadence
 import sys
 
 try:
-    import sdssdb.peewee.sdss5db.targetdb as targetdb
     import sdssdb.peewee.sdss5db.opsdb as opsdb
+    import sdssdb.peewee.sdss5db.targetdb as targetdb
     _database = True
 except:
     _database = False
