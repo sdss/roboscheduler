@@ -740,7 +740,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
 
         obsModes = targetdb.ObsMode.select().dicts()
 
-        modes = {o.label: o for o in obsModes}
+        modes = {o["label"]: o for o in obsModes}
 
         cadences = targetdb.Cadence.select().dicts()
 
@@ -748,7 +748,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             if(cadence['delta'] is None or len(cadence['delta']) == 0):
                 continue
 
-            min_deltav = [modes[o]["min_deltaV_KS91"] for o in cadence["obsmode_pk"]]
+            min_deltav = [modes[o]["min_deltav_ks91"] for o in cadence["obsmode_pk"]]
             max_airmass = [modes[o]["max_airmass"] for o in cadence["obsmode_pk"]]
             min_twilight_ang = [modes[o]["min_twilight_ang"] for o in cadence["obsmode_pk"]]
             min_moon_sep = [modes[o]["min_moon_sep"] for o in cadence["obsmode_pk"]]
