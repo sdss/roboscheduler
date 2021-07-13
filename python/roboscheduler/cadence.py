@@ -674,24 +674,35 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             print("No database available.")
             return()
 
-        pkdict = targetdb.Cadence.select(targetdb.Cadence.pk).dicts()
-        pks = np.array([p['pk'] for p in pkdict])
-        newpks = pks.max() + 1 + np.arange(len(self.cadences))
+        obsModes = targetdb.ObsMode.select().dicts()
 
-        for cadence, pk in zip(self.cadences, newpks):
+        DBmodes = {str(o["label"]): o for o in obsModes}
+
+        for cadence in self.cadences:
+            if targetdb.Cadence.get_or_none(label=cadence) is not None:
+                continue
             nexposures = [int(n) for n in self.cadences[cadence].nexp]
             delta = [float(n) for n in self.cadences[cadence].delta]
             delta_min = [float(n) for n in self.cadences[cadence].delta_min]
             delta_max = [float(n) for n in self.cadences[cadence].delta_max]
             skybrightness = [float(n) for n in self.cadences[cadence].skybrightness]
             max_length = [float(n) for n in self.cadences[cadence].max_length]
-            targetdb.Cadence.insert(pk=pk, label=cadence,
+            obs_modes = [str(n) for n in self.cadences[cadence].obsmode_pk]
+            if all([s < 0.1 for s in skybrightness]):
+                # not sure why this is needed, but seems to be with some fits files
+                continue
+            assert all([o in DBmodes for o in obs_modes]), \
+                "obsmode_pks must be in obsmode table \n" +\
+                "".join(np.unique(np.extract([o not in DBmodes for o in obs_modes], obs_modes)))\
+                + "\n are not present"
+            targetdb.Cadence.insert(label=cadence,
                                     nexp=nexposures,
                                     nepochs=self.cadences[cadence].nepochs,
                                     delta=delta, skybrightness=skybrightness,
                                     delta_min=delta_min,
                                     delta_max=delta_max,
-                                    max_length=max_length).execute()
+                                    max_length=max_length,
+                                    obsmode_pk=obs_modes).execute()
 
     def updatedb(self):
         """Update the cadences in the targetdb by name
