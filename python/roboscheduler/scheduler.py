@@ -877,18 +877,18 @@ class Scheduler(Master):
 
         (alt, az) = self.radec2altaz(mjd=mjd, ra=self.fields.racen,
                                      dec=self.fields.deccen)
-        airmass = self.alt2airmass(alt)
         skybrightness = self.skybrightness(mjd)
         # valid cadence checks against "none" cadence issue
-        moon_check = self.moon_dist(mjd=mjd, ra=self.fields.racen,
-                                    dec=self.fields.deccen, threshold=15)
-        observable = (alt > 0.) & (airmass < self.airmass_limit)\
-                   & self.fields.validCadence & moon_check\
-                   & self.fields.notDone
+        observable = (alt > 0.) & self.fields.validCadence & self.fields.notDone
         nexp = np.ones(len(observable), dtype=int)
         delta_priority = np.zeros(len(observable), dtype=np.float64)
 
-        whereRM = np.where(["bhm_rm" in c for c in self.fields.cadence])[0]
+        deltav = self.deltaV_sky_pos(mjd, self.fields.racen, self.fields.deccen)
+        airmass = self.alt2airmass(alt)
+        moon_dist = self.moon_dist(mjd=mjd, ra=self.fields.racen,
+                                   dec=self.fields.deccen)
+
+        # whereRM = np.where(["bhm_rm" in c for c in self.fields.cadence])[0]
 
         next_change, next_brightness = self.next_change(mjd)
 
@@ -910,108 +910,81 @@ class Scheduler(Master):
 
         # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
 
-        if(check_cadence):
-            indxs = np.where(self.fields.nextmjd > mjd)[0]
-            observable[indxs] = False
-            indxs = np.where(self.fields.nextmjd <= mjd)[0]
-            for indx in indxs:
-                if(observable[indx]):
-                    if int(self.fields.field_id[indx]) in ignore:
-                        observable[indx] = False
-                        continue
-                    elif self.fields.flag[indx] == -1:
-                        observable[indx] = False
-                        continue
-                    cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
-                    # iobservations = self.fields.observations[indx]
-                    # mjd_past = self.observations.mjd[iobservations]
-                    mjd_past = self.fields.hist[self.fields.field_id[indx]]
-                    # epoch_idx is the *index* of the *next* epoch
-                    # for 0 indexed arrays, this equivalent to
-                    # "how many epochs have I done previously"
-                    epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=240)
-                    if epoch_idx >= cadence.nepochs:
-                        print("DONE ", epoch_idx, cadence.nepochs, int(self.fields.field_id[indx]))
-                        observable[indx] = False
-                        continue
-                    # how many exp/"designs" since start of last epoch?
-                    exp_epoch = np.sum(np.greater(mjd_past, mjd_prev))
-                    if exp_epoch < cadence.nexp[epoch_idx] and exp_epoch != 0:
-                        nexp[indx] = cadence.nexp[epoch_idx] - exp_epoch
-                        epoch_idx -= 1
-                        partial_epoch = True
-                    else:
-                        nexp[indx] = cadence.nexp[epoch_idx]
-                        partial_epoch = False
-                    # if "x8" in cadence.name:
-                    #     if skybrightness <= 0.35:
-                    #         check = True
-                    #         print(indx, epoch_idx, mjd_prev)
-                    #         print(mjd_past)
-                    #         # print("OBS", cadence.name)
-                    # else:
-                    #     check = False
-                    ignoreMax = indx in whereRM
-                    observable[indx], delta_priority[indx] =\
-                        cadence.evaluate_next(epoch_idx=epoch_idx,
-                                              partial_epoch=partial_epoch,
-                                              mjd_past=mjd_prev,
-                                              mjd_next=mjd,
-                                              skybrightness_next=skybrightness,
-                                              check_skybrightness=check_skybrightness,
-                                              ignoreMax=ignoreMax)
-                    # if check:
-                    #     print("A", observable[indx], indx, f"    {float(mjd):.1f}" "\n \n")
-                    if nexp[indx] > maxExp:
-                        # if observable[indx] and nexp[indx] == 1:
-                        #     print("maxExp", cadence.name)
-                        # if check:
-                        #     print("maxExp", cadence.name, indx)
-                        observable[indx] = False
-                    if self.fields.flag[indx] == 1:
-                        # flagged as top priority
-                        # if we're in this loop, it's above the horizon and moon OK
-                        # so override cadence eligibility and bump priority
-                        observable[indx] = True
-                        delta_priority[indx] += 1e6
-                    if nexp[indx] > nexp_change:
-                        # change between bright/dark, field doesn't fit
-                        # if observable[indx] and nexp[indx] == 1:
-                        #     print("nexp_change", cadence.name)
-                        observable[indx] = False
-                        # if check:
-                        #     print("nexp_change", cadence.name, indx)
-                    #     if indx in whereRM and skybrightness <= 0.35:
-                    #         print(indx, " kicked out for nexp")
-                    # if indx in whereRM and skybrightness <= 0.35:
-                    #     print(mjd, indx, observable[indx], delta_priority[indx])
-                    # if check:
-                    #     print("B", observable[indx], indx, "\n \n")
-        else:
-            rejected = 0
-            iobservable = np.where(observable)[0]
-            delta_priority = np.zeros(len(observable), dtype=np.float64)
-            for indx in iobservable:
-                if(observable[indx]):
-                    if int(self.fields.field_id[indx]) in ignore:
-                        observable[indx] = False
-                        continue
-                    elif self.fields.flag[indx] == -1:
-                        observable[indx] = False
-                        continue
-                    cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
-                    iobservations = self.fields.observations[indx]
-                    mjd_past = self.observations.mjd[iobservations]
-                    epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=240)
-                    if epoch_idx >= cadence.nepochs:
-                        epoch_idx = cadence.nepochs - 1
-                    nexp[indx] = cadence.nexp[epoch_idx]
-                    skybrightness_ok = cadence.skybrightness_check(epoch_idx, skybrightness)
-                    if nexp[indx] > maxExp or not skybrightness_ok:
-                        rejected += 1
-                        observable[indx] = False
+        indxs = np.where(self.fields.nextmjd > mjd)[0]
+        observable[indxs] = False
+        indxs = np.where(self.fields.nextmjd <= mjd)[0]
+        for indx in indxs:
+            if(observable[indx]):
+                if int(self.fields.field_id[indx]) in ignore:
+                    observable[indx] = False
+                    continue
+                elif self.fields.flag[indx] == -1:
+                    observable[indx] = False
+                    continue
+                cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
 
-            # print("{} rejected {} of {} for time/moon".format(mjd, rejected, len(iobservable)))
+                mjd_past = self.fields.hist[self.fields.field_id[indx]]
+                # epoch_idx is the *index* of the *next* epoch
+                # for 0 indexed arrays, this equivalent to
+                # "how many epochs have I done previously"
+                epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=240)
+                if epoch_idx >= cadence.nepochs:
+                    print("DONE ", epoch_idx, cadence.nepochs, int(self.fields.field_id[indx]))
+                    observable[indx] = False
+                    continue
+                # how many exp/"designs" since start of last epoch?
+                exp_epoch = np.sum(np.greater(mjd_past, mjd_prev))
+                if exp_epoch < cadence.nexp[epoch_idx] and exp_epoch != 0:
+                    nexp[indx] = cadence.nexp[epoch_idx] - exp_epoch
+                    epoch_idx -= 1
+                    partial_epoch = True
+                else:
+                    nexp[indx] = cadence.nexp[epoch_idx]
+                    partial_epoch = False
+                # if "x8" in cadence.name:
+                #     if skybrightness <= 0.35:
+                #         check = True
+                #         print(indx, epoch_idx, mjd_prev)
+                #         print(mjd_past)
+                #         # print("OBS", cadence.name)
+                # else:
+                #     check = False
+                observable[indx], delta_priority[indx] =\
+                    cadence.evaluate_next(epoch_idx=epoch_idx,
+                                          partial_epoch=partial_epoch,
+                                          mjd_past=mjd_prev,
+                                          mjd_next=mjd,
+                                          skybrightness_next=skybrightness,
+                                          moon_dist=moon_dist[indx],
+                                          deltaV=deltav[indx],
+                                          airmass=airmass[indx])
+                # if check:
+                #     print("A", observable[indx], indx, f"    {float(mjd):.1f}" "\n \n")
+                if nexp[indx] > maxExp:
+                    # if observable[indx] and nexp[indx] == 1:
+                    #     print("maxExp", cadence.name)
+                    # if check:
+                    #     print("maxExp", cadence.name, indx)
+                    observable[indx] = False
+                if self.fields.flag[indx] == 1:
+                    # flagged as top priority
+                    # if we're in this loop, it's above the horizon and moon OK
+                    # so override cadence eligibility and bump priority
+                    observable[indx] = True
+                    delta_priority[indx] += 1e6
+                if nexp[indx] > nexp_change:
+                    # change between bright/dark, field doesn't fit
+                    # if observable[indx] and nexp[indx] == 1:
+                    #     print("nexp_change", cadence.name)
+                    observable[indx] = False
+                    # if check:
+                    #     print("nexp_change", cadence.name, indx)
+                #     if indx in whereRM and skybrightness <= 0.35:
+                #         print(indx, " kicked out for nexp")
+                # if indx in whereRM and skybrightness <= 0.35:
+                #     print(mjd, indx, observable[indx], delta_priority[indx])
+                # if check:
+                #     print("B", observable[indx], indx, "\n \n")
         # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
         iobservable = np.where(observable)[0]
 

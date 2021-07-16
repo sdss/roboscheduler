@@ -204,10 +204,19 @@ class Cadence(cCadenceCore.CadenceCore):
                 down_weight = True
         return skybrightness_next <= self.skybrightness[epoch_idx], down_weight
 
+    def obsmodeChecks(self, epoch_idx, moon_dist, deltaV, airmass):
+        """check obsmode reqs: moon sep, deltav, & airmass
+        """
+        if epoch_idx >= self.nepochs:
+            epoch_idx = -1
+        return self.min_deltav[epoch_idx] <= deltaV and \
+            self.max_airmass[epoch_idx] >= airmass and \
+            self.min_moon_sep[epoch_idx] <= moon_dist
+
     def evaluate_next(self, epoch_idx=None, partial_epoch=False,
                       mjd_past=None, mjd_next=None,
-                      skybrightness_next=None, check_skybrightness=True,
-                      ignoreMax=False):
+                      skybrightness_next=None, moon_dist=None, deltaV=None,
+                      airmass=None):
         """Evaluate next choice of observation
 
            Returns whether cadence is ok AND how long until
@@ -224,7 +233,12 @@ class Cadence(cCadenceCore.CadenceCore):
 
         ok_skybrightness, down_weight = self.skybrightness_check(epoch_idx,
                                                                  skybrightness_next)
-        ok_skybrightness = ok_skybrightness | (check_skybrightness is False)
+
+        valid = self.obsmodeChecks(epoch_idx, moon_dist, deltaV, airmass)
+        ok_skybrightness = ok_skybrightness | valid
+
+        if not ok_skybrightness:
+            return ok_skybrightness, -1e6
 
         if down_weight:
             base_priority = -100
