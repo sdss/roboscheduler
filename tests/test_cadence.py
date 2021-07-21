@@ -11,7 +11,6 @@ def test_add_cadence():
 
     clist.add_cadence(name='single_1x1',
                       nepochs=1,
-                      instrument='BOSS',
                       skybrightness=[1.],
                       delta=[-1.],
                       delta_min=[-1.],
@@ -21,7 +20,6 @@ def test_add_cadence():
 
     clist.add_cadence(name='single_2x1',
                       nepochs=2,
-                      instrument='APOGEE',
                       skybrightness=[1., 1.],
                       delta=[-1., -1.],
                       delta_min=[-1., -1.],
@@ -31,7 +29,6 @@ def test_add_cadence():
 
     clist.add_cadence(name='single_2x2',
                       nepochs=2,
-                      instrument='APOGEE',
                       skybrightness=[1., 1.],
                       delta=[-1., -1.],
                       delta_min=[-1., -1.],
@@ -100,7 +97,6 @@ def test_epochs_consistency_1():
     clist.add_cadence(name='timed_2x1',
                       nepochs=2,
                       skybrightness=[1., 1.],
-                      instrument='BOSS',
                       delta=[0., 2.],
                       delta_min=[0., 1.],
                       delta_max=[0., 20.],
@@ -110,7 +106,6 @@ def test_epochs_consistency_1():
     clist.add_cadence(name='timed_3x1',
                       nepochs=3,
                       skybrightness=[1., 1., 1.],
-                      instrument='BOSS',
                       delta=[0., 2., 2.],
                       delta_min=[0., 1., 1.],
                       delta_max=[0., 20., 20.],
@@ -132,7 +127,6 @@ def test_epochs_consistency_2():
 
     clist.add_cadence(name='single_2x1',
                       nepochs=2,
-                      instrument='BOSS',
                       skybrightness=[1., 1.],
                       delta=[-1., -1.],
                       delta_min=[-1., -1.],
@@ -142,7 +136,6 @@ def test_epochs_consistency_2():
 
     clist.add_cadence(name='single_2x2',
                       nepochs=2,
-                      instrument='BOSS',
                       skybrightness=[1., 1.],
                       delta=[-1., -1.],
                       delta_min=[-1., -1.],
@@ -152,7 +145,6 @@ def test_epochs_consistency_2():
 
     clist.add_cadence(name='timed_3x1',
                       nepochs=3,
-                      instrument='BOSS',
                       skybrightness=[1., 1., 1.],
                       delta=[0., 2., 2.],
                       delta_min=[0., 1., 1.],
@@ -182,7 +174,6 @@ def test_epochs_consistency_3():
     clist.add_cadence(name='bright_2x1',
                       nepochs=2,
                       skybrightness=[1., 1.],
-                      instrument='BOSS',
                       delta=[-1., -1.],
                       delta_min=[-1., -1.],
                       delta_max=[-1., -1.],
@@ -192,7 +183,6 @@ def test_epochs_consistency_3():
     clist.add_cadence(name='dark_2x1',
                       nepochs=2,
                       skybrightness=[0.35, 0.35],
-                      instrument='BOSS',
                       delta=[-1., -1.],
                       delta_min=[-1., -1.],
                       delta_max=[-1., -1.],
@@ -215,7 +205,6 @@ def test_epochs_consistency_4():
     clist.add_cadence(name='bright_3x2',
                       nepochs=3,
                       skybrightness=[1., 1., 1.],
-                      instrument='BOSS',
                       delta=[-1., -1., -1.],
                       delta_min=[-1., -1., -1.],
                       delta_max=[-1., -1., -1.],
@@ -225,7 +214,6 @@ def test_epochs_consistency_4():
     clist.add_cadence(name='bright_3x1',
                       nepochs=3,
                       skybrightness=[1., 1., 1.],
-                      instrument='BOSS',
                       delta=[-1., -1., -1.],
                       delta_min=[-1., -1., -1.],
                       delta_max=[-1., -1., -1.],
@@ -256,7 +244,6 @@ def test_exposure_consistency():
     clist.add_cadence(name='bright_3x2',
                       nepochs=3,
                       skybrightness=[1., 1., 1.],
-                      instrument='BOSS',
                       delta=[-1., -1., -1.],
                       delta_min=[-1., -1., -1.],
                       delta_max=[-1., -1., -1.],
@@ -266,7 +253,6 @@ def test_exposure_consistency():
     clist.add_cadence(name='bright_3x1',
                       nepochs=3,
                       skybrightness=[1., 1., 1.],
-                      instrument='BOSS',
                       delta=[-1., -1., -1.],
                       delta_min=[-1., -1., -1.],
                       delta_max=[-1., -1., -1.],
@@ -296,7 +282,6 @@ def test_cadence_consistency_1():
     clist.add_cadence(name='single_2x1',
                       nepochs=2,
                       skybrightness=[1., 1.],
-                      instrument='BOSS',
                       delta=[-1., -1.],
                       delta_min=[-1., -1.],
                       delta_max=[-1., -1.],
@@ -306,7 +291,6 @@ def test_cadence_consistency_1():
     clist.add_cadence(name='timed_2x1',
                       nepochs=2,
                       skybrightness=[1., 1.],
-                      instrument='BOSS',
                       delta=[0., 2.],
                       delta_min=[0., 1.],
                       delta_max=[0., 20.],
@@ -316,7 +300,6 @@ def test_cadence_consistency_1():
     clist.add_cadence(name='timed_3x1',
                       nepochs=3,
                       skybrightness=[1., 1., 1.],
-                      instrument='BOSS',
                       delta=[0., 2., 2.],
                       delta_min=[0., 1., 1.],
                       delta_max=[0., 20., 20.],
@@ -344,7 +327,6 @@ def test_cadence_consistency_2():
 
     clist.add_cadence(name='single_100x1',
                       nepochs=100,
-                      instrument='BOSS',
                       skybrightness=[1.] * 100,
                       delta=[-1.] * 100,
                       delta_min=[-1.] * 100,
@@ -354,7 +336,6 @@ def test_cadence_consistency_2():
 
     clist.add_cadence(name='single_1x1',
                       nepochs=1,
-                      instrument='BOSS',
                       skybrightness=[1.] * 1,
                       delta=[-1.] * 1,
                       delta_min=[-1.] * 1,
@@ -364,7 +345,6 @@ def test_cadence_consistency_2():
 
     clist.add_cadence(name='single_4x1',
                       nepochs=4,
-                      instrument='BOSS',
                       skybrightness=[1.] * 4,
                       delta=[-1.] * 4,
                       delta_min=[-1.] * 4,
@@ -374,7 +354,6 @@ def test_cadence_consistency_2():
 
     clist.add_cadence(name='single_10x1',
                       nepochs=10,
-                      instrument='BOSS',
                       skybrightness=[1.] * 10,
                       delta=[-1.] * 10,
                       delta_min=[-1.] * 10,
@@ -401,7 +380,6 @@ def test_cadence_consistency_3():
 
     clist.add_cadence(name='mwm_tess_rgb_2x1',
                       nepochs=2,
-                      instrument='APOGEE',
                       skybrightness=[1., 1.],
                       delta=[0., 26.],
                       delta_min=[0., 1.],
@@ -411,7 +389,6 @@ def test_cadence_consistency_3():
 
     clist.add_cadence(name='csc_faint_boss_1x4',
                       nepochs=1,
-                      instrument='BOSS',
                       skybrightness=[0.35],
                       delta=[-1.],
                       delta_min=[-1.],
@@ -429,7 +406,6 @@ def test_cadence_consistency_4():
 
     clist.add_cadence(name='dark_2x2',
                       nepochs=2,
-                      instrument='BOSS',
                       skybrightness=[0.35, 0.35],
                       delta=[0., 26.],
                       delta_min=[0., 1.],
@@ -439,7 +415,6 @@ def test_cadence_consistency_4():
 
     clist.add_cadence(name='dark_6x3',
                       nepochs=6,
-                      instrument='BOSS',
                       skybrightness=[0.35] * 6,
                       delta=[0., 26., 26., 26., 26., 26.],
                       delta_min=[0., 1., 1., 1., 1., 1.],
@@ -449,7 +424,6 @@ def test_cadence_consistency_4():
 
     clist.add_cadence(name='dark_4x1',
                       nepochs=4,
-                      instrument='BOSS',
                       skybrightness=[0.35] * 4,
                       delta=[-1.] * 4,
                       delta_min=[-1.] * 4,
@@ -459,7 +433,6 @@ def test_cadence_consistency_4():
 
     clist.add_cadence(name='dark_8x1',
                       nepochs=8,
-                      instrument='BOSS',
                       skybrightness=[0.35] * 8,
                       delta=[-1.] * 8,
                       delta_min=[-1.] * 8,
@@ -498,7 +471,6 @@ def test_cadence_evaluate_next():
 
     clist.add_cadence(name='dark_2x2',
                       nepochs=2,
-                      instrument='BOSS',
                       skybrightness=[0.35, 0.35],
                       delta=[0., 26.],
                       delta_min=[0., 1.],
@@ -549,17 +521,18 @@ def test_cadence_evaluate_next():
     assert observable
     assert priority2 > priority1
 
-    idx = 1
-    mjd_past = 59800  # this would be returned by epochs_completed
-    mjd_next = 59900
-    skybrightness_next = 0.2
-    observable, priority = \
-    test_cadence.evaluate_next(epoch_idx=idx,
-                               mjd_past=mjd_past,
-                               mjd_next=mjd_next,
-                               skybrightness_next=skybrightness_next)
+    # no longer valid because delta_max isn't strictly respected anymore
+    # idx = 1
+    # mjd_past = 59800  # this would be returned by epochs_completed
+    # mjd_next = 59900
+    # skybrightness_next = 0.2
+    # observable, priority = \
+    # test_cadence.evaluate_next(epoch_idx=idx,
+    #                            mjd_past=mjd_past,
+    #                            mjd_next=mjd_next,
+    #                            skybrightness_next=skybrightness_next)
 
-    assert not observable
+    # assert not observable
 
 
 def test_cadence_consistency_merge():
@@ -568,7 +541,6 @@ def test_cadence_consistency_merge():
 
     clist.add_cadence(name='dark_2x2',
                       nepochs=2,
-                      instrument='BOSS',
                       skybrightness=[0.35, 0.35],
                       delta=[-1., -1.],
                       delta_min=[-1., -1.],
@@ -578,7 +550,6 @@ def test_cadence_consistency_merge():
 
     clist.add_cadence(name='dark_2x4',
                       nepochs=2,
-                      instrument='BOSS',
                       skybrightness=[0.35] * 6,
                       delta=[0., 26., 26., 26., 26., 26.],
                       delta_min=[0., 1., 1., 1., 1., 1.],

@@ -13,7 +13,6 @@ namespace py = pybind11;
 
 CadenceCore::CadenceCore(std::string name,
 												 int nepochs,
-												 Instrument instrument,
 												 py::array_t<float> skybrightness,
 												 py::array_t<float> delta,
 												 py::array_t<float> delta_min,
@@ -22,7 +21,7 @@ CadenceCore::CadenceCore(std::string name,
 												 py::array_t<float> max_length,
 												 py::array_t<int> epoch_indx,
 												 py::array_t<int> epochs) :
-	name(name), nepochs(nepochs), instrument(instrument),
+	name(name), nepochs(nepochs),
 	skybrightness(skybrightness), delta(delta), delta_min(delta_min),
 	delta_max(delta_max), nexp(nexp), max_length(max_length),
 	epoch_indx(epoch_indx), epochs(epochs)
@@ -63,11 +62,6 @@ std::string CadenceCore::epochText()
 
 	out = "[" + name + "]\n";
 	out = out + " nepochs=" + std::to_string(nepochs) + "\n";
-
-	if(instrument == ApogeeInstrument)
-		out = out + " instrument=APOGEE\n";
-	else
-		out = out + " instrument=BOSS\n";
 
 	out = out + " skybrightness=";
 	for(auto i = 0; i < nepochs; i++) {

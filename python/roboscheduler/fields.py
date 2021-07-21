@@ -76,6 +76,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.nfilled = np.zeros(0, dtype=np.float64)
         self.field_id = np.zeros(0, dtype=np.int32)
         self.nextmjd = np.zeros(0, dtype=np.float64)
+        self.notDone = np.ones(0, dtype=np.bool)  # true is not done to skip the invert elsewhere
         self.cadence = []
         self.observations = []
         self.slots = []
@@ -87,6 +88,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self._lstPlan = None
         self._lunationPlan = None
         self._hist = None
+        self._database = _database
         return
 
     def setPriorities(self):
@@ -107,6 +109,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.icadence = np.zeros(self.nfields, dtype=np.int32)
         self.nextmjd = np.zeros(self.nfields, dtype=np.float64)
         self.basePriority = np.ones(self.nfields) * 200
+        self.notDone = np.ones(self.nfields, dtype=np.bool)
         if "flag" in fields_array.dtype.names:
             self.flag = fields_array["flag"]
         else:
@@ -124,44 +127,63 @@ class Fields(object, metaclass=FieldsSingleton):
         filename : string
             the full path to the fits file to be loaded
         """
-        self.fields_fits = fitsio.read(filename)
+        self._database = False
+        fields_model = [('field_id', np.int32),
+                        ('racen', np.float64),
+                        ('deccen', np.float64),
+                        ('nfilled', np.int32),
+                        ('flag', np.int32),
+                        ('slots_exposures', np.int32, (24, 2)),
+                        ('cadence', np.dtype('a20'))]
+
+        fits_dat = fitsio.read(filename)
+
+        self.fields_fits = np.zeros(len(fits_dat["fieldid"]), dtype=fields_model)
+
+        self.fields_fits["field_id"] = fits_dat["fieldid"]
+        self.fields_fits["racen"] = fits_dat["racen"]
+        self.fields_fits["deccen"] = fits_dat["deccen"]
+        self.fields_fits["nfilled"] = fits_dat["nfilled"]
+        self.fields_fits["slots_exposures"] = fits_dat["slots_exposures"]
+        self.fields_fits["cadence"] = fits_dat["cadence"]
+
         self.fromarray(self.fields_fits)
         return
 
-    def add_observations(self, mjd=None, fieldidx=None, iobs=None,
-                         lst=None, epoch_idx=None):
-        # """Add an observation, used in simulations.
+    # def add_observations(self, mjd=None, fieldidx=None, iobs=None,
+    #                      lst=None, epoch_idx=None):
+    #     # """Add an observation, used in simulations.
 
-        # Parameters:
-        # ----------
+    #     # Parameters:
+    #     # ----------
 
-        # mjd : float
-        #     MJD of the observation
-        # fieldidx : integer
-        #     index into Fields of the field observed
-        # iobs : integer
-        #     index into Scheduler.observations
-        # lst : float
-        #     lst at time of observation
-        # epoch_idx : integer
-        #     which epoch was being observed
-        # """
-        self._hist[self.field_id[fieldidx]].append(mjd)
+    #     # mjd : float
+    #     #     MJD of the observation
+    #     # fieldidx : integer
+    #     #     index into Fields of the field observed
+    #     # iobs : integer
+    #     #     index into Scheduler.observations
+    #     # lst : float
+    #     #     lst at time of observation
+    #     # epoch_idx : integer
+    #     #     which epoch was being observed
+    #     # """
+    #     # self._hist[self.field_id[fieldidx]].append(mjd)
 
-        self.observations[fieldidx] = np.append(self.observations[fieldidx], iobs)
-        self.icadence[fieldidx] = epoch_idx
-        cadence = self.cadencelist.cadences[self.cadence[fieldidx]]
-        if(self.icadence[fieldidx] < cadence.nepochs):
-            self.nextmjd[fieldidx] = (mjd +
-                                      cadence.delta_min[self.icadence[fieldidx]])
-        else:
-            self.nextmjd[fieldidx] = 100000.
-            self.icadence[fieldidx] = cadence.nepochs - 1
-        int_lst = int(np.round(lst/15, 0))
-        if int_lst == 24:
-            int_lst = 0
-        self.lstObserved[fieldidx][int_lst] += 1
-        return
+    #     self.observations[fieldidx] = np.append(self.observations[fieldidx], iobs)
+    #     self.icadence[fieldidx] = epoch_idx
+    #     cadence = self.cadencelist.cadences[self.cadence[fieldidx]]
+    #     if(self.icadence[fieldidx] < cadence.nepochs):
+    #         self.nextmjd[fieldidx] = (mjd +
+    #                                   cadence.delta_min[self.icadence[fieldidx]])
+    #     else:
+    #         self.nextmjd[fieldidx] = 100000.
+    #         self.icadence[fieldidx] = cadence.nepochs - 1
+    #     int_lst = int(np.round(lst/15, 0))
+    #     if int_lst == 24:
+    #         int_lst = 0
+    #     self.lstObserved[fieldidx][int_lst] += 1
+    #     return
 
     @property
     def validCadence(self):
@@ -192,7 +214,7 @@ class Fields(object, metaclass=FieldsSingleton):
         # """
         if self._hist is None:
             self._hist = {f: list() for f in self.field_id}
-            if _database:
+            if self._database:
                 versionDB = targetdb.Version()
                 ver = versionDB.get(plan=self.plan)
 
@@ -215,7 +237,38 @@ class Fields(object, metaclass=FieldsSingleton):
                 for d in dbfields:
                     self._hist[d["field_id"]].append(d["mjd"])
 
+            for i in range(len(self.field_id)):
+                self.checkCompletion(i)
+
         return self._hist
+
+    def checkCompletion(self, fieldidx):
+        """evaluate field completion
+        """
+        if not self.notDone[fieldidx]:
+            # already done
+            return
+        field_id = self.field_id[fieldidx]
+        obs_epochs, begin_last_epoch = epochs_completed(self.hist[field_id])
+        cadence = self.cadencelist.cadences[self.cadence[fieldidx]]
+        if obs_epochs >= cadence.nepochs:
+            self.notDone[fieldidx] = False
+
+    def completeDesign(self, field_idx, mjd, lst, iobs):
+        """Maybe just for sims but need a way to add mjds to _hist[field_id]
+        """
+        self.observations[field_idx] = np.append(self.observations[field_idx], iobs)
+
+        field_id = self.field_id[field_idx]
+
+        self._hist[field_id].append(mjd)
+
+        int_lst = int(np.round(lst/15, 0))
+        if int_lst == 24:
+            int_lst = 0
+        self.lstObserved[field_idx][int_lst] += 1
+
+        self.checkCompletion(field_idx)
 
     def fromdb(self, version=None):
         """Load this Fields object with fields from the targetdb
@@ -227,7 +280,7 @@ class Fields(object, metaclass=FieldsSingleton):
             db version to grab, if Fields.plan is not set. If passed
             Fields.plan will be reset to version
         """
-        if(_database is False):
+        if(self._database is False):
             print("No database available.")
             return()
 
@@ -333,7 +386,7 @@ class Fields(object, metaclass=FieldsSingleton):
                    ('nobservations', np.int32),
                    ('observations', np.int32, maxn)]
         fields = np.zeros(self.nfields, dtype=fields0)
-        fields['fieldid'] = self.fieldid
+        fields['fieldid'] = self.field_id
         fields['racen'] = self.racen
         fields['deccen'] = self.deccen
         for indx in np.arange(self.nfields):
@@ -403,3 +456,29 @@ def lstDiff(a, b):
     assert len(a) == len(b), "can't compare arrays of different size!"
 
     return np.array([lstDiffSingle(i, j) for i, j in zip(a, b)])
+
+
+def epochs_completed(mjd_past, tolerance=240):
+    """Calculate # of observed epochs, allowing
+    for more exposures than planned.
+
+    tolerance is in minutes
+    """
+    if len(mjd_past) == 0:
+        return 0, 0
+
+    tolerance = tolerance / 60. / 24.
+    begin_last_epoch = mjd_past[0]
+
+    obs_epochs = 1
+    prev = begin_last_epoch
+    for m in mjd_past:
+        delta = m - prev
+        if delta < tolerance:
+            continue
+        else:
+            obs_epochs += 1
+            begin_last_epoch = m
+        prev = m
+
+    return obs_epochs, begin_last_epoch
