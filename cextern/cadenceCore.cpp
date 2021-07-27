@@ -19,15 +19,18 @@ CadenceCore::CadenceCore(std::string name,
 												 py::array_t<float> delta_max,
 												 py::array_t<int> nexp,
 												 py::array_t<float> max_length,
+												 py::array_t<float> min_moon_sep,
+												 py::array_t<float> min_deltav_ks91,
+												 py::array_t<float> min_twilight_ang,
+												 py::array_t<float> max_airmass,
 												 py::array_t<int> epoch_indx,
-												 py::array_t<int> epochs,
-												 py::array_t<float> min_deltav,
-												 py::array_t<float> max_airmass) :
+												 py::array_t<int> epochs) :
 	name(name), nepochs(nepochs),
 	skybrightness(skybrightness), delta(delta), delta_min(delta_min),
 	delta_max(delta_max), nexp(nexp), max_length(max_length),
-	epoch_indx(epoch_indx), epochs(epochs), min_deltav(min_deltav),
-	max_airmass(max_airmass)
+	min_moon_sep(min_moon_sep), min_deltav_ks91(min_deltav_ks91),
+	min_twilight_ang(min_twilight_ang), max_airmass(max_airmass),
+	epoch_indx(epoch_indx), epochs(epochs)
 {
 	int *nexp_a = (int *) nexp.request().ptr;
 	int *epoch_indx_a = (int *) epoch_indx.request().ptr;
@@ -58,6 +61,10 @@ std::string CadenceCore::epochText()
 
 	int *nexp_a = (int *) nexp.request().ptr;
 	float *max_length_a = (float *) max_length.request().ptr;
+	float *min_moon_sep_a = (float *) min_moon_sep.request().ptr;
+	float *min_deltav_ks91_a = (float *) min_deltav_ks91.request().ptr;
+	float *min_twilight_ang_a = (float *) min_twilight_ang.request().ptr;
+	float *max_airmass_a = (float *) max_airmass.request().ptr;
 	float *skybrightness_a = (float *) skybrightness.request().ptr;
 	float *delta_a = (float *) delta.request().ptr;
 	float *delta_min_a = (float *) delta_min.request().ptr;
@@ -106,6 +113,35 @@ std::string CadenceCore::epochText()
 		sprintf(tmp, " %4.2f", max_length_a[i]);
 		out = out + tmps.assign(tmp);
 	}
+	out = out + "\n";
+
+	out = out + " min_moon_sep=";
+	for(auto i = 0; i < nepochs; i++) {
+		sprintf(tmp, " %4.2f", min_moon_sep_a[i]);
+		out = out + tmps.assign(tmp);
+	}
+	out = out + "\n";
+
+	out = out + " min_deltav_ks91=";
+	for(auto i = 0; i < nepochs; i++) {
+		sprintf(tmp, " %4.2f", min_deltav_ks91_a[i]);
+		out = out + tmps.assign(tmp);
+	}
+	out = out + "\n";
+
+	out = out + " min_twilight_ang=";
+	for(auto i = 0; i < nepochs; i++) {
+		sprintf(tmp, " %4.2f", min_twilight_ang_a[i]);
+		out = out + tmps.assign(tmp);
+	}
+	out = out + "\n";
+
+	out = out + " max_airmass=";
+	for(auto i = 0; i < nepochs; i++) {
+		sprintf(tmp, " %4.2f", max_airmass_a[i]);
+		out = out + tmps.assign(tmp);
+	}
+	out = out + "\n";
 
 	return(out);
 }
@@ -122,7 +158,7 @@ bool CadenceCore::epochsConsistency(CadenceCore target_cadence,
 
 	int *t_nexp_a = (int *) target_cadence.nexp.request().ptr;
 	// float *t_skybrightness_a = (float *) target_cadence.skybrightness.request().ptr;
-	float *t_min_deltav_a = (float *) target_cadence.min_deltav.request().ptr;
+	float *t_min_deltav_ks91_a = (float *) target_cadence.min_deltav_ks91.request().ptr;
 	float *t_max_airmass_a = (float *) target_cadence.max_airmass.request().ptr;
 	float *t_delta_a = (float *) target_cadence.delta.request().ptr;
 	float *t_delta_min_a = (float *) target_cadence.delta_min.request().ptr;
@@ -130,13 +166,13 @@ bool CadenceCore::epochsConsistency(CadenceCore target_cadence,
 
 	int *nexp_a = (int *) nexp.request().ptr;
 	// float *skybrightness_a = (float *) skybrightness.request().ptr;
-	float *min_deltav_a = (float *) min_deltav.request().ptr;
+	float *min_deltav_ks91_a = (float *) min_deltav_ks91.request().ptr;
 	float *max_airmass_a = (float *) max_airmass.request().ptr;
 	float *delta_min_a = (float *) delta_min.request().ptr;
 	float *delta_max_a = (float *) delta_max.request().ptr;
 
 	ok = (t_nexp_a[0] <= nexp_a[epochs[0]] - nexp_count[epochs[0]]) &
-		(t_min_deltav_a[0] <= min_deltav_a[epochs[0]]) &
+		(t_min_deltav_ks91_a[0] <= min_deltav_ks91_a[epochs[0]]) &
 		(t_max_airmass_a[0] >= max_airmass_a[epochs[0]]);
 	if(!ok)
 		return(false);
@@ -154,11 +190,11 @@ bool CadenceCore::epochsConsistency(CadenceCore target_cadence,
 			ok = (t_delta_min_a[i] <= dtotmin) &
 				(t_delta_max_a[i] >= dtotmax) &
 				(t_nexp_a[i] <= nexp_a[epochs[i]] - nexp_count[epochs[i]]) &
-				(t_min_deltav_a[0] <= min_deltav_a[epochs[0]]) &
+				(t_min_deltav_ks91_a[0] <= min_deltav_ks91_a[epochs[0]]) &
 				(t_max_airmass_a[0] >= max_airmass_a[epochs[0]]);
 		} else {
 			ok = (t_nexp_a[i] <= nexp_a[epochs[i]] - nexp_count[epochs[i]]) &
-				(t_min_deltav_a[0] <= min_deltav_a[epochs[0]]) &
+				(t_min_deltav_ks91_a[0] <= min_deltav_ks91_a[epochs[0]]) &
 				(t_max_airmass_a[0] >= max_airmass_a[epochs[0]]);
 		}
 		if(!ok)

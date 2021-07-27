@@ -17,7 +17,7 @@ def test_add_cadence():
                       delta_max=[-1.],
                       nexp=[1],
                       max_length=[1.],
-                      min_deltav=[-2.5],
+                      min_deltav_ks91=[-2.5],
                       max_airmass=[2],
                       min_twilight_ang=[8],
                       min_moon_sep=[15])
@@ -30,7 +30,7 @@ def test_add_cadence():
                       delta_max=[-1., -1.],
                       nexp=[1, 1],
                       max_length=[1., 1.],
-                      min_deltav=[-2.5, 2.5],
+                      min_deltav_ks91=[-2.5, 2.5],
                       max_airmass=[2, 2],
                       min_twilight_ang=[8, 8],
                       min_moon_sep=[15, 15])
@@ -43,7 +43,7 @@ def test_add_cadence():
                       delta_max=[-1., -1.],
                       nexp=[2, 2],
                       max_length=[1., 1.],
-                      min_deltav=[-2.5, 2.5],
+                      min_deltav_ks91=[-2.5, 2.5],
                       max_airmass=[2, 2],
                       min_twilight_ang=[8, 8],
                       min_moon_sep=[15, 15])
@@ -114,7 +114,7 @@ def test_epochs_consistency_1():
                       delta_max=[0., 20.],
                       nexp=[1, 1],
                       max_length=[1., 1.],
-                      min_deltav=[-2.5, 2.5],
+                      min_deltav_ks91=[-2.5, 2.5],
                       max_airmass=[2, 2],
                       min_twilight_ang=[8, 8],
                       min_moon_sep=[15, 15])
@@ -127,7 +127,7 @@ def test_epochs_consistency_1():
                       delta_max=[0., 20., 20.],
                       nexp=[1, 1, 1],
                       max_length=[1., 1., 1.],
-                      min_deltav=[-2.5, 2.5, -2.5],
+                      min_deltav_ks91=[-2.5, 2.5, -2.5],
                       max_airmass=[2, 2, 2],
                       min_twilight_ang=[8, 8, 8],
                       min_moon_sep=[15, 15, 15])
@@ -153,7 +153,7 @@ def test_epochs_consistency_2():
                       delta_max=[-1., -1.],
                       nexp=[1, 1],
                       max_length=[1., 1.],
-                      min_deltav=[-2.5, 2.5],
+                      min_deltav_ks91=[-2.5, 2.5],
                       max_airmass=[2, 2],
                       min_twilight_ang=[8, 8],
                       min_moon_sep=[15, 15])
@@ -166,7 +166,7 @@ def test_epochs_consistency_2():
                       delta_max=[-1., -1.],
                       nexp=[2, 2],
                       max_length=[1., 1.],
-                      min_deltav=[-2.5, 2.5],
+                      min_deltav_ks91=[-2.5, 2.5],
                       max_airmass=[2, 2],
                       min_twilight_ang=[8, 8],
                       min_moon_sep=[15, 15])
@@ -179,7 +179,7 @@ def test_epochs_consistency_2():
                       delta_max=[0., 20., 20.],
                       nexp=[1, 1, 1],
                       max_length=[1., 1., 1.],
-                      min_deltav=[-2.5, 2.5, -2.5],
+                      min_deltav_ks91=[-2.5, 2.5, -2.5],
                       max_airmass=[2, 2, 2],
                       min_twilight_ang=[8, 8, 8],
                       min_moon_sep=[15, 15, 15])
@@ -211,7 +211,7 @@ def test_epochs_consistency_3():
                       delta_max=[-1., -1.],
                       nexp=[1, 1],
                       max_length=[1., 1.],
-                      min_deltav=[-2.5, 2.5],
+                      min_deltav_ks91=[-2.5, 2.5],
                       max_airmass=[2, 2],
                       min_twilight_ang=[8, 8],
                       min_moon_sep=[15, 15])
@@ -224,7 +224,7 @@ def test_epochs_consistency_3():
                       delta_max=[-1., -1.],
                       nexp=[1, 1],
                       max_length=[1., 1.],
-                      min_deltav=[-1.5, 1.5],
+                      min_deltav_ks91=[-1.5, 1.5],
                       max_airmass=[1.4, 1.4],
                       min_twilight_ang=[15, 15],
                       min_moon_sep=[35, 35])
@@ -250,7 +250,7 @@ def test_epochs_consistency_4():
                       delta_max=[-1., -1., -1.],
                       nexp=[2, 2, 2],
                       max_length=[1., 1., 1.],
-                      min_deltav=[-2.5, 2.5, -2.5],
+                      min_deltav_ks91=[-2.5, 2.5, -2.5],
                       max_airmass=[2, 2, 2],
                       min_twilight_ang=[8, 8, 8],
                       min_moon_sep=[15, 15, 15])
@@ -263,7 +263,7 @@ def test_epochs_consistency_4():
                       delta_max=[-1., -1., -1.],
                       nexp=[1, 1, 1],
                       max_length=[1., 1., 1.],
-                      min_deltav=[-2.5, 2.5, -2.5],
+                      min_deltav_ks91=[-2.5, 2.5, -2.5],
                       max_airmass=[2, 2, 2],
                       min_twilight_ang=[8, 8, 8],
                       min_moon_sep=[15, 15, 15])
@@ -297,7 +297,7 @@ def test_exposure_consistency():
                       delta_max=[-1., -1., -1.],
                       nexp=[2, 2, 2],
                       max_length=[1., 1., 1.],
-                      min_deltav=[-2.5, 2.5, -2.5],
+                      min_deltav_ks91=[-2.5, 2.5, -2.5],
                       max_airmass=[2, 2, 2],
                       min_twilight_ang=[8, 8, 8],
                       min_moon_sep=[15, 15, 15])
@@ -310,7 +310,7 @@ def test_exposure_consistency():
                       delta_max=[-1., -1., -1.],
                       nexp=[1, 1, 1],
                       max_length=[1., 1., 1.],
-                      min_deltav=[-2.5, 2.5, -2.5],
+                      min_deltav_ks91=[-2.5, 2.5, -2.5],
                       max_airmass=[2, 2, 2],
                       min_twilight_ang=[8, 8, 8],
                       min_moon_sep=[15, 15, 15])
@@ -343,7 +343,7 @@ def test_cadence_consistency_1():
                       delta_max=[-1., -1.],
                       nexp=[1, 1],
                       max_length=[1., 1.],
-                      min_deltav=[-2.5, 2.5],
+                      min_deltav_ks91=[-2.5, 2.5],
                       max_airmass=[2, 2],
                       min_twilight_ang=[8, 8],
                       min_moon_sep=[15, 15])
@@ -356,7 +356,7 @@ def test_cadence_consistency_1():
                       delta_max=[0., 20.],
                       nexp=[1, 1],
                       max_length=[1., 1.],
-                      min_deltav=[-2.5, 2.5],
+                      min_deltav_ks91=[-2.5, 2.5],
                       max_airmass=[2, 2],
                       min_twilight_ang=[8, 8],
                       min_moon_sep=[15, 15])
@@ -369,7 +369,7 @@ def test_cadence_consistency_1():
                       delta_max=[0., 20., 20.],
                       nexp=[1, 1, 1],
                       max_length=[1., 1., 1.],
-                      min_deltav=[-2.5, 2.5, -2.5],
+                      min_deltav_ks91=[-2.5, 2.5, -2.5],
                       max_airmass=[2, 2, 2],
                       min_twilight_ang=[8, 8, 8],
                       min_moon_sep=[15, 15, 15])
@@ -401,7 +401,7 @@ def test_cadence_consistency_2():
                       delta_max=[-1.] * 100,
                       nexp=[1] * 100,
                       max_length=[1.] * 100,
-                      min_deltav=[-2.5] * 100,
+                      min_deltav_ks91=[-2.5] * 100,
                       max_airmass=[2] * 100,
                       min_twilight_ang=[8] * 100,
                       min_moon_sep=[15] * 100)
@@ -414,7 +414,7 @@ def test_cadence_consistency_2():
                       delta_max=[-1.] * 1,
                       nexp=[1] * 1,
                       max_length=[1.] * 1,
-                      min_deltav=[-2.5] * 1,
+                      min_deltav_ks91=[-2.5] * 1,
                       max_airmass=[2] * 1,
                       min_twilight_ang=[8] * 1,
                       min_moon_sep=[15] * 1)
@@ -427,7 +427,7 @@ def test_cadence_consistency_2():
                       delta_max=[-1.] * 4,
                       nexp=[1] * 4,
                       max_length=[1.] * 4,
-                      min_deltav=[-2.5] * 4,
+                      min_deltav_ks91=[-2.5] * 4,
                       max_airmass=[2] * 4,
                       min_twilight_ang=[8] * 4,
                       min_moon_sep=[15] * 4)
@@ -440,7 +440,7 @@ def test_cadence_consistency_2():
                       delta_max=[-1.] * 10,
                       nexp=[1] * 10,
                       max_length=[1.] * 10,
-                      min_deltav=[-2.5] * 10,
+                      min_deltav_ks91=[-2.5] * 10,
                       max_airmass=[2] * 10,
                       min_twilight_ang=[8] * 10,
                       min_moon_sep=[15] * 10)
@@ -470,7 +470,7 @@ def test_cadence_consistency_3():
                       delta_max=[0., 3000.],
                       nexp=[1, 1],
                       max_length=[1., 1.],
-                      min_deltav=[-2.5, -2.5],
+                      min_deltav_ks91=[-2.5, -2.5],
                       max_airmass=[2, 2],
                       min_twilight_ang=[8, 8],
                       min_moon_sep=[15, 15])
@@ -483,7 +483,7 @@ def test_cadence_consistency_3():
                       delta_max=[-1.],
                       nexp=[4],
                       max_length=[1.],
-                      min_deltav=[-1.5],
+                      min_deltav_ks91=[-1.5],
                       max_airmass=[1.4],
                       min_twilight_ang=[15],
                       min_moon_sep=[35])
@@ -504,7 +504,7 @@ def test_cadence_consistency_4():
                       delta_max=[0., 3000.],
                       nexp=[2, 2],
                       max_length=[1., 1.],
-                      min_deltav=[-1.5] * 2,
+                      min_deltav_ks91=[-1.5] * 2,
                       max_airmass=[1.4] * 2,
                       min_twilight_ang=[15] * 2,
                       min_moon_sep=[35] * 2)
@@ -517,7 +517,7 @@ def test_cadence_consistency_4():
                       delta_max=[0., 3000., 3000., 3000., 3000., 3000.],
                       nexp=[3] * 6,
                       max_length=[1.] * 6,
-                      min_deltav=[-1.5] * 6,
+                      min_deltav_ks91=[-1.5] * 6,
                       max_airmass=[1.4] * 6,
                       min_twilight_ang=[15] * 6,
                       min_moon_sep=[35] * 6)
@@ -530,7 +530,7 @@ def test_cadence_consistency_4():
                       delta_max=[-1.] * 4,
                       nexp=[1] * 4,
                       max_length=[1.] * 4,
-                      min_deltav=[-1.5] * 4,
+                      min_deltav_ks91=[-1.5] * 4,
                       max_airmass=[1.4] * 4,
                       min_twilight_ang=[15] * 4,
                       min_moon_sep=[35] * 4)
@@ -543,7 +543,7 @@ def test_cadence_consistency_4():
                       delta_max=[-1.] * 8,
                       nexp=[1] * 8,
                       max_length=[1.] * 8,
-                      min_deltav=[-1.5] * 8,
+                      min_deltav_ks91=[-1.5] * 8,
                       max_airmass=[1.4] * 8,
                       min_twilight_ang=[15] * 8,
                       min_moon_sep=[35] * 8)
@@ -585,7 +585,7 @@ def test_cadence_evaluate_next():
                       delta_max=[0., 40.],
                       nexp=[2, 2],
                       max_length=[1., 1.],
-                      min_deltav=[-1.5] * 2,
+                      min_deltav_ks91=[-1.5] * 2,
                       max_airmass=[1.4] * 2,
                       min_twilight_ang=[15] * 2,
                       min_moon_sep=[35] * 2)
@@ -659,7 +659,7 @@ def test_cadence_consistency_merge():
                       delta_max=[-1., -1.],
                       nexp=[2, 2],
                       max_length=[1.] * 2,
-                      min_deltav=[-1.5] * 2,
+                      min_deltav_ks91=[-1.5] * 2,
                       max_airmass=[1.4] * 2,
                       min_twilight_ang=[15] * 2,
                       min_moon_sep=[35] * 2)
@@ -672,7 +672,7 @@ def test_cadence_consistency_merge():
                       delta_max=[0., 3000., 3000., 3000., 3000., 3000.],
                       nexp=[4] * 2,
                       max_length=[1.] * 2,
-                      min_deltav=[-1.5] * 2,
+                      min_deltav_ks91=[-1.5] * 2,
                       max_airmass=[1.4] * 2,
                       min_twilight_ang=[15] * 2,
                       min_moon_sep=[35] * 2)

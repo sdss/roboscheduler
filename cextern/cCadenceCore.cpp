@@ -10,8 +10,10 @@ PYBIND11_MODULE(cCadenceCore, m) {
     py::class_<CadenceCore, std::shared_ptr<CadenceCore>>(m, "CadenceCore")
 			.def(py::init<std::string, int, py::array_t<float>,
 					 py::array_t<float>, py::array_t<float>, py::array_t<float>,
-					 py::array_t<int>, py::array_t<float>, py::array_t<int>,
-					 py::array_t<int>, py::array_t<float>, py::array_t<float>>())
+					 py::array_t<int>, py::array_t<float>,
+					 py::array_t<float>, py::array_t<float>,
+					 py::array_t<float>, py::array_t<float>,
+					 py::array_t<int>, py::array_t<int>>())
 			.def("epoch_text", &CadenceCore::epochText)
 			.def("__str__", &CadenceCore::__str__)
 			.def("epochs_consistency", &CadenceCore::epochsConsistency,
@@ -29,6 +31,8 @@ PYBIND11_MODULE(cCadenceCore, m) {
 			.def_readwrite("epochs", &CadenceCore::epochs)
 			.def_readwrite("nexp", &CadenceCore::nexp)
 			.def_readwrite("max_length", &CadenceCore::max_length)
-			.def_readwrite("min_deltav", &CadenceCore::min_deltav)
+			.def_readwrite("min_moon_sep", &CadenceCore::min_moon_sep)
+			.def_readwrite("min_deltav_ks91", &CadenceCore::min_deltav_ks91)
+			.def_readwrite("min_twilight_ang", &CadenceCore::min_twilight_ang)
 			.def_readwrite("max_airmass", &CadenceCore::max_airmass);
 }
