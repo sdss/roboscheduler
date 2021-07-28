@@ -739,7 +739,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                 where(targetdb.Cadence.label == cadence).execute()
         return
 
-    def fromdb(self, use_label_root=False, version='', cadences=None):
+    def fromdb(self, use_label_root=True, version='', cadences=None):
         """Extract cadences into the targetdb
 
         Parameters:
@@ -760,10 +760,18 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             print("No database available.")
             return()
 
-        cadence_dicts = targetdb.Cadence.select().join(ObsMode).dicts()
+        cadence_dicts = targetdb.Cadence.select().dicts()
+        obsmode_dicts = targetdb.ObsMode.select().dicts()
+        obsmodes = dict()
+        for obsmode_dict in obsmode_dicts:
+            curr = dict()
+            curr['min_deltav_ks91'] = obsmode_dict['min_deltav_ks91']
+            curr['min_moon_sep'] = obsmode_dict['min_moon_sep']
+            curr['min_twilight_ang'] = obsmode_dict['min_twilight_ang']
+            curr['max_airmass'] = obsmode_dict['max_airmass']
+            obsmodes[obsmode_dict['label']] = curr
 
         for cadence in cadence_dicts:
-            print(cadence)
             if(cadence['delta'] is None or len(cadence['delta']) == 0):
                 continue
             
@@ -785,7 +793,42 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             else:
                 label = str(cadence['label'])
 
-            self.add_cadence(name=str(cadence['label'].strip()),
+            if(cadence['obsmode_pk'] is not None):
+                min_moon_sep = np.array([obsmodes[x]['min_moon_sep']
+                                         for x in cadence['obsmode_pk']],
+                                        dtype=np.float32)
+                min_deltav_ks91 = np.array([obsmodes[x]['min_deltav_ks91']
+                                            for x in cadence['obsmode_pk']],
+                                           dtype=np.float32)
+                min_twilight_ang = np.array([obsmodes[x]['min_twilight_ang']
+                                             for x in cadence['obsmode_pk']],
+                                            dtype=np.float32)
+                max_airmass = np.array([obsmodes[x]['max_airmass']
+                                        for x in cadence['obsmode_pk']],
+                                       dtype=np.float32)
+            else:
+                min_moon_sep = np.zeros(np.int32(cadence['nepochs']),
+                                        dtype=np.float32)
+                min_deltav_ks91 = np.zeros(np.int32(cadence['nepochs']),
+                                           dtype=np.float32)
+                min_twilight_ang = np.zeros(np.int32(cadence['nepochs']),
+                                            dtype=np.float32)
+                max_airmass = np.zeros(np.int32(cadence['nepochs']),
+                                       dtype=np.float32)
+                for epoch in np.arange(np.int32(cadence['nepochs']),
+                                       dtype=np.int32):
+                    if(cadence['skybrightness'][epoch] < 0.5):
+                        min_moon_sep[epoch] = 15.
+                        min_deltav_ks91[epoch] = - 2.5
+                        min_twilight_ang[epoch] = 8.
+                        max_airmass[epoch] = 2.
+                    else:
+                        min_moon_sep[epoch] = 35.
+                        min_deltav_ks91[epoch] = - 1.5
+                        min_twilight_ang[epoch] = 15.
+                        max_airmass[epoch] = 1.4
+
+            self.add_cadence(name=label,
                              nexp=cadence['nexp'],
                              nepochs=cadence['nepochs'],
                              delta=np.array(cadence['delta']),
@@ -793,10 +836,10 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                              delta_max=np.array(cadence['delta_max']),
                              skybrightness=np.array(cadence['skybrightness']),
                              max_length=np.array(cadence['max_length']),
-                             min_moon_sep=np.array(cadence['min_moon_sep']),
-                             min_deltav_ks91=np.array(cadence['min_deltaV_KS91']),
-                             min_twilight_ang=np.array(cadence['min_twilight_ang']),
-                             max_airmass=np.array(cadence['max_airmass']),
+                             min_moon_sep=min_moon_sep,
+                             min_deltav_ks91=min_deltav_ks91,
+                             min_twilight_ang=min_twilight_ang,
+                             max_airmass=max_airmass,
                              obsmode_pk=np.array(cadence['obsmode_pk']),
                              label_root=str(cadence['label_root'].strip()),
                              label_version=str(cadence['label_root'].strip()))
