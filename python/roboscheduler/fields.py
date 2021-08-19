@@ -467,6 +467,13 @@ def epochs_completed(mjd_past, tolerance=240):
     if len(mjd_past) == 0:
         return 0, 0
 
+    try:
+        len(tolerance)
+    except TypeError:
+        tolerance = np.array([tolerance])
+
+    epoch_idx = 0
+
     tolerance = tolerance / 60. / 24.
     begin_last_epoch = mjd_past[0]
 
@@ -474,11 +481,14 @@ def epochs_completed(mjd_past, tolerance=240):
     prev = begin_last_epoch
     for m in mjd_past:
         delta = m - prev
-        if delta < tolerance:
+        if delta < tolerance[epoch_idx]:
             continue
         else:
             obs_epochs += 1
             begin_last_epoch = m
+            epoch_idx += 1
+            if epoch_idx > len(tolerance) - 1:
+                epoch_idx -= 1
         prev = m
 
     return obs_epochs, begin_last_epoch

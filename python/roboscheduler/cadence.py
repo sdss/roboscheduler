@@ -216,7 +216,7 @@ class Cadence(cCadenceCore.CadenceCore):
         """
         if epoch_idx >= self.nepochs:
             epoch_idx = -1
-        return self.min_deltav[epoch_idx] <= deltaV and \
+        return self.min_deltav_ks91[epoch_idx] <= deltaV and \
             self.max_airmass[epoch_idx] >= airmass and \
             self.min_moon_sep[epoch_idx] <= moon_dist
 

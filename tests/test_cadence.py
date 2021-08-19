@@ -600,7 +600,10 @@ def test_cadence_evaluate_next():
     test_cadence.evaluate_next(epoch_idx=idx,
                                mjd_past=mjd_past,
                                mjd_next=mjd_next,
-                               skybrightness_next=skybrightness_next)
+                               skybrightness_next=skybrightness_next,
+                               moon_dist=50,
+                               deltaV=-0.8,
+                               airmass=1.2)
 
     assert observable
 
@@ -609,7 +612,10 @@ def test_cadence_evaluate_next():
     test_cadence.evaluate_next(epoch_idx=idx,
                                mjd_past=mjd_past,
                                mjd_next=mjd_next,
-                               skybrightness_next=skybrightness_next)
+                               skybrightness_next=skybrightness_next,
+                               moon_dist=50,
+                               deltaV=-0.8,
+                               airmass=1.2)
 
     assert not observable
 
@@ -621,14 +627,20 @@ def test_cadence_evaluate_next():
     test_cadence.evaluate_next(epoch_idx=idx,
                                mjd_past=mjd_past,
                                mjd_next=mjd_next,
-                               skybrightness_next=skybrightness_next)
+                               skybrightness_next=skybrightness_next,
+                               moon_dist=50,
+                               deltaV=-0.8,
+                               airmass=1.2)
 
     mjd_next = mjd_past + 25
     observable, priority2 = \
     test_cadence.evaluate_next(epoch_idx=idx,
                                mjd_past=mjd_past,
                                mjd_next=mjd_next,
-                               skybrightness_next=skybrightness_next)
+                               skybrightness_next=skybrightness_next,
+                               moon_dist=50,
+                               deltaV=-0.8,
+                               airmass=1.2)
 
     assert observable
     assert priority2 > priority1

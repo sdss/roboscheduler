@@ -13,11 +13,17 @@ def test_epochs_completed():
 
     mjds_2 = 59900. + np.array([0., exp, 5, 5+exp, 5+2*exp])
 
+    mjds_3 = 59900. + np.array([0., exp, 5, 5+exp, 6])
+
     comp, prev = scheduler.epochs_completed(mjd_past=mjds_1)
     assert comp == 1
     assert np.isclose(prev, 59900)
 
     comp, prev = scheduler.epochs_completed(mjd_past=mjds_2)
+    assert comp == 2
+    assert np.isclose(prev, 59905)
+
+    comp, prev = scheduler.epochs_completed(mjd_past=mjds_3, tolerance=np.array([0.5*24*60, 2*24*60]))
     assert comp == 2
     assert np.isclose(prev, 59905)
 
