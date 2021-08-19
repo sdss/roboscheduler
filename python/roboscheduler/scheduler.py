@@ -1095,7 +1095,7 @@ class Scheduler(Master):
 
         """
         fieldidx = self.fields.getidx(fieldid)
-        mjd_past = self.fields.hist[fieldidx]
+        mjd_past = self.fields.hist[fieldid]
         cadence = self.cadencelist.cadences[self.fields.cadence[fieldidx]]
         epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=240)
         nexp_next = cadence.nexp[epoch_idx]

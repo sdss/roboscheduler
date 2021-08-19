@@ -211,10 +211,19 @@ class Cadence(cCadenceCore.CadenceCore):
                 down_weight = True
         return skybrightness_next <= self.skybrightness[epoch_idx], down_weight
 
+    def obsmodeChecks(self, epoch_idx, moon_dist, deltaV, airmass):
+        """check obsmode reqs: moon sep, deltav, & airmass
+        """
+        if epoch_idx >= self.nepochs:
+            epoch_idx = -1
+        return self.min_deltav[epoch_idx] <= deltaV and \
+            self.max_airmass[epoch_idx] >= airmass and \
+            self.min_moon_sep[epoch_idx] <= moon_dist
+
     def evaluate_next(self, epoch_idx=None, partial_epoch=False,
                       mjd_past=None, mjd_next=None,
-                      skybrightness_next=None, check_skybrightness=True,
-                      ignoreMax=False):
+                      skybrightness_next=None, moon_dist=None, deltaV=None,
+                      airmass=None):
         """Evaluate next choice of observation
 
            Returns whether cadence is ok AND how long until
@@ -231,7 +240,12 @@ class Cadence(cCadenceCore.CadenceCore):
 
         ok_skybrightness, down_weight = self.skybrightness_check(epoch_idx,
                                                                  skybrightness_next)
-        ok_skybrightness = ok_skybrightness | (check_skybrightness is False)
+
+        valid = self.obsmodeChecks(epoch_idx, moon_dist, deltaV, airmass)
+        ok_skybrightness = ok_skybrightness & valid
+
+        if not ok_skybrightness:
+            return ok_skybrightness, 0
 
         if down_weight:
             base_priority = -100
@@ -677,39 +691,50 @@ class CadenceList(object, metaclass=CadenceListSingleton):
 
     def todb(self):
         """Insert all cadences into the targetdb
-        
+
         Notes:
         -----
 
-        This may be obsolete.
+        This may be obsolete. (John uses it locally and likes it)
         """
 
         if(_database is False):
             print("No database available.")
             return()
 
-        pkdict = targetdb.Cadence.select(targetdb.Cadence.pk).dicts()
-        pks = np.array([p['pk'] for p in pkdict])
-        newpks = pks.max() + 1 + np.arange(len(self.cadences))
+        obsModes = targetdb.ObsMode.select().dicts()
 
-        for cadence, pk in zip(self.cadences, newpks):
+        DBmodes = {str(o["label"]): o for o in obsModes}
+
+        for cadence in self.cadences:
+            if targetdb.Cadence.get_or_none(label=cadence) is not None:
+                continue
             nexposures = [int(n) for n in self.cadences[cadence].nexp]
             delta = [float(n) for n in self.cadences[cadence].delta]
             delta_min = [float(n) for n in self.cadences[cadence].delta_min]
             delta_max = [float(n) for n in self.cadences[cadence].delta_max]
             skybrightness = [float(n) for n in self.cadences[cadence].skybrightness]
             max_length = [float(n) for n in self.cadences[cadence].max_length]
-            targetdb.Cadence.insert(pk=pk, label=cadence,
+            obs_modes = [str(n) for n in self.cadences[cadence].obsmode_pk]
+            if all([s < 0.1 for s in skybrightness]):
+                # not sure why this is needed, but seems to be with some fits files
+                continue
+            assert all([o in DBmodes for o in obs_modes]), \
+                "obsmode_pks must be in obsmode table \n" +\
+                "".join(np.unique(np.extract([o not in DBmodes for o in obs_modes], obs_modes)))\
+                + "\n are not present"
+            targetdb.Cadence.insert(label=cadence,
                                     nexp=nexposures,
                                     nepochs=self.cadences[cadence].nepochs,
                                     delta=delta, skybrightness=skybrightness,
                                     delta_min=delta_min,
                                     delta_max=delta_max,
-                                    max_length=max_length).execute()
+                                    max_length=max_length,
+                                    obsmode_pk=obs_modes).execute()
 
     def updatedb(self):
         """Update the cadences in the targetdb by name
-        
+
         Notes:
         -----
 
@@ -774,7 +799,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         for cadence in cadence_dicts:
             if(cadence['delta'] is None or len(cadence['delta']) == 0):
                 continue
-            
+
             if(version is not None):
                 if(version == ''):
                     if(cadence['label_version'] != ''):
@@ -784,10 +809,10 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                         continue
 
             label_root = str(cadence['label_root'].strip())
-            if(cadences is not None): 
+            if(cadences is not None):
                 if(label_root not in cadences):
                     continue
-            
+
             if(use_label_root):
                 label = label_root
             else:
@@ -843,4 +868,3 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                              obsmode_pk=np.array(cadence['obsmode_pk']),
                              label_root=str(cadence['label_root'].strip()),
                              label_version=str(cadence['label_root'].strip()))
-                             
