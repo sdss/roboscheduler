@@ -75,7 +75,8 @@ class Fields(object, metaclass=FieldsSingleton):
         self.deccen = np.zeros(0, dtype=np.float64)
         self.nfilled = np.zeros(0, dtype=np.float64)
         self.field_id = np.zeros(0, dtype=np.int32)
-        self.nextmjd = np.zeros(0, dtype=np.float64)
+        # self.nextmjd = np.zeros(0, dtype=np.float64)
+        self.epoch_idx = np.zeros(0, dtype=np.int32)
         self.notDone = np.ones(0, dtype=np.bool)  # true is not done to skip the invert elsewhere
         self.cadence = []
         self.observations = []
@@ -107,7 +108,8 @@ class Fields(object, metaclass=FieldsSingleton):
         self.lstObserved = np.zeros((len(self.slots), 24), dtype=np.int32)
         self.observations = [np.zeros(0, dtype=np.int32)] * self.nfields
         self.icadence = np.zeros(self.nfields, dtype=np.int32)
-        self.nextmjd = np.zeros(self.nfields, dtype=np.float64)
+        # self.nextmjd = np.zeros(self.nfields, dtype=np.float64)
+        self.epoch_idx = np.zeros(self.nfields, dtype=np.float64)
         self.basePriority = np.ones(self.nfields) * 200
         self.notDone = np.ones(self.nfields, dtype=np.bool)
         if "flag" in fields_array.dtype.names:
@@ -249,8 +251,11 @@ class Fields(object, metaclass=FieldsSingleton):
             # already done
             return
         field_id = self.field_id[fieldidx]
-        obs_epochs, begin_last_epoch = epochs_completed(self.hist[field_id])
         cadence = self.cadencelist.cadences[self.cadence[fieldidx]]
+        tol = cadence.max_length[int(self.epoch_idx[fieldidx])]
+        obs_epochs, begin_last_epoch = epochs_completed(self.hist[field_id],
+                                                        tolerance=tol)
+        self.epoch_idx[fieldidx] = int(obs_epochs)
         if obs_epochs >= cadence.nepochs:
             self.notDone[fieldidx] = False
 
