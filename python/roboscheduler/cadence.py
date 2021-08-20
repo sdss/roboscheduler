@@ -7,7 +7,7 @@ import roboscheduler.cCadenceCore as cCadenceCore
 try:
     import sdssdb.peewee.sdss5db.targetdb as targetdb
     from sdssdb.peewee.sdss5db import database
-    database.set_profile('operations')
+    # database.set_profile('operations')
     _database = True
 except:
     _database = False
