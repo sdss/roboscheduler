@@ -70,7 +70,7 @@ std::string CadenceCore::epochText()
 	float *delta_min_a = (float *) delta_min.request().ptr;
 	float *delta_max_a = (float *) delta_max.request().ptr;
 
-	out = name + "\n";
+	out = "[" + name + "]\n";
 	out = out + " nepochs=" + std::to_string(nepochs) + "\n";
 
 	out = out + " skybrightness=";
@@ -141,6 +141,8 @@ std::string CadenceCore::epochText()
 		sprintf(tmp, " %4.2f", max_airmass_a[i]);
 		out = out + tmps.assign(tmp);
 	}
+	out = out + "\n";
+
 	out = out + "\n";
 
 	return(out);
