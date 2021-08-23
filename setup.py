@@ -9,12 +9,6 @@ import os
 import argparse
 import sys
 
-# The NAME variable should be of the format "sdss-roboscheduler".
-# Please check your NAME adheres to that format.
-NAME = 'sdss-roboscheduler'
-VERSION = '0.9.1dev'
-RELEASE = 'dev' in VERSION
-
 
 class getPybindInclude(object):
     """Helper class to determine the pybind11 include path

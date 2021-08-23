@@ -5,7 +5,7 @@ python:
    version: 3.6
    setup_py_install: true
 
-requirements_file: requirements_doc.txt
+# requirements_file: requirements_doc.txt
 
 # Don't build any extra formats
 formats:
