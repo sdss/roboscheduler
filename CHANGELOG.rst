@@ -6,8 +6,8 @@ Change Log
 
 This document records the main changes to the roboscheduler code.
 
-.. _changelog-0.1.0:
-0.1.0 (unreleased)
+.. _changelog-0.9.0:
+0.9.0 (unreleased)
 ------------------
 
 Added

@@ -17,8 +17,8 @@ import sys
 
 # The NAME variable should be of the format "sdss-roboscheduler".
 # Please check your NAME adheres to that format.
-NAME = 'roboscheduler'
-VERSION = '0.1.0dev'
+NAME = 'sdss-roboscheduler'
+VERSION = '0.9.1dev'
 RELEASE = 'dev' in VERSION
 
 
@@ -83,7 +83,7 @@ def run(packages, install_requires):
           setup_requires=["pybind11"],
           install_requires=install_requires,
           package_dir={'': 'python'},
-          scripts=['bin/roboscheduler', 'bin/make_ms'],
+          scripts=['bin/make_ms'],
           classifiers=[
               'Development Status :: 4 - Beta',
               'Intended Audience :: Science/Research',
