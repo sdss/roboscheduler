@@ -178,11 +178,9 @@ class Observer(SchedulerBase):
         super().__init__()
         self.observatory = observatory
         if(observatoryfile is None):
-            env_dir = os.getenv('ROBOSCHEDULER_DIR')
-            if env_dir is None:
-                env_dir = os.path.abspath(__file__).split("/python/roboscheduler/")[0]
-            observatoryfile = os.path.join(env_dir,
-                                           'data', 'observatories.par')
+            prod_dir = os.path.abspath(__file__).split("/scheduler.py")[0]
+            observatoryfile = os.path.join(prod_dir,
+                                           'etc', 'observatories.par')
         self._file = observatoryfile
         self._data = yanny.yanny(self._file)
         observatories = np.array([obs.decode()
@@ -675,12 +673,9 @@ class Master(Observer):
                          observatoryfile=observatoryfile)
         masterfile = 'master_schedule_{o}_{s}.par'.format(o=observatory,
                                                           s=schedule)
-        env_dir = os.getenv('ROBOSCHEDULER_DIR')
-        if env_dir is None:
-            env_dir = os.path.abspath(__file__).split("/python/roboscheduler/")[0]
-        schedulefile = os.path.join(env_dir,
-                                    'data', masterfile)
-        print(schedulefile)
+        prod_dir = os.path.abspath(__file__).split("/scheduler.py")[0]
+        schedulefile = os.path.join(prod_dir,
+                                    'etc', masterfile)
         self._schedulefile = schedulefile
         self.schedule = yanny.yanny(self._schedulefile)
         self._validate()
