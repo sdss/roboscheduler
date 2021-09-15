@@ -463,37 +463,30 @@ def lstDiff(a, b):
     return np.array([lstDiffSingle(i, j) for i, j in zip(a, b)])
 
 
-def epochs_completed(mjd_past, tolerance=240):
+def epochs_completed(mjd_past, tolerance=0.5):
     """Calculate # of observed epochs, allowing
     for more exposures than planned.
 
-    tolerance is in minutes
+    tolerance HAS CHANGED TO DAYS
     """
     if len(mjd_past) == 0:
         return 0, 0
 
-    try:
-        len(tolerance)
-    except TypeError:
-        tolerance = np.array([tolerance])
-
     epoch_idx = 0
 
-    tolerance = tolerance / 60. / 24.
+    tolerance = tolerance
     begin_last_epoch = mjd_past[0]
 
     obs_epochs = 1
     prev = begin_last_epoch
     for m in mjd_past:
         delta = m - prev
-        if delta < tolerance[epoch_idx]:
+        if delta < tolerance:
             continue
         else:
             obs_epochs += 1
             begin_last_epoch = m
             epoch_idx += 1
-            if epoch_idx > len(tolerance) - 1:
-                epoch_idx -= 1
         prev = m
 
     return obs_epochs, begin_last_epoch

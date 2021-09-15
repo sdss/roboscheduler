@@ -39,6 +39,24 @@ def dateandtime2mjd(date=None, time='12:00', to_tai=7):
     return(times.mjd)
 
 
+def nExpPrioritize(nexp):
+    """adjust field priorities based on planned exps
+
+       1 exp: negative, 8 exp: super high
+    """
+
+    assert nexp < 9 and nexp > 0, "invalid nexp"
+
+    if nexp == 1:
+        return -100
+    elif nexp == 8:
+        return 2e6
+    elif nexp == 2:
+        return 0
+    else:
+        return nexp * 20
+
+
 class SchedulerBase(object):
     """Scheduler base class with generic utilities.
 
@@ -801,6 +819,8 @@ class Scheduler(Master):
         """
         super().__init__(schedule=schedule, observatory=observatory,
                          observatoryfile=observatoryfile)
+        self.check = False
+        self.recent = list()
         self.airmass_limit = airmass_limit
         if exp_time is None:
             self.exp_time = 18 / 60 / 24
@@ -893,6 +913,11 @@ class Scheduler(Master):
             if skybrightness <= 0.35:
                 # it's still dark
                 nexp_change = 1e3
+            elif nexp_change == 0:
+                # going into dark from bright, don't waste 15 minutes?
+                # delta V check will cover bad cases
+                skybrightness = 0.34
+                nexp_change = maxExp
         else:
             # next is bright
             if skybrightness > 0.35:
@@ -923,9 +948,21 @@ class Scheduler(Master):
             # for 0 indexed arrays, this equivalent to
             # "how many epochs have I done previously"
             tol = cadence.max_length[int(self.fields.epoch_idx[indx])]
-            epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=tol)
+            if tol < 0.1:
+                tol = 0.1
+            elif tol > 14:
+                tol = 14
+            epoch_idx, begin_last_epoch = epochs_completed(mjd_past, tolerance=tol)
             # how many exp/"designs" since start of last epoch?
-            exp_epoch = np.sum(np.greater(mjd_past, mjd_prev))
+            exp_epoch = np.sum(np.greater_equal(mjd_past, begin_last_epoch))
+            if len(mjd_past):
+                mjd_prev = mjd_past[-1]
+            else:
+                mjd_prev = 0
+            if epoch_idx >= cadence.nepochs and not self.fields.flag[indx] == 1:
+                # print("DONE ", epoch_idx, cadence.nepochs, int(self.fields.field_id[indx]))
+                observable[indx] = False
+                continue
             if exp_epoch < cadence.nexp[epoch_idx] and exp_epoch != 0:
                 nexp[indx] = cadence.nexp[epoch_idx] - exp_epoch
                 epoch_idx -= 1
@@ -933,11 +970,8 @@ class Scheduler(Master):
             else:
                 nexp[indx] = cadence.nexp[epoch_idx]
                 partial_epoch = False
-            if epoch_idx >= cadence.nepochs:
-                print("DONE ", epoch_idx, cadence.nepochs, int(self.fields.field_id[indx]))
-                observable[indx] = False
-                continue
             if nexp[indx] > nexp_change and self.fields.flag[indx] != 1:
+                # print(f"{float(mjd):.3f} {int(self.fields.field_id[indx])} c_nexp {cadence.nexp[epoch_idx]} NEXP {nexp_change} MAXEXP {maxExp}")
                 # change between bright/dark, field doesn't fit
                 observable[indx] = False
                 continue
@@ -952,8 +986,10 @@ class Scheduler(Master):
                                       airmass=airmass[indx])
             # if nexp[indx] > 6 and observable[indx]:
             #     delta_priority[indx] += 1e6
-            delta_priority[indx] += nexp[indx] * 10
+            # delta_priority[indx] += 2.5**nexp[indx]
+            delta_priority[indx] += nExpPrioritize(nexp[indx])
             if nexp[indx] > maxExp:
+                # print(f"{float(mjd):.3f} {int(self.fields.field_id[indx])} c_nexp {cadence.nexp[epoch_idx]} MAXEXP {maxExp}")
                 observable[indx] = False
             if self.fields.flag[indx] == 1:
                 # flagged as top priority
@@ -962,6 +998,16 @@ class Scheduler(Master):
                 # so override cadence eligibility and bump priority
                 observable[indx] = True
                 delta_priority[indx] += 1e6
+            if "x8" in cadence.name and observable[indx]:
+                self.check = True
+                # print(f"F {float(mjd):.3f} {int(self.fields.field_id[indx])} {delta_priority[indx]}")
+                self.recent.append(f"R {epoch_idx} {float(mjd):.3f} {int(self.fields.field_id[indx])} {mjd-mjd_prev} tol {tol}")
+                # print(nexp[indx], type(nexp[indx]))
+            elif "x8" in cadence.name and not observable[indx]:
+                if skybrightness < 0.36 and moon_dist[indx] < 30 and deltav[indx] < 2 and airmass[indx] < 1.5:
+                    print(f"F {epoch_idx} {float(mjd):.3f} {int(self.fields.field_id[indx])} {mjd-mjd_prev}")
+                    print(f"sky {skybrightness} moon {moon_dist[indx]} deltav {deltav[indx]} AM {airmass[indx]:}")
+                    print(nexp[indx], type(nexp[indx]), maxExp)
         # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
         iobservable = np.where(observable)[0]
 
@@ -1016,11 +1062,11 @@ class Scheduler(Master):
         dec = self.fields.deccen[iobservable]
 
         # gaussian weight, mean already 0, use 1 hr  std
-        priority += 50 * np.exp(-(lstDiffs)**2 / (2 * 0.5**2))
+        priority += 100 * np.exp(-(lstDiffs)**2 / (2 * 0.5**2))
         # gaussian weight, mean already 0, use 1 hr = 15 deg std
-        priority += 50 * np.exp(-(ha)**2 / (2 * 15**2))
+        # priority += 50 * np.exp(-(ha)**2 / (2 * 15**2))
         # gaussian weight, mean = obs lat, use 20 deg std
-        priority -= 20 * np.exp(-(dec - self.latitude)**2 / (2 * 20**2))
+        priority -= 40 * np.exp(-(dec - self.latitude)**2 / (2 * 20**2))
 
         return priority
 
@@ -1052,10 +1098,12 @@ class Scheduler(Master):
         pick_fieldid = fieldid[ipick]
         pick_exp = nexp[ipick]
 
-        # if self.check:
-        #     self.chosen[-1] = pick_fieldid
-        #     self.chosen_pri[-1] = float(priority[ipick])
-        #     print("CHOICE", pick_fieldid, np.max(priority), ipick, pick_exp, "\n")
+        if self.check:
+            # self.chosen[-1] = pick_fieldid
+            # self.chosen_pri[-1] = float(priority[ipick])
+            print("\n CHOICE", pick_fieldid, np.max(priority), pick_exp)
+            for r in self.recent:
+                print(r)
 
         return(pick_fieldid, pick_exp)
 
@@ -1127,6 +1175,8 @@ class Scheduler(Master):
         sorted_exp : list of integer
             a list of nexp sorted by priority
         """
+        self.check = False
+        self.recent = list()
 
         iobservable, nexp, delta_priority = self.observable(mjd=mjd, maxExp=maxExp,
                                                             ignore=ignore)

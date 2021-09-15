@@ -266,17 +266,17 @@ class Cadence(cCadenceCore.CadenceCore):
         # if "x1" in self.name:
         #     print("delta {} dhi {} dlo {} curr {:.2f}".format(dnom, dhi, dlo, float(delta_curr)), self.name)
         # 1/sqrt(x) priority; at 1 day +100, at 10 days +30, at 30 days +18
-        remain_priority = 15 * np.clip(10/np.sqrt(np.abs(dhi - delta_curr)),
+        remain_priority = 10 * np.clip(10/np.sqrt(np.abs(dhi - delta_curr)),
                                        a_min=None, a_max=10)
-        nom_priority = 5 * np.clip(10/np.sqrt(np.abs(dnom - delta_curr)),
+        nom_priority = 4 * np.clip(10/np.sqrt(np.abs(dnom - delta_curr)),
                                    a_min=None, a_max=10)
         priority = base_priority + remain_priority + nom_priority
         if delta_curr <= dhi:
-            priority += 500
+            priority += 100
         # if ignoreMax:
         #     return(ok_skybrightness & (delta_curr >= dlo), priority)
         # if "x8" in self.name:
-        #     print(self.name, "norm", ok_skybrightness, delta_curr, dlo)
+        #     print("CAD", self.name, ok_skybrightness, delta_curr, dlo, priority)
         return(ok_skybrightness & (delta_curr >= dlo), priority)
 
 
