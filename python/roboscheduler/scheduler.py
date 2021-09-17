@@ -988,6 +988,9 @@ class Scheduler(Master):
             #     delta_priority[indx] += 1e6
             # delta_priority[indx] += 2.5**nexp[indx]
             delta_priority[indx] += nExpPrioritize(nexp[indx])
+            # prioritize nepochs. Huge bump for 8 + epochs
+            # slight decrement for single epochs
+            delta_priority[indx] += (cadence.nepochs - 2)*10
             if nexp[indx] > maxExp:
                 # print(f"{float(mjd):.3f} {int(self.fields.field_id[indx])} c_nexp {cadence.nexp[epoch_idx]} MAXEXP {maxExp}")
                 observable[indx] = False
