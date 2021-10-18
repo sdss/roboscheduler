@@ -821,6 +821,7 @@ class Scheduler(Master):
                          observatoryfile=observatoryfile)
         self.check = False
         self.recent = list()
+        self.recent_ids = list()
         self.airmass_limit = airmass_limit
         if exp_time is None:
             self.exp_time = 18 / 60 / 24
@@ -930,6 +931,8 @@ class Scheduler(Master):
 
         # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
 
+        over = list()
+
         # indxs = np.where(self.fields.nextmjd > mjd)[0]
         # observable[indxs] = False
         indxs = np.where(observable)[0]
@@ -959,14 +962,27 @@ class Scheduler(Master):
                 mjd_prev = mjd_past[-1]
             else:
                 mjd_prev = 0
-            if epoch_idx >= cadence.nepochs and not self.fields.flag[indx] == 1:
-                # print("DONE ", epoch_idx, cadence.nepochs, int(self.fields.field_id[indx]))
+            if len(mjd_past) > np.sum(cadence.nexp):
+                over.append(int(self.fields.field_id[indx]))
+            actually_done = False
+            # because dark-2xN can have max length 7 but delta min 0.5
+            while exp_epoch > cadence.nexp[epoch_idx]:
+                exp_epoch -= cadence.nexp[epoch_idx]
+                epoch_idx += 1
+                if epoch_idx == cadence.nepochs:
+                    actually_done = True
+                    break
+            if actually_done:
                 observable[indx] = False
                 continue
             if exp_epoch < cadence.nexp[epoch_idx] and exp_epoch != 0:
                 nexp[indx] = cadence.nexp[epoch_idx] - exp_epoch
                 epoch_idx -= 1
                 partial_epoch = True
+            if epoch_idx >= cadence.nepochs and not self.fields.flag[indx] == 1:
+                # print("DONE ", epoch_idx, cadence.nepochs, int(self.fields.field_id[indx]))
+                observable[indx] = False
+                continue
             else:
                 nexp[indx] = cadence.nexp[epoch_idx]
                 partial_epoch = False
@@ -975,6 +991,9 @@ class Scheduler(Master):
                 # change between bright/dark, field doesn't fit
                 observable[indx] = False
                 continue
+            # if int(self.fields.field_id[indx]) in over:
+            #     print("!?", epoch_idx >= cadence.nepochs, not self.fields.flag[indx] == 1)
+            #     print(int(self.fields.field_id[indx]), len(mjd_past), cadence.nexp, exp_epoch, cadence.nepochs, epoch_idx)
             observable[indx], delta_priority[indx] =\
                 cadence.evaluate_next(epoch_idx=epoch_idx,
                                       partial_epoch=partial_epoch,
@@ -1001,16 +1020,17 @@ class Scheduler(Master):
                 # so override cadence eligibility and bump priority
                 observable[indx] = True
                 delta_priority[indx] += 1e6
-            if "x8" in cadence.name and observable[indx]:
-                self.check = True
-                # print(f"F {float(mjd):.3f} {int(self.fields.field_id[indx])} {delta_priority[indx]}")
-                self.recent.append(f"R {epoch_idx} {float(mjd):.3f} {int(self.fields.field_id[indx])} {mjd-mjd_prev} tol {tol}")
+            # if "dark_2x2" in cadence.name and observable[indx] and mjd_prev != 0:
+            #     self.check = True
+            #     # print(f"F {float(mjd):.3f} {int(self.fields.field_id[indx])} {delta_priority[indx]}")
+            #     self.recent.append(f"R {int(self.fields.field_id[indx])} {epoch_idx} prev {len(mjd_past)} epoch {epoch_idx} tol {tol} partial {partial_epoch}")
+            #     self.recent_ids.append(int(self.fields.field_id[indx]))
                 # print(nexp[indx], type(nexp[indx]))
-            elif "x8" in cadence.name and not observable[indx]:
-                if skybrightness < 0.36 and moon_dist[indx] < 30 and deltav[indx] < 2 and airmass[indx] < 1.5:
-                    print(f"F {epoch_idx} {float(mjd):.3f} {int(self.fields.field_id[indx])} {mjd-mjd_prev}")
-                    print(f"sky {skybrightness} moon {moon_dist[indx]} deltav {deltav[indx]} AM {airmass[indx]:}")
-                    print(nexp[indx], type(nexp[indx]), maxExp)
+            # elif "x8" in cadence.name and not observable[indx]:
+            #     if skybrightness < 0.36 and moon_dist[indx] < 30 and deltav[indx] < 2 and airmass[indx] < 1.5:
+            #         print(f"F {epoch_idx} {float(mjd):.3f} {int(self.fields.field_id[indx])} {mjd-mjd_prev}")
+            #         print(f"sky {skybrightness} moon {moon_dist[indx]} deltav {deltav[indx]} AM {airmass[indx]:}")
+            #         print(nexp[indx], type(nexp[indx]), maxExp)
         # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
         iobservable = np.where(observable)[0]
 
@@ -1101,12 +1121,12 @@ class Scheduler(Master):
         pick_fieldid = fieldid[ipick]
         pick_exp = nexp[ipick]
 
-        if self.check:
-            # self.chosen[-1] = pick_fieldid
-            # self.chosen_pri[-1] = float(priority[ipick])
-            print("\n CHOICE", pick_fieldid, np.max(priority), pick_exp)
-            for r in self.recent:
-                print(r)
+        # if self.check and int(pick_fieldid) in self.recent_ids:
+        #     # self.chosen[-1] = pick_fieldid
+        #     # self.chosen_pri[-1] = float(priority[ipick])
+        #     print("\n CHOICE", pick_fieldid, np.max(priority), pick_exp)
+        #     for r in self.recent:
+        #         print(r)
 
         return(pick_fieldid, pick_exp)
 
@@ -1180,6 +1200,7 @@ class Scheduler(Master):
         """
         self.check = False
         self.recent = list()
+        self.recent_ids = list()
 
         iobservable, nexp, delta_priority = self.observable(mjd=mjd, maxExp=maxExp,
                                                             ignore=ignore)
