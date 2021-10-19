@@ -39,7 +39,7 @@ def dateandtime2mjd(date=None, time='12:00', to_tai=7):
     return(times.mjd)
 
 
-def nExpPrioritize(nexp):
+def nExpPrioritize(nexp, award=2e6, penalty=-100):
     """adjust field priorities based on planned exps
 
        1 exp: negative, 8 exp: super high
@@ -48,9 +48,9 @@ def nExpPrioritize(nexp):
     assert nexp < 9 and nexp > 0, "invalid nexp"
 
     if nexp == 1:
-        return -100
+        return penalty
     elif nexp == 8:
-        return 2e6
+        return award
     elif nexp == 2:
         return 0
     else:
@@ -827,6 +827,13 @@ class Scheduler(Master):
             self.exp_time = 18 / 60 / 24
         else:
             self.exp_time = exp_time
+
+        # priorities
+        self.nepochsPri = 10
+        self.nExpPriAward = 2e6
+        self.nExpPriPenalty = -100
+        self.basePri = 100
+
         return
 
     def initdb(self, designbase='plan-0', fromFits=True):
@@ -1006,10 +1013,12 @@ class Scheduler(Master):
             # if nexp[indx] > 6 and observable[indx]:
             #     delta_priority[indx] += 1e6
             # delta_priority[indx] += 2.5**nexp[indx]
+            nExpPrioritize(nexp, award=self.nExpPriAward,
+                           penalty=self.nExpPriPenalty)
             delta_priority[indx] += nExpPrioritize(nexp[indx])
             # prioritize nepochs. Huge bump for 8 + epochs
             # slight decrement for single epochs
-            delta_priority[indx] += (cadence.nepochs - 2)*10
+            delta_priority[indx] += (cadence.nepochs - 2)*self.nepochsPri
             if nexp[indx] > maxExp:
                 # print(f"{float(mjd):.3f} {int(self.fields.field_id[indx])} c_nexp {cadence.nexp[epoch_idx]} MAXEXP {maxExp}")
                 observable[indx] = False
@@ -1064,11 +1073,16 @@ class Scheduler(Master):
             calculated priority for each field
         """
 
-        priority = np.ones(len(iobservable))*100
+        priority = np.ones(len(iobservable)) * self.basePri
         # priority = self.fields.basePriority[fieldid]
         priority += delta_priority
 
-        priority += np.power(2, nexp) * 5  # 1280 for RM
+        # # #################
+        # # #################
+        # # GRRRRRR
+        # # #################
+        # # #################
+        # priority += np.power(2, nexp) * 5  # 1280 for RM
 
         lst = self.lst(mjd)
 
