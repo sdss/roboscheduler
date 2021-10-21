@@ -112,7 +112,7 @@ class Cadence(cCadenceCore.CadenceCore):
                  max_length=None, obsmode_pk=None, label_root=None,
                  label_version=None, cfg=None, min_moon_sep=None,
                  min_deltav_ks91=None, min_twilight_ang=None,
-                 max_airmass=None):
+                 max_airmass=None, priorities={}):
         if(cfg is not None):
             self._from_cfg(name=name, cfg=cfg)
             return
@@ -140,6 +140,13 @@ class Cadence(cCadenceCore.CadenceCore):
                          min_moon_sep, min_deltav_ks91,
                          min_twilight_ang, max_airmass,
                          epoch_indx, epochs)
+
+        self.partialEpochPri = priorities.get("partialEpochPri", 200)
+        self.brightDurDarkPenalty = priorities.get("brightDurDarkPenalty", -100)
+        self.deltaMaxPriBump = priorities.get("deltaMaxPriBump", 10)
+        self.deltaNomBump = priorities.get("deltaNomBump", 4)
+        self.overDeltaMaxBump = priorities.get("overDeltaMaxBump", 100)
+
         return
 
     def _from_cfg(self, name=None, cfg=None):
@@ -231,7 +238,7 @@ class Cadence(cCadenceCore.CadenceCore):
         """
 
         if partial_epoch:
-            base_priority = 200
+            base_priority = self.partialEpochPri
         elif(epoch_idx >= self.nepochs):
             print("done!")
             return(False, 0)
@@ -248,7 +255,7 @@ class Cadence(cCadenceCore.CadenceCore):
             return ok_skybrightness, 0
 
         if down_weight:
-            base_priority = -100
+            base_priority = self.brightDurDarkPenalty
 
         if(epoch_idx == 0):
             # if "x8" in self.name:
@@ -266,13 +273,13 @@ class Cadence(cCadenceCore.CadenceCore):
         # if "x1" in self.name:
         #     print("delta {} dhi {} dlo {} curr {:.2f}".format(dnom, dhi, dlo, float(delta_curr)), self.name)
         # 1/sqrt(x) priority; at 1 day +100, at 10 days +30, at 30 days +18
-        remain_priority = 10 * np.clip(10/np.sqrt(np.abs(dhi - delta_curr)),
+        remain_priority = self.deltaMaxPriBump * np.clip(10/np.sqrt(np.abs(dhi - delta_curr)),
                                        a_min=None, a_max=10)
-        nom_priority = 4 * np.clip(10/np.sqrt(np.abs(dnom - delta_curr)),
+        nom_priority = self.deltaNomBump * np.clip(10/np.sqrt(np.abs(dnom - delta_curr)),
                                    a_min=None, a_max=10)
         priority = base_priority + remain_priority + nom_priority
         if delta_curr <= dhi:
-            priority += 100
+            priority += self.overDeltaMaxBump
         # if ignoreMax:
         #     return(ok_skybrightness & (delta_curr >= dlo), priority)
         # if "x8" in self.name:
@@ -503,7 +510,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         # If we have gotten here no working solution was found
         return False
 
-    def fromarray(self, cadences_array=None):
+    def fromarray(self, cadences_array=None, priorities={}):
         """Add cadences to ccadence list from an array
 
         Parameters:
@@ -532,10 +539,11 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                              min_twilight_ang=ccadence['MIN_TWILIGHT_ANG'][0:nepochs],
                              max_airmass=ccadence['MAX_AIRMASS'][0:nepochs],
                              label_root=ccadence['LABEL_ROOT'],
-                             label_version=ccadence['LABEL_VERSION'])
+                             label_version=ccadence['LABEL_VERSION'],
+                             priorities=priorities)
         return
 
-    def fromfits(self, filename=None, unpickle=False):
+    def fromfits(self, filename=None, unpickle=False, priorities={}):
         """Add cadences to ccadence list from a FITS file
 
         Parameters:
@@ -552,7 +560,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             'NEXP'
         """
         self.cadences_fits = fitsio.read(filename)
-        self.fromarray(self.cadences_fits)
+        self.fromarray(self.cadences_fits, priorities=priorities)
         if(unpickle):
             fp = open(filename + '.pkl', 'rb')
             cc = pickle.load(fp)

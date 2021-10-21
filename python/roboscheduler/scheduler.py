@@ -814,7 +814,7 @@ class Scheduler(Master):
     """
     def __init__(self, airmass_limit=2.,
                  schedule='normal', observatory='apo', observatoryfile=None,
-                 exp_time=None):
+                 exp_time=None, priorities={}):
         """Return Scheduler object
         """
         super().__init__(schedule=schedule, observatory=observatory,
@@ -829,10 +829,13 @@ class Scheduler(Master):
             self.exp_time = exp_time
 
         # priorities
-        self.nepochsPri = 10
-        self.nExpPriAward = 2e6
-        self.nExpPriPenalty = -100
-        self.basePri = 100
+        self.priorities = priorities  # need it later
+        self.nepochsPri = priorities.get("nepochsPri", 10)
+        self.nExpPriAward = priorities.get("nExpPriAward", 2e6)
+        self.nExpPriPenalty = priorities.get("nExpPriPenalty", -100)
+        self.basePri = priorities.get("basePri", 100)
+        self.lstPri = priorities.get("lstPri", 100)
+        self.overheadPri = priorities.get("overheadPri", 40)
 
         return
 
@@ -860,9 +863,10 @@ class Scheduler(Master):
             cadence_file = filebase + "/" + "rsCadences" + "-" + designbase + "-"\
                            + self.observatory + ".fits"
             fields_file = filebase + "/" + "rsAllocation" + "-" + designbase + "-"\
-                           + self.observatory + ".fits"
+                          + self.observatory + ".fits"
 
-            self.cadencelist.fromfits(filename=cadence_file)
+            self.cadencelist.fromfits(filename=cadence_file,
+                                      priorities=self.priorities)
             self.fields.fromfits(filename=fields_file)
         else:
             self.cadencelist.fromdb()
@@ -1099,11 +1103,11 @@ class Scheduler(Master):
         dec = self.fields.deccen[iobservable]
 
         # gaussian weight, mean already 0, use 1 hr  std
-        priority += 100 * np.exp(-(lstDiffs)**2 / (2 * 0.5**2))
+        priority += self.lstPri * np.exp(-(lstDiffs)**2 / (2 * 0.5**2))
         # gaussian weight, mean already 0, use 1 hr = 15 deg std
         # priority += 50 * np.exp(-(ha)**2 / (2 * 15**2))
         # gaussian weight, mean = obs lat, use 20 deg std
-        priority -= 40 * np.exp(-(dec - self.latitude)**2 / (2 * 20**2))
+        priority -= self.overheadPri * np.exp(-(dec - self.latitude)**2 / (2 * 20**2))
 
         return priority
 
