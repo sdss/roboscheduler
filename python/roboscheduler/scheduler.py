@@ -39,7 +39,7 @@ def dateandtime2mjd(date=None, time='12:00', to_tai=7):
     return(times.mjd)
 
 
-def nExpPrioritize(nexp):
+def nExpPrioritize(nexp, award=2e6, penalty=-100):
     """adjust field priorities based on planned exps
 
        1 exp: negative, 8 exp: super high
@@ -48,9 +48,9 @@ def nExpPrioritize(nexp):
     assert nexp < 9 and nexp > 0, "invalid nexp"
 
     if nexp == 1:
-        return -100
+        return penalty
     elif nexp == 8:
-        return 2e6
+        return award
     elif nexp == 2:
         return 0
     else:
@@ -814,7 +814,7 @@ class Scheduler(Master):
     """
     def __init__(self, airmass_limit=2.,
                  schedule='normal', observatory='apo', observatoryfile=None,
-                 exp_time=None):
+                 exp_time=None, priorities={}):
         """Return Scheduler object
         """
         super().__init__(schedule=schedule, observatory=observatory,
@@ -827,6 +827,16 @@ class Scheduler(Master):
             self.exp_time = 18 / 60 / 24
         else:
             self.exp_time = exp_time
+
+        # priorities
+        self.priorities = priorities  # need it later
+        self.nepochsPri = priorities.get("nepochsPri", 10)
+        self.nExpPriAward = priorities.get("nExpPriAward", 2e6)
+        self.nExpPriPenalty = priorities.get("nExpPriPenalty", -100)
+        self.basePri = priorities.get("basePri", 100)
+        self.lstPri = priorities.get("lstPri", 100)
+        self.overheadPri = priorities.get("overheadPri", 40)
+
         return
 
     def initdb(self, designbase='plan-0', fromFits=True):
@@ -853,9 +863,10 @@ class Scheduler(Master):
             cadence_file = filebase + "/" + "rsCadences" + "-" + designbase + "-"\
                            + self.observatory + ".fits"
             fields_file = filebase + "/" + "rsAllocation" + "-" + designbase + "-"\
-                           + self.observatory + ".fits"
+                          + self.observatory + ".fits"
 
-            self.cadencelist.fromfits(filename=cadence_file)
+            self.cadencelist.fromfits(filename=cadence_file,
+                                      priorities=self.priorities)
             self.fields.fromfits(filename=fields_file)
         else:
             self.cadencelist.fromdb()
@@ -1006,10 +1017,12 @@ class Scheduler(Master):
             # if nexp[indx] > 6 and observable[indx]:
             #     delta_priority[indx] += 1e6
             # delta_priority[indx] += 2.5**nexp[indx]
+            nExpPrioritize(nexp, award=self.nExpPriAward,
+                           penalty=self.nExpPriPenalty)
             delta_priority[indx] += nExpPrioritize(nexp[indx])
             # prioritize nepochs. Huge bump for 8 + epochs
             # slight decrement for single epochs
-            delta_priority[indx] += (cadence.nepochs - 2)*10
+            delta_priority[indx] += (cadence.nepochs - 2)*self.nepochsPri
             if nexp[indx] > maxExp:
                 # print(f"{float(mjd):.3f} {int(self.fields.field_id[indx])} c_nexp {cadence.nexp[epoch_idx]} MAXEXP {maxExp}")
                 observable[indx] = False
@@ -1064,11 +1077,16 @@ class Scheduler(Master):
             calculated priority for each field
         """
 
-        priority = np.ones(len(iobservable))*100
+        priority = np.ones(len(iobservable)) * self.basePri
         # priority = self.fields.basePriority[fieldid]
         priority += delta_priority
 
-        priority += np.power(2, nexp) * 5  # 1280 for RM
+        # # #################
+        # # #################
+        # # GRRRRRR
+        # # #################
+        # # #################
+        # priority += np.power(2, nexp) * 5  # 1280 for RM
 
         lst = self.lst(mjd)
 
@@ -1085,11 +1103,11 @@ class Scheduler(Master):
         dec = self.fields.deccen[iobservable]
 
         # gaussian weight, mean already 0, use 1 hr  std
-        priority += 100 * np.exp(-(lstDiffs)**2 / (2 * 0.5**2))
+        priority += self.lstPri * np.exp(-(lstDiffs)**2 / (2 * 0.5**2))
         # gaussian weight, mean already 0, use 1 hr = 15 deg std
         # priority += 50 * np.exp(-(ha)**2 / (2 * 15**2))
         # gaussian weight, mean = obs lat, use 20 deg std
-        priority -= 40 * np.exp(-(dec - self.latitude)**2 / (2 * 20**2))
+        priority -= self.overheadPri * np.exp(-(dec - self.latitude)**2 / (2 * 20**2))
 
         return priority
 
