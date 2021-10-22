@@ -293,14 +293,20 @@ class CadenceList(object, metaclass=CadenceListSingleton):
     Parameters:
     ----------
 
+    skybrightness_only : bool
+        Only use sky brightness for consistency checks (default False)
+
     Attributes:
     ----------
 
+    skybrightness_only : bool
+        Only use sky brightness for consistency checks
+
     ncadences : np.int32, int
-         number of different cadences
+        number of different cadences
 
     cadences : dict
-         dictionary of Cadence objects
+        dictionary of Cadence objects
 
     Methods:
     -------
@@ -321,9 +327,10 @@ class CadenceList(object, metaclass=CadenceListSingleton):
     This is a singleton, so there can only be one CadenceList defined
     within any session.
     """
-    def __init__(self):
+    def __init__(self, skybrightness_only=False):
         self.reset()
         self.max_nsolns = 100
+        self.skybrightness_only = skybrightness_only
         return
 
     def reset(self):
@@ -416,12 +423,14 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         of how many exposures you are putting into each epoch. In this 
         case 'nexps' is returned.
         """
-        cache_key = (one, two, epoch_level, return_solutions, merge_epochs)
+        cache_key = (one, two, epoch_level, return_solutions,
+                     merge_epochs, self.skybrightness_only)
         if(cache_key in self._cadence_consistency):
             return(self._cadence_consistency[cache_key])
 
         onecc = self.cadences[one].as_cadencecore()
-        possibles = self.cadences[two].cadence_consistency(onecc)
+        possibles = self.cadences[two].cadence_consistency(onecc,
+                                                           self.skybrightness_only)
         success = len(possibles) > 0
 
         if(return_solutions):
