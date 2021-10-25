@@ -1,4 +1,4 @@
-import os
+import os, sys
 import numpy as np
 import scipy.optimize as optimize
 import PyAstronomy.pyasl as pyasl
@@ -39,7 +39,7 @@ def dateandtime2mjd(date=None, time='12:00', to_tai=7):
     return(times.mjd)
 
 
-def nExpPrioritize(nexp, award=2e6, penalty=-100):
+def nExpPrioritize(nexp, base=20, award=2e6, penalty=-100):
     """adjust field priorities based on planned exps
 
        1 exp: negative, 8 exp: super high
@@ -54,7 +54,7 @@ def nExpPrioritize(nexp, award=2e6, penalty=-100):
     elif nexp == 2:
         return 0
     else:
-        return nexp * 20
+        return nexp * base
 
 
 class SchedulerBase(object):
@@ -831,6 +831,7 @@ class Scheduler(Master):
         # priorities
         self.priorities = priorities  # need it later
         self.nepochsPri = priorities.get("nepochsPri", 10)
+        self.nExpPriBase = priorities.get("nExpPriBase", 20)
         self.nExpPriAward = priorities.get("nExpPriAward", 2e6)
         self.nExpPriPenalty = priorities.get("nExpPriPenalty", -100)
         self.basePri = priorities.get("basePri", 100)
@@ -916,6 +917,7 @@ class Scheduler(Master):
                                    dec=self.fields.deccen)
 
         # whereRM = np.where(["bhm_rm" in c for c in self.fields.cadence])[0]
+        where_uhoh = np.where(["dark_2x" in c for c in self.fields.cadence])[0]
 
         next_change, next_brightness = self.next_change(mjd)
 
@@ -1017,9 +1019,10 @@ class Scheduler(Master):
             # if nexp[indx] > 6 and observable[indx]:
             #     delta_priority[indx] += 1e6
             # delta_priority[indx] += 2.5**nexp[indx]
-            nExpPrioritize(nexp, award=self.nExpPriAward,
-                           penalty=self.nExpPriPenalty)
-            delta_priority[indx] += nExpPrioritize(nexp[indx])
+            delta_priority[indx] += nExpPrioritize(nexp[indx],
+                                                   base=self.nExpPriBase,
+                                                   award=self.nExpPriAward,
+                                                   penalty=self.nExpPriPenalty)
             # prioritize nepochs. Huge bump for 8 + epochs
             # slight decrement for single epochs
             delta_priority[indx] += (cadence.nepochs - 2)*self.nepochsPri
@@ -1046,6 +1049,12 @@ class Scheduler(Master):
             #         print(nexp[indx], type(nexp[indx]), maxExp)
         # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
         iobservable = np.where(observable)[0]
+
+        # if len(iobservable) == 0 and skybrightness < 0.35:
+        #     for i, v, a in zip(self.fields.field_id[where_uhoh], deltav[where_uhoh], airmass[where_uhoh]):
+        #         print(int(i), v, a)
+        #     print("failed", mjd, next_change, maxExp)
+        #     sys.exit(1)
 
         return iobservable, nexp[iobservable], delta_priority[iobservable]
 
