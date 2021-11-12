@@ -835,7 +835,7 @@ class Scheduler(Master):
         self.nExpPriAward = priorities.get("nExpPriAward", 2e6)
         self.nExpPriPenalty = priorities.get("nExpPriPenalty", -100)
         self.basePri = priorities.get("basePri", 100)
-        self.lstPri = priorities.get("lstPri", 100)
+        self.lstPri = priorities.get("lstPri", 400)
         self.overheadPri = priorities.get("overheadPri", 40)
 
         return
@@ -1050,10 +1050,10 @@ class Scheduler(Master):
         # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
         iobservable = np.where(observable)[0]
 
-        # if len(iobservable) == 0 and skybrightness < 0.35:
+        # if len(iobservable) == 0:
         #     for i, v, a in zip(self.fields.field_id[where_uhoh], deltav[where_uhoh], airmass[where_uhoh]):
         #         print(int(i), v, a)
-        #     print("failed", mjd, next_change, maxExp)
+        #     print("failed", skybrightness, mjd, next_change, maxExp)
         #     sys.exit(1)
 
         return iobservable, nexp[iobservable], delta_priority[iobservable]
