@@ -231,7 +231,7 @@ class Fields(object, metaclass=FieldsSingleton):
 
                 dbfields = Field.select(d2s.mjd, Field.field_id)\
                                 .join(Design)\
-                                .join(d2s, on=(Design.pk == d2s.design_pk))\
+                                .join(d2s, on=(Design.design_id == d2s.design_id))\
                                 .where((Field.version == ver) &
                                        (Field.observatory == obs),
                                        (d2s.status == done)).dicts()
