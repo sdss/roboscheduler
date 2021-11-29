@@ -8,6 +8,7 @@ import sys
 import numpy as np
 from astropy.time import Time
 
+import roboscheduler
 from roboscheduler.scheduler import Observer
 
 
@@ -82,8 +83,9 @@ def makeSched(start, stop, outDir="", name="MS", observatory="apo"):
 
     date = Time(mjds[0], format="mjd").datetime
 
-    prod_dir = os.path.abspath(__file__).split("/bin/")[0]
-    head_file = os.path.join(prod_dir, 'data', 'sch_head.txt')
+    prod_dir = os.path.abspath(roboscheduler.__file__).split("/__init__.py")[0]
+    head_file = os.path.join(prod_dir, 'etc', 'sch_head.txt')
+
 
     with open(head_file, "r") as header:
         local = "# Timezone offset in hours to apply to get to TAI \n# (i.e. Greenwich time)"
