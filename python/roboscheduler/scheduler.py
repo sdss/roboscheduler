@@ -951,7 +951,7 @@ class Scheduler(Master):
         indxs = np.where(observable)[0]
         for indx in indxs:
             # if(observable[indx]):
-            if int(self.fields.field_id[indx]) in ignore:
+            if int(self.fields.pk[indx]) in ignore:
                 observable[indx] = False
                 continue
             elif self.fields.flag[indx] == -1:
@@ -959,7 +959,7 @@ class Scheduler(Master):
                 continue
             cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
 
-            mjd_past = self.fields.hist[self.fields.field_id[indx]]
+            mjd_past = self.fields.hist[self.fields.pk[indx]]
             # epoch_idx is the *index* of the *next* epoch
             # for 0 indexed arrays, this equivalent to
             # "how many epochs have I done previously"
@@ -976,7 +976,7 @@ class Scheduler(Master):
             else:
                 mjd_prev = 0
             if len(mjd_past) > np.sum(cadence.nexp):
-                over.append(int(self.fields.field_id[indx]))
+                over.append(int(self.fields.pk[indx]))
             actually_done = False
             # because dark-2xN can have max length 7 but delta min 0.5
             while exp_epoch > cadence.nexp[epoch_idx]:
@@ -993,20 +993,20 @@ class Scheduler(Master):
                 epoch_idx -= 1
                 partial_epoch = True
             if epoch_idx >= cadence.nepochs and not self.fields.flag[indx] == 1:
-                # print("DONE ", epoch_idx, cadence.nepochs, int(self.fields.field_id[indx]))
+                # print("DONE ", epoch_idx, cadence.nepochs, int(self.fields.pk[indx]))
                 observable[indx] = False
                 continue
             else:
                 nexp[indx] = cadence.nexp[epoch_idx]
                 partial_epoch = False
             if nexp[indx] > nexp_change and self.fields.flag[indx] != 1:
-                # print(f"{float(mjd):.3f} {int(self.fields.field_id[indx])} c_nexp {cadence.nexp[epoch_idx]} NEXP {nexp_change} MAXEXP {maxExp}")
+                # print(f"{float(mjd):.3f} {int(self.fields.pk[indx])} c_nexp {cadence.nexp[epoch_idx]} NEXP {nexp_change} MAXEXP {maxExp}")
                 # change between bright/dark, field doesn't fit
                 observable[indx] = False
                 continue
-            # if int(self.fields.field_id[indx]) in over:
+            # if int(self.fields.pk[indx]) in over:
             #     print("!?", epoch_idx >= cadence.nepochs, not self.fields.flag[indx] == 1)
-            #     print(int(self.fields.field_id[indx]), len(mjd_past), cadence.nexp, exp_epoch, cadence.nepochs, epoch_idx)
+            #     print(int(self.fields.pk[indx]), len(mjd_past), cadence.nexp, exp_epoch, cadence.nepochs, epoch_idx)
             observable[indx], delta_priority[indx] =\
                 cadence.evaluate_next(epoch_idx=epoch_idx,
                                       partial_epoch=partial_epoch,
@@ -1027,7 +1027,7 @@ class Scheduler(Master):
             # slight decrement for single epochs
             delta_priority[indx] += (cadence.nepochs - 2)*self.nepochsPri
             if nexp[indx] > maxExp:
-                # print(f"{float(mjd):.3f} {int(self.fields.field_id[indx])} c_nexp {cadence.nexp[epoch_idx]} MAXEXP {maxExp}")
+                # print(f"{float(mjd):.3f} {int(self.fields.pk[indx])} c_nexp {cadence.nexp[epoch_idx]} MAXEXP {maxExp}")
                 observable[indx] = False
             if self.fields.flag[indx] == 1:
                 # flagged as top priority
@@ -1038,20 +1038,20 @@ class Scheduler(Master):
                 delta_priority[indx] += 1e6
             # if "dark_2x2" in cadence.name and observable[indx] and mjd_prev != 0:
             #     self.check = True
-            #     # print(f"F {float(mjd):.3f} {int(self.fields.field_id[indx])} {delta_priority[indx]}")
-            #     self.recent.append(f"R {int(self.fields.field_id[indx])} {epoch_idx} prev {len(mjd_past)} epoch {epoch_idx} tol {tol} partial {partial_epoch}")
-            #     self.recent_ids.append(int(self.fields.field_id[indx]))
+            #     # print(f"F {float(mjd):.3f} {int(self.fields.pk[indx])} {delta_priority[indx]}")
+            #     self.recent.append(f"R {int(self.fields.pk[indx])} {epoch_idx} prev {len(mjd_past)} epoch {epoch_idx} tol {tol} partial {partial_epoch}")
+            #     self.recent_ids.append(int(self.fields.pk[indx]))
                 # print(nexp[indx], type(nexp[indx]))
             # elif "x8" in cadence.name and not observable[indx]:
             #     if skybrightness < 0.36 and moon_dist[indx] < 30 and deltav[indx] < 2 and airmass[indx] < 1.5:
-            #         print(f"F {epoch_idx} {float(mjd):.3f} {int(self.fields.field_id[indx])} {mjd-mjd_prev}")
+            #         print(f"F {epoch_idx} {float(mjd):.3f} {int(self.fields.pk[indx])} {mjd-mjd_prev}")
             #         print(f"sky {skybrightness} moon {moon_dist[indx]} deltav {deltav[indx]} AM {airmass[indx]:}")
             #         print(nexp[indx], type(nexp[indx]), maxExp)
         # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
         iobservable = np.where(observable)[0]
 
         # if len(iobservable) == 0 and skybrightness < 0.35:
-        #     for i, v, a in zip(self.fields.field_id[where_uhoh], deltav[where_uhoh], airmass[where_uhoh]):
+        #     for i, v, a in zip(self.fields.pk[where_uhoh], deltav[where_uhoh], airmass[where_uhoh]):
         #         print(int(i), v, a)
         #     print("failed", mjd, next_change, maxExp)
         #     sys.exit(1)
@@ -1251,10 +1251,10 @@ class Scheduler(Master):
             # for i in sorted_priority:
             #     field_idx = iobservable[i]
             #     print(i, priority[i], nexp[i],
-            #           self.fields.field_id[field_idx],
+            #           self.fields.pk[field_idx],
             #           self.fields.cadence[field_idx])
             sorted_idx = [iobservable[i] for i in sorted_priority]
-            sorted_fields = [self.fields.field_id[i] for i in sorted_idx]
+            sorted_fields = [self.fields.pk[i] for i in sorted_idx]
             sorted_exp = [nexp[i] for i in sorted_priority]
 
             if not live:
@@ -1271,7 +1271,7 @@ class Scheduler(Master):
         #         print(c, i, p, np.max(priority))
         #         considered = True
 
-        observable_fieldid = self.fields.field_id[iobservable]
+        observable_fieldid = self.fields.pk[iobservable]
 
         fieldid, next_exp = self.pick(priority=priority,
                                       fieldid=observable_fieldid,
@@ -1286,7 +1286,7 @@ class Scheduler(Master):
 
         return fieldid, designs
 
-    def update(self, fieldid=None, result=None, finish=False):
+    def update(self, field_pk=None, result=None, finish=False):
         """Update Scheduler.observations with result of observations, used for sims
 
         Parameters:
@@ -1300,7 +1300,7 @@ class Scheduler(Master):
 
         """
 
-        fieldidx = int(np.where(self.fields.field_id == fieldid)[0])
+        fieldidx = int(np.where(self.fields.pk == field_pk)[0])
 
         racen = self.fields.racen[fieldidx]
         deccen = self.fields.deccen[fieldidx]
