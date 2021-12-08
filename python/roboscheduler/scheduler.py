@@ -1157,25 +1157,25 @@ class Scheduler(Master):
 
         return(pick_fieldid, pick_exp)
 
-    def designsNext(self, fieldid):
+    def designsNext(self, field_pk):
         """Figure out next designs on a field, i.e. which exposure are we on?
 
         Parameters:
         ----------
 
-        fieldid : ndarray of np.int32
-            field ids corresponding to prioritiea
+        field_pk : ndarray of np.int32
+            field pk to get designs for
 
         Returns:
         -------
 
         designs : list of integer
-            a list of exposure numbers up next for "fieldid", corresponding 
+            a list of exposure numbers up next for "field_pk", corresponding
             to some designs.
 
         """
-        fieldidx = self.fields.getidx(fieldid)
-        mjd_past = self.fields.hist[fieldid]
+        fieldidx = self.fields.getidx(field_pk)
+        mjd_past = self.fields.hist[field_pk]
         cadence = self.cadencelist.cadences[self.fields.cadence[fieldidx]]
         epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=240)
         nexp_next = cadence.nexp[epoch_idx]
@@ -1273,18 +1273,18 @@ class Scheduler(Master):
 
         observable_fieldid = self.fields.pk[iobservable]
 
-        fieldid, next_exp = self.pick(priority=priority,
-                                      fieldid=observable_fieldid,
-                                      nexp=nexp)
+        field_pk, next_exp = self.pick(priority=priority,
+                                       fieldid=observable_fieldid,
+                                       nexp=nexp)
 
         if not live:
             # just a sim return number of designs
-            return(fieldid, next_exp)
+            return(field_pk, next_exp)
 
         # its live, return list of exp indices
-        designs = self.designsNext(fieldid)
+        designs = self.designsNext(field_pk)
 
-        return fieldid, designs
+        return field_pk, designs
 
     def update(self, field_pk=None, result=None, finish=False):
         """Update Scheduler.observations with result of observations, used for sims
@@ -1292,8 +1292,8 @@ class Scheduler(Master):
         Parameters:
         -----------
 
-        fieldid : np.int32, int
-            ID of field
+        field_pk : np.int32, int
+            PK of field
 
         result : ndarray
             One element, contains 'mjd', 'duration', 'sn2'
@@ -1314,7 +1314,7 @@ class Scheduler(Master):
         airmass = self.alt2airmass(alt)
         skybrightness = self.skybrightness(result['mjd'])
         lst = self.lst(result['mjd'])
-        iobs = self.observations.add(fieldid=fieldid,
+        iobs = self.observations.add(field_pk=field_pk,
                                      mjd=result['mjd'],
                                      duration=result['duration'],
                                      apgSN2=result['apgSN2'],

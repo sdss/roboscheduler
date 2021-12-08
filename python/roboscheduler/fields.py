@@ -104,6 +104,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.racen = fields_array['racen']
         self.deccen = fields_array['deccen']
         self.nfilled = fields_array['nfilled']
+        self.field_id = fields_array['field_id']
         self.pk = fields_array['pk']
         self.cadence = [c.strip().decode() for c in fields_array['cadence']]
         self.slots = fields_array['slots_exposures']
@@ -123,7 +124,7 @@ class Fields(object, metaclass=FieldsSingleton):
 
     def fromfits(self, filename=None):
         """Load a fits file into this Fields object,
-           likely an RS-Assignments file.
+           likely an RS-Allocation file.
 
         Parameters:
         ----------
@@ -133,6 +134,7 @@ class Fields(object, metaclass=FieldsSingleton):
         """
         self._database = False
         fields_model = [('pk', np.int32),
+                        ('field_id', np.int32),
                         ('racen', np.float64),
                         ('deccen', np.float64),
                         ('nfilled', np.int32),
@@ -144,8 +146,7 @@ class Fields(object, metaclass=FieldsSingleton):
 
         self.fields_fits = np.zeros(len(fits_dat["fieldid"]), dtype=fields_model)
 
-        # THIS WILL BREAK READING FROM A FILE! But let's let that happen until
-        # John fully reviews new rsAllocation files
+        self.fields_fits["pk"] = np.arange(len(fits_dat["fieldid"]))
         self.fields_fits["field_id"] = fits_dat["fieldid"]
         self.fields_fits["racen"] = fits_dat["racen"]
         self.fields_fits["deccen"] = fits_dat["deccen"]
@@ -300,6 +301,7 @@ class Fields(object, metaclass=FieldsSingleton):
         assert version is not None, "must specify version!"
 
         fields_model = [('pk', np.int32),
+                        ('field_id', np.int32),
                         ('racen', np.float64),
                         ('deccen', np.float64),
                         ('nfilled', np.int32),
@@ -317,7 +319,8 @@ class Fields(object, metaclass=FieldsSingleton):
         dbfields = Field.select().where(Field.version == ver,
                                         Field.observatory == obs)
 
-        fieldid = list()
+        pk = list()
+        field_id = list()
         racen = list()
         deccen = list()
         slots_exposures = list()
@@ -325,7 +328,8 @@ class Fields(object, metaclass=FieldsSingleton):
         flags = list()
 
         for field in dbfields:
-            fieldid.append(field.pk)
+            pk.append(field.pk)
+            field_id.append(field.field_id)
             racen.append(field.racen)
             deccen.append(field.deccen)
             slots_exposures.append(field.slots_exposures)
@@ -340,7 +344,8 @@ class Fields(object, metaclass=FieldsSingleton):
 
         fields = np.zeros(len(dbfields), dtype=fields_model)
 
-        fields["pk"] = fieldid
+        fields["pk"] = pk
+        fields["field_id"] = field_id
         fields["racen"] = racen
         fields["deccen"] = deccen
         fields["flag"] = flags
