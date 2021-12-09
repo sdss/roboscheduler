@@ -394,6 +394,7 @@ class Fields(object, metaclass=FieldsSingleton):
         if(maxn == 1):
             maxn = 2
         fields0 = [('pk', np.int32),
+                   ('fieldid', np.int32),
                    ('racen', np.float64),
                    ('deccen', np.float64),
                    ('cadence', np.dtype('a20')),
@@ -401,6 +402,7 @@ class Fields(object, metaclass=FieldsSingleton):
                    ('observations', np.int32, maxn)]
         fields = np.zeros(self.nfields, dtype=fields0)
         fields['pk'] = self.pk
+        fields['fieldid'] = self.field_id
         fields['racen'] = self.racen
         fields['deccen'] = self.deccen
         for indx in np.arange(self.nfields):
