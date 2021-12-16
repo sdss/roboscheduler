@@ -888,4 +888,4 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                              max_airmass=max_airmass,
                              obsmode_pk=np.array(cadence['obsmode_pk']),
                              label_root=str(cadence['label_root'].strip()),
-                             label_version=str(cadence['label_root'].strip()))
+                             label_version=str(cadence['label_version'].strip()))
