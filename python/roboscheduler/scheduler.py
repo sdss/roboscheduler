@@ -1,5 +1,6 @@
 import os, sys
 import numpy as np
+import fitsio
 import scipy.optimize as optimize
 import PyAstronomy.pyasl as pyasl
 import astropy.units as units
@@ -55,6 +56,81 @@ def nExpPrioritize(nexp, base=20, award=2e6, penalty=-100):
         return 0
     else:
         return nexp * base
+
+
+class priorityLogger(object):
+    """Object to track priorities and write logs
+    """
+
+    def __init__(self, path=None):
+        if path is None:
+            try:
+                path = os.getenv('RS_OUTDIR')
+            except TypeError:
+                # fails if either above is None
+                print("WARN: incorrect output specified \n",
+                      "WARN: creating priority log in current directory")
+                path = ""
+        self.outDir = path + "/priorityLogs"
+        try:
+            os.makedirs(self.outDir)
+        except FileExistsError:
+            pass
+
+        self.mjd = list()
+        self.field_pk = list()
+        self.field_id = list()
+        self.cadence = list()
+        self.cadencePriority = list()
+        self.priority = list()
+
+        self.model = [('mjd', np.float32),
+                      ('field_pk', np.int32),
+                      ('field_id', np.int32),
+                      ('cadence', np.dtype('a20')),
+                      ('cadencePriority', np.float32),
+                      ('priority', np.float32)]
+
+    def add(self, mjd=None, field_pk=None, field_id=None, cadence=None,
+            cadencePriority=None, priority=None):
+        self.mjd.append(mjd)
+        self.field_pk.append(field_pk)
+        self.field_id.append(field_id)
+        self.cadence.append(cadence)
+        self.cadencePriority.append(cadencePriority)
+        self.priority.append(priority)
+
+    def reset(self):
+        self.mjd = list()
+        self.field_pk = list()
+        self.field_id = list()
+        self.cadence = list()
+        self.cadencePriority = list()
+        self.priority = list()
+
+    def write(self, name=None, flush=True):
+        if len(self.field_pk) == 0:
+            print("WARN: no priority data to log")
+            return
+        output = np.zeros(len(self.field_pk), dtype=self.model)
+
+        if name is None:
+            # int floors so this is probably best
+            name = str(int(np.min(self.mjd)))
+
+        outfile = self.outDir + f"/{name}.fits"
+
+        output["mjd"] = np.array(self.mjd)
+        output["field_pk"] = np.array(self.field_pk)
+        output["field_id"] = np.array(self.field_id)
+        output["cadence"] = np.array(self.cadence)
+        output["cadencePriority"] = np.array(self.cadencePriority)
+        output["priority"] = np.array(self.priority)
+
+        fitsio.write(outfile, output, clobber=True)
+
+        if flush:
+            self.reset()
 
 
 class SchedulerBase(object):
@@ -857,13 +933,17 @@ class Scheduler(Master):
         self.cadencelist = roboscheduler.cadence.CadenceList()
         self.fields = roboscheduler.fields.Fields(plan=designbase,
                                                   observatory=self.observatory)
+
+        self.priorityLogger = priorityLogger()
         if fromFits:
             filebase = os.path.join(os.getenv('OBSERVING_PLAN_DIR'),
                                     designbase)
             # base = os.getenv('OBSERVING_PLAN_DIR')
-            cadence_file = filebase + "/" + "rsCadences" + "-" + designbase + "-"\
+            cadence_file = filebase + "/" + "rsCadences-"\
+                           + designbase + "-"\
                            + self.observatory + ".fits"
-            fields_file = filebase + "/" + "rsAllocation" + "-" + designbase + "-"\
+            fields_file = filebase + "/" + "final/rsAllocationFinal-"\
+                          + designbase + "-"\
                           + self.observatory + ".fits"
 
             self.cadencelist.fromfits(filename=cadence_file,
@@ -1117,6 +1197,15 @@ class Scheduler(Master):
         # priority += 50 * np.exp(-(ha)**2 / (2 * 15**2))
         # gaussian weight, mean = obs lat, use 20 deg std
         priority -= self.overheadPri * np.exp(-(dec - self.latitude)**2 / (2 * 20**2))
+
+        pk = self.fields.pk[iobservable]
+        field_id = self.fields.field_id[iobservable]
+        cadence = [self.fields.cadence[i] for i in iobservable]
+
+        for k, i, c, d, p in zip(pk, field_id, cadence, delta_priority, priority):
+            self.priorityLogger.add(mjd=mjd, field_pk=k, field_id=i,
+                                    cadence=c, cadencePriority=d,
+                                    priority=p)
 
         return priority
 
