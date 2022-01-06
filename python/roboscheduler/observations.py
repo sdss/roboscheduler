@@ -38,8 +38,8 @@ class Observations(object):
     nobservations : np.int32
         number of observations
 
-    fieldid : ndarray of np.int32
-        id of each field for observations
+    field_pk : ndarray of np.int32
+        pk of each field for observations
 
     mjd : ndarray of np.float64
         MJD of observation (days)
@@ -70,7 +70,7 @@ class Observations(object):
     def __init__(self, observatory='apo'):
         self.nobservations = np.int32(0)
         self.observatory = observatory
-        self.fieldid = np.zeros(0, dtype=np.int32)
+        self.field_pk = np.zeros(0, dtype=np.int32)
         self.racen = np.zeros(0, dtype=np.float64)
         self.deccen = np.zeros(0, dtype=np.float64)
         self.cadence = np.zeros(0, dtype=np.dtype('a20'))
@@ -87,12 +87,12 @@ class Observations(object):
         self.nexp_cumul = np.zeros(0, dtype=np.int32)
         return
 
-    def add(self, fieldid=None, mjd=None, duration=None, apgSN2=None,
+    def add(self, field_pk=None, mjd=None, duration=None, apgSN2=None,
             rSN2=None, bSN2=None, skybrightness=None, airmass=None,
             lst=None, racen=None, deccen=None, cadence=None, nfilled=None,
             nexp_cumul=None):
-        self.fieldid = np.append(self.fieldid,
-                                 np.array([np.float64(fieldid)]))
+        self.field_pk = np.append(self.field_pk,
+                                 np.array([np.float64(field_pk)]))
         self.mjd = np.append(self.mjd,
                              np.array([np.float64(mjd)]))
         self.duration = np.append(self.duration,
@@ -109,7 +109,7 @@ class Observations(object):
                                  np.array([np.float32(airmass)]))
         self.lst = np.append(self.lst,
                              np.array([np.float32(lst)]))
-        self.nobservations = len(self.fieldid)
+        self.nobservations = len(self.field_pk)
 
         self.racen = np.append(self.racen,
                                np.array([np.float64(racen)]))
@@ -128,9 +128,9 @@ class Observations(object):
 
         return(self.nobservations - 1)
 
-    def forfield(self, mjd=None, fieldid=None):
+    def forfield(self, mjd=None, field_pk=None):
         indx = np.where((self.mjd <= mjd) &
-                        (self.fieldid == fieldid))[0]
+                        (self.field_pk == field_pk))[0]
         return(self.toarray(indx=indx))
 
     def toarray(self, indx=None):
@@ -148,7 +148,7 @@ class Observations(object):
         observations : record array
             observation information
         """
-        obs0 = [('fieldid', np.int32),
+        obs0 = [('field_pk', np.int32),
                 ('mjd', np.float64),
                 ('duration', np.float64),
                 ('apgSN2', np.float32),
@@ -168,7 +168,7 @@ class Observations(object):
         nobs = len(indx)
         obs = np.zeros(nobs, dtype=obs0)
         if(nobs > 0):
-            obs['fieldid'] = self.fieldid[indx]
+            obs['field_pk'] = self.field_pk[indx]
             obs['mjd'] = self.mjd[indx]
             obs['duration'] = self.duration[indx]
             obs['apgSN2'] = self.apgSN2[indx]

@@ -46,8 +46,10 @@ class Fields(object, metaclass=FieldsSingleton):
     deccen : ndarray of np.float64
         declination of each design (J2000 deg)
 
-    field_id : ndarray of np.int32
-        id for each field
+    pk : ndarray of np.int32
+        db primary key for each field, changed from field_id to allow
+        multiple fields with the same id (and therefore position on sky)
+        to be scheduled together
 
     cadence : list of string
         cadence for each field
@@ -74,7 +76,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.racen = np.zeros(0, dtype=np.float64)
         self.deccen = np.zeros(0, dtype=np.float64)
         self.nfilled = np.zeros(0, dtype=np.float64)
-        self.field_id = np.zeros(0, dtype=np.int32)
+        self.pk = np.zeros(0, dtype=np.int32)
         # self.nextmjd = np.zeros(0, dtype=np.float64)
         self.epoch_idx = np.zeros(0, dtype=np.int32)
         self.notDone = np.ones(0, dtype=np.bool)  # true is not done to skip the invert elsewhere
@@ -103,6 +105,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.deccen = fields_array['deccen']
         self.nfilled = fields_array['nfilled']
         self.field_id = fields_array['field_id']
+        self.pk = fields_array['pk']
         self.cadence = [c.strip().decode() for c in fields_array['cadence']]
         self.slots = fields_array['slots_exposures']
         self.lstObserved = np.zeros((len(self.slots), 24), dtype=np.int32)
@@ -121,7 +124,7 @@ class Fields(object, metaclass=FieldsSingleton):
 
     def fromfits(self, filename=None):
         """Load a fits file into this Fields object,
-           likely an RS-Assignments file.
+           likely an RS-Allocation file.
 
         Parameters:
         ----------
@@ -130,7 +133,8 @@ class Fields(object, metaclass=FieldsSingleton):
             the full path to the fits file to be loaded
         """
         self._database = False
-        fields_model = [('field_id', np.int32),
+        fields_model = [('pk', np.int32),
+                        ('field_id', np.int32),
                         ('racen', np.float64),
                         ('deccen', np.float64),
                         ('nfilled', np.int32),
@@ -142,12 +146,13 @@ class Fields(object, metaclass=FieldsSingleton):
 
         self.fields_fits = np.zeros(len(fits_dat["fieldid"]), dtype=fields_model)
 
+        self.fields_fits["pk"] = np.arange(len(fits_dat["fieldid"]))
         self.fields_fits["field_id"] = fits_dat["fieldid"]
         self.fields_fits["racen"] = fits_dat["racen"]
         self.fields_fits["deccen"] = fits_dat["deccen"]
         self.fields_fits["nfilled"] = fits_dat["nfilled"]
         self.fields_fits["slots_exposures"] = fits_dat["slots_exposures"]
-        self.fields_fits["cadence"] = fits_dat["cadence"]
+        self.fields_fits["cadence"] = [c[:c.index("_v")] for c in fits_dat["cadence"]]
 
         self.fromarray(self.fields_fits)
         return
@@ -211,11 +216,11 @@ class Fields(object, metaclass=FieldsSingleton):
         # ----------
 
         # _hist : dict of lists
-        #     A dictionary with field_id keys containing lists of obs mjds for
+        #     A dictionary with pk keys containing lists of obs mjds for
         #     each field.
         # """
         if self._hist is None:
-            self._hist = {f: list() for f in self.field_id}
+            self._hist = {f: list() for f in self.pk}
             if self._database:
                 versionDB = targetdb.Version()
                 ver = versionDB.get(plan=self.plan)
@@ -229,7 +234,7 @@ class Fields(object, metaclass=FieldsSingleton):
                 d2s = opsdb.DesignToStatus
                 done = Status.get(label="done")
 
-                dbfields = Field.select(d2s.mjd, Field.field_id)\
+                dbfields = Field.select(d2s.mjd, Field.pk)\
                                 .join(Design)\
                                 .join(d2s, on=(Design.design_id == d2s.design_id))\
                                 .where((Field.version == ver) &
@@ -237,9 +242,9 @@ class Fields(object, metaclass=FieldsSingleton):
                                        (d2s.status == done)).dicts()
 
                 for d in dbfields:
-                    self._hist[d["field_id"]].append(d["mjd"])
+                    self._hist[d["pk"]].append(d["mjd"])
 
-            for i in range(len(self.field_id)):
+            for i in range(len(self.pk)):
                 self.checkCompletion(i)
 
         return self._hist
@@ -250,23 +255,23 @@ class Fields(object, metaclass=FieldsSingleton):
         if not self.notDone[fieldidx]:
             # already done
             return
-        field_id = self.field_id[fieldidx]
+        pk = self.pk[fieldidx]
         cadence = self.cadencelist.cadences[self.cadence[fieldidx]]
         tol = cadence.max_length[int(self.epoch_idx[fieldidx])]
-        obs_epochs, begin_last_epoch = epochs_completed(self.hist[field_id],
+        obs_epochs, begin_last_epoch = epochs_completed(self.hist[pk],
                                                         tolerance=tol)
         self.epoch_idx[fieldidx] = int(obs_epochs)
         if obs_epochs >= cadence.nepochs:
             self.notDone[fieldidx] = False
 
     def completeDesign(self, field_idx, mjd, lst, iobs):
-        """Maybe just for sims but need a way to add mjds to _hist[field_id]
+        """Maybe just for sims but need a way to add mjds to _hist[pk]
         """
         self.observations[field_idx] = np.append(self.observations[field_idx], iobs)
 
-        field_id = self.field_id[field_idx]
+        pk = self.pk[field_idx]
 
-        self._hist[field_id].append(mjd)
+        self._hist[pk].append(mjd)
 
         int_lst = int(np.round(lst/15, 0))
         if int_lst == 24:
@@ -295,13 +300,14 @@ class Fields(object, metaclass=FieldsSingleton):
             self.plan = version
         assert version is not None, "must specify version!"
 
-        fields_model = [('field_id', np.int32),
+        fields_model = [('pk', np.int32),
+                        ('field_id', np.int32),
                         ('racen', np.float64),
                         ('deccen', np.float64),
                         ('nfilled', np.int32),
                         ('flag', np.int32),
                         ('slots_exposures', np.int32, (24, 2)),
-                        ('cadence', np.dtype('a20'))]
+                        ('cadence', np.dtype('a25'))]
 
         versionDB = targetdb.Version()
         ver = versionDB.get(plan=version)
@@ -313,7 +319,8 @@ class Fields(object, metaclass=FieldsSingleton):
         dbfields = Field.select().where(Field.version == ver,
                                         Field.observatory == obs)
 
-        fieldid = list()
+        pk = list()
+        field_id = list()
         racen = list()
         deccen = list()
         slots_exposures = list()
@@ -321,7 +328,8 @@ class Fields(object, metaclass=FieldsSingleton):
         flags = list()
 
         for field in dbfields:
-            fieldid.append(field.field_id)
+            pk.append(field.pk)
+            field_id.append(field.field_id)
             racen.append(field.racen)
             deccen.append(field.deccen)
             slots_exposures.append(field.slots_exposures)
@@ -336,7 +344,8 @@ class Fields(object, metaclass=FieldsSingleton):
 
         fields = np.zeros(len(dbfields), dtype=fields_model)
 
-        fields["field_id"] = fieldid
+        fields["pk"] = pk
+        fields["field_id"] = field_id
         fields["racen"] = racen
         fields["deccen"] = deccen
         fields["flag"] = flags
@@ -345,7 +354,7 @@ class Fields(object, metaclass=FieldsSingleton):
 
         self.fromarray(fields_array=fields)
 
-        self.cadencelist.fromdb()
+        self.cadencelist.fromdb(use_label_root=False, version="v1")
 
     def lstWeight(self, lst, field_idx=None):
         # field id corresponds to indx, so fields is id/indx
@@ -384,13 +393,15 @@ class Fields(object, metaclass=FieldsSingleton):
         maxn = np.array([len(x) for x in self.observations]).max()
         if(maxn == 1):
             maxn = 2
-        fields0 = [('fieldid', np.int32),
+        fields0 = [('pk', np.int32),
+                   ('fieldid', np.int32),
                    ('racen', np.float64),
                    ('deccen', np.float64),
                    ('cadence', np.dtype('a20')),
                    ('nobservations', np.int32),
                    ('observations', np.int32, maxn)]
         fields = np.zeros(self.nfields, dtype=fields0)
+        fields['pk'] = self.pk
         fields['fieldid'] = self.field_id
         fields['racen'] = self.racen
         fields['deccen'] = self.deccen
@@ -403,7 +414,7 @@ class Fields(object, metaclass=FieldsSingleton):
 
     def getidx(self, fieldid):
         # return idx into array of fieldid
-        return int(np.where(self.field_id == fieldid)[0])
+        return int(np.where(self.pk == fieldid)[0])
 
 
 def lstDiffSingle(a, b):

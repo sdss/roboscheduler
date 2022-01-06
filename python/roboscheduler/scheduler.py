@@ -1,5 +1,6 @@
 import os, sys
 import numpy as np
+import fitsio
 import scipy.optimize as optimize
 import PyAstronomy.pyasl as pyasl
 import astropy.units as units
@@ -55,6 +56,81 @@ def nExpPrioritize(nexp, base=20, award=2e6, penalty=-100):
         return 0
     else:
         return nexp * base
+
+
+class priorityLogger(object):
+    """Object to track priorities and write logs
+    """
+
+    def __init__(self, path=None):
+        if path is None:
+            try:
+                path = os.getenv('RS_OUTDIR')
+            except TypeError:
+                # fails if either above is None
+                print("WARN: incorrect output specified \n",
+                      "WARN: creating priority log in current directory")
+                path = ""
+        self.outDir = path + "/priorityLogs"
+        try:
+            os.makedirs(self.outDir)
+        except FileExistsError:
+            pass
+
+        self.mjd = list()
+        self.field_pk = list()
+        self.field_id = list()
+        self.cadence = list()
+        self.cadencePriority = list()
+        self.priority = list()
+
+        self.model = [('mjd', np.float32),
+                      ('field_pk', np.int32),
+                      ('field_id', np.int32),
+                      ('cadence', np.dtype('a20')),
+                      ('cadencePriority', np.float32),
+                      ('priority', np.float32)]
+
+    def add(self, mjd=None, field_pk=None, field_id=None, cadence=None,
+            cadencePriority=None, priority=None):
+        self.mjd.append(mjd)
+        self.field_pk.append(field_pk)
+        self.field_id.append(field_id)
+        self.cadence.append(cadence)
+        self.cadencePriority.append(cadencePriority)
+        self.priority.append(priority)
+
+    def reset(self):
+        self.mjd = list()
+        self.field_pk = list()
+        self.field_id = list()
+        self.cadence = list()
+        self.cadencePriority = list()
+        self.priority = list()
+
+    def write(self, name=None, flush=True):
+        if len(self.field_pk) == 0:
+            print("WARN: no priority data to log")
+            return
+        output = np.zeros(len(self.field_pk), dtype=self.model)
+
+        if name is None:
+            # int floors so this is probably best
+            name = str(int(np.min(self.mjd)))
+
+        outfile = self.outDir + f"/{name}.fits"
+
+        output["mjd"] = np.array(self.mjd)
+        output["field_pk"] = np.array(self.field_pk)
+        output["field_id"] = np.array(self.field_id)
+        output["cadence"] = np.array(self.cadence)
+        output["cadencePriority"] = np.array(self.cadencePriority)
+        output["priority"] = np.array(self.priority)
+
+        fitsio.write(outfile, output, clobber=True)
+
+        if flush:
+            self.reset()
 
 
 class SchedulerBase(object):
@@ -857,20 +933,25 @@ class Scheduler(Master):
         self.cadencelist = roboscheduler.cadence.CadenceList()
         self.fields = roboscheduler.fields.Fields(plan=designbase,
                                                   observatory=self.observatory)
+
+        self.priorityLogger = priorityLogger()
         if fromFits:
             filebase = os.path.join(os.getenv('OBSERVING_PLAN_DIR'),
                                     designbase)
             # base = os.getenv('OBSERVING_PLAN_DIR')
-            cadence_file = filebase + "/" + "rsCadences" + "-" + designbase + "-"\
+            cadence_file = filebase + "/" + "rsCadences-"\
+                           + designbase + "-"\
                            + self.observatory + ".fits"
-            fields_file = filebase + "/" + "rsAllocation" + "-" + designbase + "-"\
+            fields_file = filebase + "/" + "final/rsAllocationFinal-"\
+                          + designbase + "-"\
                           + self.observatory + ".fits"
 
             self.cadencelist.fromfits(filename=cadence_file,
                                       priorities=self.priorities)
             self.fields.fromfits(filename=fields_file)
         else:
-            self.cadencelist.fromdb()
+            # self.cadencelist.fromdb(version="v1")
+            # feilds.fromdb calls cadencelist from db
             self.fields.fromdb()
 
         self.observations = roboscheduler.observations.Observations(observatory=self.observatory)
@@ -949,9 +1030,10 @@ class Scheduler(Master):
         # indxs = np.where(self.fields.nextmjd > mjd)[0]
         # observable[indxs] = False
         indxs = np.where(observable)[0]
+        # print(f"attempting {mjd:.2f} with {len(indxs)} fields")
         for indx in indxs:
             # if(observable[indx]):
-            if int(self.fields.field_id[indx]) in ignore:
+            if int(self.fields.pk[indx]) in ignore:
                 observable[indx] = False
                 continue
             elif self.fields.flag[indx] == -1:
@@ -959,7 +1041,7 @@ class Scheduler(Master):
                 continue
             cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
 
-            mjd_past = self.fields.hist[self.fields.field_id[indx]]
+            mjd_past = self.fields.hist[self.fields.pk[indx]]
             # epoch_idx is the *index* of the *next* epoch
             # for 0 indexed arrays, this equivalent to
             # "how many epochs have I done previously"
@@ -976,7 +1058,7 @@ class Scheduler(Master):
             else:
                 mjd_prev = 0
             if len(mjd_past) > np.sum(cadence.nexp):
-                over.append(int(self.fields.field_id[indx]))
+                over.append(int(self.fields.pk[indx]))
             actually_done = False
             # because dark-2xN can have max length 7 but delta min 0.5
             while exp_epoch > cadence.nexp[epoch_idx]:
@@ -993,20 +1075,20 @@ class Scheduler(Master):
                 epoch_idx -= 1
                 partial_epoch = True
             if epoch_idx >= cadence.nepochs and not self.fields.flag[indx] == 1:
-                # print("DONE ", epoch_idx, cadence.nepochs, int(self.fields.field_id[indx]))
+                # print("DONE ", epoch_idx, cadence.nepochs, int(self.fields.pk[indx]))
                 observable[indx] = False
                 continue
             else:
                 nexp[indx] = cadence.nexp[epoch_idx]
                 partial_epoch = False
             if nexp[indx] > nexp_change and self.fields.flag[indx] != 1:
-                # print(f"{float(mjd):.3f} {int(self.fields.field_id[indx])} c_nexp {cadence.nexp[epoch_idx]} NEXP {nexp_change} MAXEXP {maxExp}")
+                # print(f"{float(mjd):.3f} {int(self.fields.pk[indx])} c_nexp {cadence.nexp[epoch_idx]} NEXP {nexp_change} MAXEXP {maxExp}")
                 # change between bright/dark, field doesn't fit
                 observable[indx] = False
                 continue
-            # if int(self.fields.field_id[indx]) in over:
+            # if int(self.fields.pk[indx]) in over:
             #     print("!?", epoch_idx >= cadence.nepochs, not self.fields.flag[indx] == 1)
-            #     print(int(self.fields.field_id[indx]), len(mjd_past), cadence.nexp, exp_epoch, cadence.nepochs, epoch_idx)
+            #     print(int(self.fields.pk[indx]), len(mjd_past), cadence.nexp, exp_epoch, cadence.nepochs, epoch_idx)
             observable[indx], delta_priority[indx] =\
                 cadence.evaluate_next(epoch_idx=epoch_idx,
                                       partial_epoch=partial_epoch,
@@ -1019,6 +1101,10 @@ class Scheduler(Master):
             # if nexp[indx] > 6 and observable[indx]:
             #     delta_priority[indx] += 1e6
             # delta_priority[indx] += 2.5**nexp[indx]
+
+            # if not observable[indx]:
+            #     print(f"{float(mjd):.3f} {int(self.fields.pk[indx])} {cadence.name} MAXEXP {maxExp}")
+
             delta_priority[indx] += nExpPrioritize(nexp[indx],
                                                    base=self.nExpPriBase,
                                                    award=self.nExpPriAward,
@@ -1027,7 +1113,7 @@ class Scheduler(Master):
             # slight decrement for single epochs
             delta_priority[indx] += (cadence.nepochs - 2)*self.nepochsPri
             if nexp[indx] > maxExp:
-                # print(f"{float(mjd):.3f} {int(self.fields.field_id[indx])} c_nexp {cadence.nexp[epoch_idx]} MAXEXP {maxExp}")
+                # print(f"{float(mjd):.3f} {int(self.fields.pk[indx])} c_nexp {cadence.nexp[epoch_idx]} MAXEXP {maxExp}")
                 observable[indx] = False
             if self.fields.flag[indx] == 1:
                 # flagged as top priority
@@ -1038,23 +1124,17 @@ class Scheduler(Master):
                 delta_priority[indx] += 1e6
             # if "dark_2x2" in cadence.name and observable[indx] and mjd_prev != 0:
             #     self.check = True
-            #     # print(f"F {float(mjd):.3f} {int(self.fields.field_id[indx])} {delta_priority[indx]}")
-            #     self.recent.append(f"R {int(self.fields.field_id[indx])} {epoch_idx} prev {len(mjd_past)} epoch {epoch_idx} tol {tol} partial {partial_epoch}")
-            #     self.recent_ids.append(int(self.fields.field_id[indx]))
+            #     # print(f"F {float(mjd):.3f} {int(self.fields.pk[indx])} {delta_priority[indx]}")
+            #     self.recent.append(f"R {int(self.fields.pk[indx])} {epoch_idx} prev {len(mjd_past)} epoch {epoch_idx} tol {tol} partial {partial_epoch}")
+            #     self.recent_ids.append(int(self.fields.pk[indx]))
                 # print(nexp[indx], type(nexp[indx]))
             # elif "x8" in cadence.name and not observable[indx]:
             #     if skybrightness < 0.36 and moon_dist[indx] < 30 and deltav[indx] < 2 and airmass[indx] < 1.5:
-            #         print(f"F {epoch_idx} {float(mjd):.3f} {int(self.fields.field_id[indx])} {mjd-mjd_prev}")
+            #         print(f"F {epoch_idx} {float(mjd):.3f} {int(self.fields.pk[indx])} {mjd-mjd_prev}")
             #         print(f"sky {skybrightness} moon {moon_dist[indx]} deltav {deltav[indx]} AM {airmass[indx]:}")
             #         print(nexp[indx], type(nexp[indx]), maxExp)
         # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
         iobservable = np.where(observable)[0]
-
-        # if len(iobservable) == 0:
-        #     for i, v, a in zip(self.fields.field_id[where_uhoh], deltav[where_uhoh], airmass[where_uhoh]):
-        #         print(int(i), v, a)
-        #     print("failed", skybrightness, mjd, next_change, maxExp)
-        #     sys.exit(1)
 
         return iobservable, nexp[iobservable], delta_priority[iobservable]
 
@@ -1118,6 +1198,15 @@ class Scheduler(Master):
         # gaussian weight, mean = obs lat, use 20 deg std
         priority -= self.overheadPri * np.exp(-(dec - self.latitude)**2 / (2 * 20**2))
 
+        pk = self.fields.pk[iobservable]
+        field_id = self.fields.field_id[iobservable]
+        cadence = [self.fields.cadence[i] for i in iobservable]
+
+        for k, i, c, d, p in zip(pk, field_id, cadence, delta_priority, priority):
+            self.priorityLogger.add(mjd=mjd, field_pk=k, field_id=i,
+                                    cadence=c, cadencePriority=d,
+                                    priority=p)
+
         return priority
 
     def pick(self, priority=None, fieldid=None, nexp=None):
@@ -1157,25 +1246,25 @@ class Scheduler(Master):
 
         return(pick_fieldid, pick_exp)
 
-    def designsNext(self, fieldid):
+    def designsNext(self, field_pk):
         """Figure out next designs on a field, i.e. which exposure are we on?
 
         Parameters:
         ----------
 
-        fieldid : ndarray of np.int32
-            field ids corresponding to prioritiea
+        field_pk : ndarray of np.int32
+            field pk to get designs for
 
         Returns:
         -------
 
         designs : list of integer
-            a list of exposure numbers up next for "fieldid", corresponding 
+            a list of exposure numbers up next for "field_pk", corresponding
             to some designs.
 
         """
-        fieldidx = self.fields.getidx(fieldid)
-        mjd_past = self.fields.hist[fieldid]
+        fieldidx = self.fields.getidx(field_pk)
+        mjd_past = self.fields.hist[field_pk]
         cadence = self.cadencelist.cadences[self.fields.cadence[fieldidx]]
         epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=240)
         nexp_next = cadence.nexp[epoch_idx]
@@ -1251,10 +1340,10 @@ class Scheduler(Master):
             # for i in sorted_priority:
             #     field_idx = iobservable[i]
             #     print(i, priority[i], nexp[i],
-            #           self.fields.field_id[field_idx],
+            #           self.fields.pk[field_idx],
             #           self.fields.cadence[field_idx])
             sorted_idx = [iobservable[i] for i in sorted_priority]
-            sorted_fields = [self.fields.field_id[i] for i in sorted_idx]
+            sorted_fields = [self.fields.pk[i] for i in sorted_idx]
             sorted_exp = [nexp[i] for i in sorted_priority]
 
             if not live:
@@ -1271,36 +1360,36 @@ class Scheduler(Master):
         #         print(c, i, p, np.max(priority))
         #         considered = True
 
-        observable_fieldid = self.fields.field_id[iobservable]
+        observable_fieldid = self.fields.pk[iobservable]
 
-        fieldid, next_exp = self.pick(priority=priority,
-                                      fieldid=observable_fieldid,
-                                      nexp=nexp)
+        field_pk, next_exp = self.pick(priority=priority,
+                                       fieldid=observable_fieldid,
+                                       nexp=nexp)
 
         if not live:
             # just a sim return number of designs
-            return(fieldid, next_exp)
+            return(field_pk, next_exp)
 
         # its live, return list of exp indices
-        designs = self.designsNext(fieldid)
+        designs = self.designsNext(field_pk)
 
-        return fieldid, designs
+        return field_pk, designs
 
-    def update(self, fieldid=None, result=None, finish=False):
+    def update(self, field_pk=None, result=None, finish=False):
         """Update Scheduler.observations with result of observations, used for sims
 
         Parameters:
         -----------
 
-        fieldid : np.int32, int
-            ID of field
+        field_pk : np.int32, int
+            PK of field
 
         result : ndarray
             One element, contains 'mjd', 'duration', 'sn2'
 
         """
 
-        fieldidx = int(np.where(self.fields.field_id == fieldid)[0])
+        fieldidx = int(np.where(self.fields.pk == field_pk)[0])
 
         racen = self.fields.racen[fieldidx]
         deccen = self.fields.deccen[fieldidx]
@@ -1314,7 +1403,7 @@ class Scheduler(Master):
         airmass = self.alt2airmass(alt)
         skybrightness = self.skybrightness(result['mjd'])
         lst = self.lst(result['mjd'])
-        iobs = self.observations.add(fieldid=fieldid,
+        iobs = self.observations.add(field_pk=field_pk,
                                      mjd=result['mjd'],
                                      duration=result['duration'],
                                      apgSN2=result['apgSN2'],
