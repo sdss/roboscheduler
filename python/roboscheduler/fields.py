@@ -307,7 +307,7 @@ class Fields(object, metaclass=FieldsSingleton):
                         ('nfilled', np.int32),
                         ('flag', np.int32),
                         ('slots_exposures', np.int32, (24, 2)),
-                        ('cadence', np.dtype('a20'))]
+                        ('cadence', np.dtype('a25'))]
 
         versionDB = targetdb.Version()
         ver = versionDB.get(plan=version)
@@ -354,7 +354,7 @@ class Fields(object, metaclass=FieldsSingleton):
 
         self.fromarray(fields_array=fields)
 
-        self.cadencelist.fromdb()
+        self.cadencelist.fromdb(use_label_root=False, version="v1")
 
     def lstWeight(self, lst, field_idx=None):
         # field id corresponds to indx, so fields is id/indx

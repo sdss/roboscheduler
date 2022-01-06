@@ -116,10 +116,6 @@ class Cadence(cCadenceCore.CadenceCore):
         if(cfg is not None):
             self._from_cfg(name=name, cfg=cfg)
             return
-
-        # min_deltav_ks91 = [m if m > -2 else -3 for m in min_deltav_ks91]
-        # max_airmass = [m if m > 1.5 else 1.5 for m in max_airmass]
-
         nepochs = np.int32(nepochs)
         skybrightness = self._arrayify(skybrightness, dtype=np.float32)
         delta = self._arrayify(delta, dtype=np.float32)
@@ -147,8 +143,8 @@ class Cadence(cCadenceCore.CadenceCore):
 
         self.partialEpochPri = priorities.get("partialEpochPri", 200)
         self.brightDurDarkPenalty = priorities.get("brightDurDarkPenalty", -5000)
-        self.deltaMaxPriBump = priorities.get("deltaMaxPriBump", 15)
-        self.deltaNomBump = priorities.get("deltaNomBump", 5)
+        self.deltaMaxPriBump = priorities.get("deltaMaxPriBump", 10)
+        self.deltaNomBump = priorities.get("deltaNomBump", 4)
         self.overDeltaMaxBump = priorities.get("overDeltaMaxBump", 100)
 
         return

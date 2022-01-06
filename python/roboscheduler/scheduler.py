@@ -950,7 +950,8 @@ class Scheduler(Master):
                                       priorities=self.priorities)
             self.fields.fromfits(filename=fields_file)
         else:
-            self.cadencelist.fromdb()
+            # self.cadencelist.fromdb(version="v1")
+            # feilds.fromdb calls cadencelist from db
             self.fields.fromdb()
 
         self.observations = roboscheduler.observations.Observations(observatory=self.observatory)
@@ -1029,6 +1030,7 @@ class Scheduler(Master):
         # indxs = np.where(self.fields.nextmjd > mjd)[0]
         # observable[indxs] = False
         indxs = np.where(observable)[0]
+        # print(f"attempting {mjd:.2f} with {len(indxs)} fields")
         for indx in indxs:
             # if(observable[indx]):
             if int(self.fields.pk[indx]) in ignore:
@@ -1099,6 +1101,10 @@ class Scheduler(Master):
             # if nexp[indx] > 6 and observable[indx]:
             #     delta_priority[indx] += 1e6
             # delta_priority[indx] += 2.5**nexp[indx]
+
+            # if not observable[indx]:
+            #     print(f"{float(mjd):.3f} {int(self.fields.pk[indx])} {cadence.name} MAXEXP {maxExp}")
+
             delta_priority[indx] += nExpPrioritize(nexp[indx],
                                                    base=self.nExpPriBase,
                                                    award=self.nExpPriAward,
@@ -1129,17 +1135,6 @@ class Scheduler(Master):
             #         print(nexp[indx], type(nexp[indx]), maxExp)
         # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
         iobservable = np.where(observable)[0]
-
-<<<<<<< HEAD
-        # if len(iobservable) == 0 and skybrightness < 0.35:
-        #     for i, v, a in zip(self.fields.pk[where_uhoh], deltav[where_uhoh], airmass[where_uhoh]):
-=======
-        # if len(iobservable) == 0:
-        #     for i, v, a in zip(self.fields.field_id[where_uhoh], deltav[where_uhoh], airmass[where_uhoh]):
->>>>>>> main
-        #         print(int(i), v, a)
-        #     print("failed", skybrightness, mjd, next_change, maxExp)
-        #     sys.exit(1)
 
         return iobservable, nexp[iobservable], delta_priority[iobservable]
 
