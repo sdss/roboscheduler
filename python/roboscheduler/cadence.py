@@ -480,13 +480,18 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         ok : bool
             True if these exposures under cadence #2 satisfy cadence #1
         """
+
+        cadence_two = self.cadences[two]
+        cadence_one = self.cadences[one]
+
+        # Are there fewer exposures than needed total?
+        if(len(iexp) < cadence_one.nexp_total):
+            return False
+
         # Are there any ways cadence one fits into cadence two?
         ok, epochs_list = self.cadence_consistency(one, two)
         if(not ok):
             return False
-
-        cadence_two = self.cadences[two]
-        cadence_one = self.cadences[one]
 
         # Now count how many exposures there are at each epoch for this
         # array of iexp
@@ -495,8 +500,18 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         ngot = np.zeros(cadence_two.nepochs, dtype=np.int32)
         ngot[epochs_two_got] = nexps_got
 
-        # Check each solution and see if the current assignment satisfies
+        # First check the obvious and most common case, which is
+        # that the actual epochs assigned are exactly what is needed
+        epochs_two = [int(x) for x in cadence_two.epochs[iexp]]
+        if(epochs_two in epochs_list):
+            nneed = np.zeros(cadence_two.nepochs, dtype=np.int32)
+            for epoch_one, epoch_two in enumerate(epochs_two):
+                nneed[epoch_two] = nneed[epoch_two] + cadence_one.nexp[epoch_one]
+            nbad = (ngot < nneed).sum()
+            if(nbad == 0):
+                return True
 
+        # Check each solution and see if the current assignment satisfies
         nneed = np.zeros(cadence_two.nepochs, dtype=np.int32)
         for epochs_two in epochs_list:
 
@@ -510,7 +525,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                     bad = True
                     break
 
-            # For each exposure in the solution, are there enough exposures?
+            # For each epoch in the solution, are there enough exposures?
             if(not bad):
                 nbad = (ngot < nneed).sum()
                 if(nbad == 0):

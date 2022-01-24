@@ -476,6 +476,12 @@ def test_exposure_consistency():
     assert clist.exposure_consistency('bright_3x1', 'bright_3x2',
                                       [2, 2, 2]) is False
 
+    assert clist.exposure_consistency('bright_3x2', 'bright_3x2',
+                                      [0, 1, 2, 3, 4]) is False
+
+    assert clist.exposure_consistency('bright_3x2', 'bright_3x2',
+                                      [0, 1, 2, 3, 4, 5]) is True
+
 
 def test_cadence_consistency_1():
     clist = cadence.CadenceList()
