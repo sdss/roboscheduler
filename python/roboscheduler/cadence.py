@@ -146,6 +146,7 @@ class Cadence(cCadenceCore.CadenceCore):
         self.deltaMaxPriBump = priorities.get("deltaMaxPriBump", 10)
         self.deltaNomBump = priorities.get("deltaNomBump", 4)
         self.overDeltaMaxBump = priorities.get("overDeltaMaxBump", 100)
+        self.base_priority = priorities.get("base_priority", 50)
 
         return
 
@@ -208,13 +209,13 @@ class Cadence(cCadenceCore.CadenceCore):
     def skybrightness_check(self, epoch_idx, skybrightness_next):
         """check lunation for mjd_past against lunation_next"""
         down_weight = False
-        if(epoch_idx >= self.nepochs):
-            if self.skybrightness[-1] > 0.4:
-                if skybrightness_next < 0.4:
-                    down_weight = True
-            return skybrightness_next <= self.skybrightness[-1], down_weight
-        if self.skybrightness[epoch_idx] > 0.4:
-            if skybrightness_next < 0.4:
+        # if(epoch_idx >= self.nepochs):
+        #     if self.skybrightness[-1] > 0.35:
+        #         if skybrightness_next < 0.35:
+        #             down_weight = True
+        #     return skybrightness_next <= self.skybrightness[-1], down_weight
+        if self.skybrightness[epoch_idx] > 0.35:
+            if skybrightness_next < 0.35:
                 down_weight = True
         return skybrightness_next <= self.skybrightness[epoch_idx], down_weight
 
@@ -243,7 +244,7 @@ class Cadence(cCadenceCore.CadenceCore):
             print("done!")
             return(False, 0)
         else:
-            base_priority = 0
+            base_priority = self.base_priority
 
         ok_skybrightness, down_weight = self.skybrightness_check(epoch_idx,
                                                                  skybrightness_next)
@@ -274,11 +275,11 @@ class Cadence(cCadenceCore.CadenceCore):
         #     print("delta {} dhi {} dlo {} curr {:.2f}".format(dnom, dhi, dlo, float(delta_curr)), self.name)
         # 1/sqrt(x) priority; at 1 day +100, at 10 days +30, at 30 days +18
         remain_priority = self.deltaMaxPriBump * np.clip(10/np.sqrt(np.abs(dhi - delta_curr)),
-                                       a_min=None, a_max=10)
+                                                         a_min=None, a_max=10)
         nom_priority = self.deltaNomBump * np.clip(10/np.sqrt(np.abs(dnom - delta_curr)),
-                                   a_min=None, a_max=10)
+                                                   a_min=None, a_max=10)
         priority = base_priority + remain_priority + nom_priority
-        if delta_curr <= dhi:
+        if delta_curr >= dhi:
             priority += self.overDeltaMaxBump
         # if ignoreMax:
         #     return(ok_skybrightness & (delta_curr >= dlo), priority)

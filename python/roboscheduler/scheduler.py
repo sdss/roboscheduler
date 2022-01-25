@@ -64,10 +64,8 @@ class priorityLogger(object):
 
     def __init__(self, path=None):
         if path is None:
-            try:
-                path = os.getenv('RS_OUTDIR')
-            except TypeError:
-                # fails if either above is None
+            path = os.getenv('RS_OUTDIR')
+            if path is None:
                 print("WARN: incorrect output specified \n",
                       "WARN: creating priority log in current directory")
                 path = ""
@@ -1109,6 +1107,7 @@ class Scheduler(Master):
                                                    base=self.nExpPriBase,
                                                    award=self.nExpPriAward,
                                                    penalty=self.nExpPriPenalty)
+
             # prioritize nepochs. Huge bump for 8 + epochs
             # slight decrement for single epochs
             delta_priority[indx] += (cadence.nepochs - 2)*self.nepochsPri
