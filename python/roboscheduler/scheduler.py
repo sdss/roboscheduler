@@ -384,13 +384,15 @@ class Observer(SchedulerBase):
 
         moonra, moondec = self.moon_radec(mjd)
 
-        moon_dist = np.power((ra - moonra)*np.cos(dec*np.pi / 180), 2)\
-                  + np.power((dec - moondec), 2)
+        # moon_dist = np.power((ra - moonra)*np.cos(dec*np.pi / 180), 2)\
+        #           + np.power((dec - moondec), 2)
+
+        moon_dist = pyasl.getAngDist(ra, dec, moonra, moondec)
 
         if threshold:
-            return moon_dist > np.power(threshold, 2)
+            return moon_dist > threshold
         else:
-            return np.power(moon_dist, 0.5)
+            return moon_dist
 
     def radec2altaz(self, mjd=None, ra=None, dec=None):
         """Return (alt, az) for (ra, dec) in deg J2000 at MJD (days)
