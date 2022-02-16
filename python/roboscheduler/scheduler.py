@@ -78,6 +78,8 @@ class priorityLogger(object):
         self.mjd = list()
         self.field_pk = list()
         self.field_id = list()
+        self.ra = list()
+        self.dec = list()
         self.cadence = list()
         self.cadencePriority = list()
         self.priority = list()
@@ -85,15 +87,19 @@ class priorityLogger(object):
         self.model = [('mjd', np.float32),
                       ('field_pk', np.int32),
                       ('field_id', np.int32),
+                      ('ra', np.float64),
+                      ('dec', np.float64),
                       ('cadence', np.dtype('a20')),
                       ('cadencePriority', np.float32),
                       ('priority', np.float32)]
 
     def add(self, mjd=None, field_pk=None, field_id=None, cadence=None,
-            cadencePriority=None, priority=None):
+            cadencePriority=None, priority=None, ra=None, dec=None):
         self.mjd.append(mjd)
         self.field_pk.append(field_pk)
         self.field_id.append(field_id)
+        self.ra.append(ra)
+        self.dec.append(dec)
         self.cadence.append(cadence)
         self.cadencePriority.append(cadencePriority)
         self.priority.append(priority)
@@ -102,6 +108,8 @@ class priorityLogger(object):
         self.mjd = list()
         self.field_pk = list()
         self.field_id = list()
+        self.ra = list()
+        self.dec = list()
         self.cadence = list()
         self.cadencePriority = list()
         self.priority = list()
@@ -121,6 +129,8 @@ class priorityLogger(object):
         output["mjd"] = np.array(self.mjd)
         output["field_pk"] = np.array(self.field_pk)
         output["field_id"] = np.array(self.field_id)
+        output["ra"] = np.array(self.ra)
+        output["dec"] = np.array(self.dec)
         output["cadence"] = np.array(self.cadence)
         output["cadencePriority"] = np.array(self.cadencePriority)
         output["priority"] = np.array(self.priority)
@@ -1189,7 +1199,8 @@ class Scheduler(Master):
         assert len(lstDiffs) == len(iobservable), "lst weight going poorly"
         # assert 0 not in delta_remaining, "some delta remaining not set properly!"
 
-        ha = self.ralst2ha(ra=self.fields.racen[iobservable], lst=lst)
+        ra = self.fields.racen[iobservable]
+        ha = self.ralst2ha(ra=ra, lst=lst)
         dec = self.fields.deccen[iobservable]
 
         # gaussian weight, mean already 0, use 1 hr  std
@@ -1203,10 +1214,10 @@ class Scheduler(Master):
         field_id = self.fields.field_id[iobservable]
         cadence = [self.fields.cadence[i] for i in iobservable]
 
-        for k, i, c, d, p in zip(pk, field_id, cadence, delta_priority, priority):
+        for k, i, c, d, p, r, de in zip(pk, field_id, cadence, delta_priority, priority, ra, dec):
             self.priorityLogger.add(mjd=mjd, field_pk=k, field_id=i,
                                     cadence=c, cadencePriority=d,
-                                    priority=p)
+                                    priority=p, ra=r, dec=de)
 
         return priority
 
