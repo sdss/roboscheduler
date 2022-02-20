@@ -1055,12 +1055,18 @@ class Scheduler(Master):
             # epoch_idx is the *index* of the *next* epoch
             # for 0 indexed arrays, this equivalent to
             # "how many epochs have I done previously"
-            tol = cadence.max_length[int(self.fields.epoch_idx[indx])]
+            try:
+                tol = cadence.max_length[int(self.fields.epoch_idx[indx])]
+            except IndexError:
+                tol = cadence.max_length[-1]
             if tol < 0.1:
                 tol = 0.1
             elif tol > 14:
                 tol = 14
             epoch_idx, begin_last_epoch = epochs_completed(mjd_past, tolerance=tol)
+            if epoch_idx >= cadence.nepochs:
+                observable[indx] = False
+                continue
             # how many exp/"designs" since start of last epoch?
             exp_epoch = np.sum(np.greater_equal(mjd_past, begin_last_epoch))
             if len(mjd_past):
