@@ -1051,6 +1051,10 @@ class Scheduler(Master):
                 continue
             cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
 
+            if int(self.fields.epoch_idx[indx]) >= cadence.nepochs and self.fields.flag[indx] != 1:
+                observable[indx] = False
+                continue
+
             mjd_past = self.fields.hist[self.fields.pk[indx]]
             # epoch_idx is the *index* of the *next* epoch
             # for 0 indexed arrays, this equivalent to
@@ -1064,7 +1068,7 @@ class Scheduler(Master):
             elif tol > 14:
                 tol = 14
             epoch_idx, begin_last_epoch = epochs_completed(mjd_past, tolerance=tol)
-            if epoch_idx >= cadence.nepochs:
+            if epoch_idx >= cadence.nepochs  and self.fields.flag[indx] != 1:
                 observable[indx] = False
                 continue
             # how many exp/"designs" since start of last epoch?
@@ -1083,7 +1087,7 @@ class Scheduler(Master):
                 if epoch_idx == cadence.nepochs:
                     actually_done = True
                     break
-            if actually_done:
+            if actually_done and self.fields.flag[indx] != 1:
                 observable[indx] = False
                 continue
             if exp_epoch < cadence.nexp[epoch_idx] and exp_epoch != 0:
