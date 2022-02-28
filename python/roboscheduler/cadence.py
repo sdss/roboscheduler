@@ -252,6 +252,14 @@ class Cadence(cCadenceCore.CadenceCore):
         valid = self.obsmodeChecks(epoch_idx, moon_dist, deltaV, airmass)
         ok_skybrightness = ok_skybrightness & valid
 
+        # if not ok_skybrightness and "bright" in self.name:
+        #     d_check = 10 * (self.min_deltav_ks91[epoch_idx] <= deltaV)
+        #     # a_check = 10 * (self.max_airmass[epoch_idx] >= airmass)
+        #     m_check = 1 * (self.min_moon_sep[epoch_idx] <= moon_dist)
+        #     total = d_check + m_check
+        #     print(f"use {self.min_deltav_ks91[epoch_idx]:.1f} {self.min_moon_sep[epoch_idx]:.1f} {mjd_past}")
+        #     print(f"{total} {deltaV:.1f}  {moon_dist:.1f} {mjd_past}")
+
         if not ok_skybrightness:
             return ok_skybrightness, 0
 

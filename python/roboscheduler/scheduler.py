@@ -998,7 +998,7 @@ class Scheduler(Master):
                                      dec=self.fields.deccen)
         skybrightness = self.skybrightness(mjd)
         # valid cadence checks against "none" cadence issue
-        observable = (alt > 0.) & self.fields.validCadence & self.fields.notDone
+        observable = (alt > 30.) & self.fields.validCadence & self.fields.notDone
         nexp = np.ones(len(observable), dtype=int)
         delta_priority = np.zeros(len(observable), dtype=np.float64)
 
@@ -1040,7 +1040,7 @@ class Scheduler(Master):
         # indxs = np.where(self.fields.nextmjd > mjd)[0]
         # observable[indxs] = False
         indxs = np.where(observable)[0]
-        # print(f"attempting {mjd:.2f} with {len(indxs)} fields")
+        # print(f"attempting {float(mjd):.2f} with {len(indxs)} fields")
         for indx in indxs:
             # if(observable[indx]):
             if int(self.fields.pk[indx]) in ignore:
@@ -1122,8 +1122,8 @@ class Scheduler(Master):
             #     delta_priority[indx] += 1e6
             # delta_priority[indx] += 2.5**nexp[indx]
 
-            # if not observable[indx]:
-            #     print(f"{float(mjd):.3f} {int(self.fields.pk[indx])} {cadence.name} MAXEXP {maxExp}")
+            # if not observable[indx] and "bright" in cadence.name:
+            #     print(f"{float(mjd):.3f} {skybrightness} {int(self.fields.pk[indx])} {cadence.name} MAXEXP {maxExp}")
 
             delta_priority[indx] += nExpPrioritize(nexp[indx],
                                                    base=self.nExpPriBase,
@@ -1143,11 +1143,12 @@ class Scheduler(Master):
                 # so override cadence eligibility and bump priority
                 observable[indx] = True
                 delta_priority[indx] += 1e6
-            # if "dark_2x2" in cadence.name and observable[indx] and mjd_prev != 0:
+            # if "dark_" in cadence.name: # and observable[indx] and mjd_prev != 0:
             #     self.check = True
-            #     # print(f"F {float(mjd):.3f} {int(self.fields.pk[indx])} {delta_priority[indx]}")
-            #     self.recent.append(f"R {int(self.fields.pk[indx])} {epoch_idx} prev {len(mjd_past)} epoch {epoch_idx} tol {tol} partial {partial_epoch}")
-            #     self.recent_ids.append(int(self.fields.pk[indx]))
+            #     self.recent.append(f"{float(skybrightness):.1f} {airmass[indx]:.1f} {int(self.fields.pk[indx])} {cadence.name} MAXEXP {maxExp}")
+                # # print(f"F {float(mjd):.3f} {int(self.fields.pk[indx])} {delta_priority[indx]}")
+                # self.recent.append(f"R {int(self.fields.pk[indx])} {epoch_idx} prev {len(mjd_past)} epoch {epoch_idx} tol {tol} partial {partial_epoch}")
+                # self.recent_ids.append(int(self.fields.pk[indx]))
                 # print(nexp[indx], type(nexp[indx]))
             # elif "x8" in cadence.name and not observable[indx]:
             #     if skybrightness < 0.36 and moon_dist[indx] < 30 and deltav[indx] < 2 and airmass[indx] < 1.5:
@@ -1156,6 +1157,11 @@ class Scheduler(Master):
             #         print(nexp[indx], type(nexp[indx]), maxExp)
         # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
         iobservable = np.where(observable)[0]
+
+        # if len(iobservable) == 0 and self.check:
+        #     print(f"{float(mjd):.3f} AAAHHH")
+        #     for r in self.recent:
+        #         print(r)
 
         return iobservable, nexp[iobservable], delta_priority[iobservable]
 
