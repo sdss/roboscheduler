@@ -1000,6 +1000,8 @@ class Scheduler(Master):
         # valid cadence checks against "none" cadence issue
         observable = (alt > 30.) & self.fields.validCadence & self.fields.notDone
         nexp = np.ones(len(observable), dtype=int)
+        exp_epochs = np.zeros(len(observable), dtype=np.int32)
+        epoch_idxs = np.zeros(len(observable), dtype=np.int32)
         delta_priority = np.zeros(len(observable), dtype=np.float64)
 
         deltav = self.deltaV_sky_pos(mjd, self.fields.racen, self.fields.deccen)
@@ -1068,7 +1070,7 @@ class Scheduler(Master):
             elif tol > 14:
                 tol = 14
             epoch_idx, begin_last_epoch = epochs_completed(mjd_past, tolerance=tol)
-            if epoch_idx >= cadence.nepochs  and self.fields.flag[indx] != 1:
+            if epoch_idx >= cadence.nepochs and self.fields.flag[indx] != 1:
                 observable[indx] = False
                 continue
             # how many exp/"designs" since start of last epoch?
@@ -1109,6 +1111,10 @@ class Scheduler(Master):
             # if int(self.fields.pk[indx]) in over:
             #     print("!?", epoch_idx >= cadence.nepochs, not self.fields.flag[indx] == 1)
             #     print(int(self.fields.pk[indx]), len(mjd_past), cadence.nexp, exp_epoch, cadence.nepochs, epoch_idx)
+
+            exp_epochs[indx] = exp_epoch
+            epoch_idxs[indx] = epoch_idx
+
             observable[indx], delta_priority[indx] =\
                 cadence.evaluate_next(epoch_idx=epoch_idx,
                                       partial_epoch=partial_epoch,
@@ -1163,7 +1169,8 @@ class Scheduler(Master):
         #     for r in self.recent:
         #         print(r)
 
-        return iobservable, nexp[iobservable], delta_priority[iobservable]
+        return iobservable, nexp[iobservable], delta_priority[iobservable],\
+            exp_epochs[iobservable], epoch_idxs[iobservable]
 
     def prioritize(self, mjd=None, iobservable=None, nexp=None,
                    delta_priority=None):
@@ -1274,7 +1281,7 @@ class Scheduler(Master):
 
         return(pick_fieldid, pick_exp)
 
-    def designsNext(self, field_pk):
+    def designsNext(self, field_pk, pick_exp_epoch, pick_epoch_idx):
         """Figure out next designs on a field, i.e. which exposure are we on?
 
         Parameters:
@@ -1294,14 +1301,14 @@ class Scheduler(Master):
         fieldidx = self.fields.getidx(field_pk)
         mjd_past = self.fields.hist[field_pk]
         cadence = self.cadencelist.cadences[self.fields.cadence[fieldidx]]
-        epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=240)
-        nexp_next = cadence.nexp[epoch_idx]
+        # epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=tol)
+        nexp_next = cadence.nexp[pick_epoch_idx]
         # how many completed designs since start of epoch
         # this assumes designs are marked incomplete when epoch_max_length
         # is hit
-        exp_in_epoch = np.sum(np.greater(mjd_past, mjd_prev))
+        # exp_in_epoch = np.sum(np.greater(mjd_past, mjd_prev))
 
-        exp_to_do = nexp_next - exp_in_epoch
+        exp_to_do = nexp_next - pick_exp_epoch
 
         designs = list(len(mjd_past) + np.arange(exp_to_do))
 
@@ -1346,13 +1353,13 @@ class Scheduler(Master):
         self.recent = list()
         self.recent_ids = list()
 
-        iobservable, nexp, delta_priority = self.observable(mjd=mjd, maxExp=maxExp,
-                                                            ignore=ignore)
-        if(len(iobservable) == 0) and live:
-            # in a sim we'll take the dead time, should write something to track this better
-            # print("Nothing observable")
-            iobservable, nexp, delta_priority = self.observable(mjd=mjd, maxExp=maxExp,
-                                                                ignore=ignore)
+        iobservable, nexp, delta_priority, exp_epoch, epoch_idx\
+            = self.observable(mjd=mjd, maxExp=maxExp, ignore=ignore)
+        # if(len(iobservable) == 0) and live:
+        #     # in a sim we'll take the dead time, should write something to track this better
+        #     # print("Nothing observable")
+        #     iobservable, nexp, delta_priority, exp_epoch, epoch_idx\
+        #         = self.observable(mjd=mjd, maxExp=maxExp, ignore=ignore)
         if len(iobservable) == 0:
             # print("!! nothing to observe; {} exp left in the night".format(maxExp))
             if returnAll:
@@ -1390,16 +1397,21 @@ class Scheduler(Master):
 
         observable_fieldid = self.fields.pk[iobservable]
 
-        field_pk, next_exp = self.pick(priority=priority,
-                                       fieldid=observable_fieldid,
-                                       nexp=nexp)
+        # field_pk, next_exp = self.pick(priority=priority,
+        #                                fieldid=observable_fieldid,
+        #                                nexp=nexp)
+        ipick = np.argmax(priority)
+        field_pk = observable_fieldid[ipick]
+        next_exp = nexp[ipick]
+        pick_exp_epoch = exp_epoch[ipick]
+        pick_epoch_idx = epoch_idx[ipick]
 
         if not live:
             # just a sim return number of designs
             return(field_pk, next_exp)
 
         # its live, return list of exp indices
-        designs = self.designsNext(field_pk)
+        designs = self.designsNext(field_pk, pick_exp_epoch, pick_epoch_idx)
 
         return field_pk, designs
 
