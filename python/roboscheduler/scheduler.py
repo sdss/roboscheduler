@@ -1037,7 +1037,7 @@ class Scheduler(Master):
 
         # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
 
-        over = list()
+        # over = list()
 
         # indxs = np.where(self.fields.nextmjd > mjd)[0]
         # observable[indxs] = False
@@ -1059,73 +1059,33 @@ class Scheduler(Master):
 
             mjd_past = self.fields.hist[self.fields.pk[indx]]
             # epoch_idx is the *index* of the *next* epoch
-            # for 0 indexed arrays, this equivalent to
-            # "how many epochs have I done previously"
-            try:
-                tol = cadence.max_length[int(self.fields.epoch_idx[indx])]
-            except IndexError:
-                tol = cadence.max_length[-1]
-            if tol < 0.1:
-                tol = 0.1
-            elif tol > 14:
-                tol = 14
-            epoch_idx, begin_last_epoch = epochs_completed(mjd_past, tolerance=tol)
+            expCount = [np.sum(cadence.nexp[:i+1]) for i in range(len(cadence.nexp))]
+            epoch_idx = np.where(np.array(expCount) > len(mjd_past))[0][0]
+
             if epoch_idx >= cadence.nepochs and self.fields.flag[indx] != 1:
                 observable[indx] = False
                 continue
-            # how many exp/"designs" since start of last epoch?
-            # exp_epoch = np.sum(np.greater_equal(mjd_past, begin_last_epoch))
 
-            expCount = [np.sum(cadence.nexp[:i+1]) for i in range(len(cadence.nexp))]
-            current_epoch = np.where(np.array(expCount) > len(mjd_past))[0][0]
-
-            if current_epoch > 0:
-                exp_epoch = expCount[current_epoch-1] - len(mjd_past)
+            if epoch_idx > 0:
+                exp_epoch = expCount[epoch_idx-1] - len(mjd_past)
             else:
                 exp_epoch = len(mjd_past)
+
+            nexp[indx] = cadence.nexp[epoch_idx] - exp_epoch
+            partial_epoch = exp_epoch > 0
+
+            exp_epochs[indx] = exp_epoch
+            epoch_idxs[indx] = epoch_idx
 
             if len(mjd_past):
                 mjd_prev = mjd_past[-1]
             else:
                 mjd_prev = 0
-            if len(mjd_past) > np.sum(cadence.nexp):
-                over.append(int(self.fields.pk[indx]))
-            actually_done = False
-            # because dark-2xN can have max length 7 but delta min 0.5
-            while exp_epoch > cadence.nexp[epoch_idx]:
-                exp_epoch -= cadence.nexp[epoch_idx]
-                epoch_idx += 1
-                if epoch_idx == cadence.nepochs:
-                    actually_done = True
-                    break
-            if actually_done and self.fields.flag[indx] != 1:
-                observable[indx] = False
-                continue
-            if exp_epoch < cadence.nexp[epoch_idx] and exp_epoch != 0:
-                nexp[indx] = cadence.nexp[epoch_idx] - exp_epoch
-                epoch_idx -= 1
-                partial_epoch = True
-            if epoch_idx >= cadence.nepochs and not self.fields.flag[indx] == 1:
-                # print("DONE ", epoch_idx, cadence.nepochs, int(self.fields.pk[indx]))
-                observable[indx] = False
-                continue
-            else:
-                nexp[indx] = cadence.nexp[epoch_idx]
-                partial_epoch = False
+
             if nexp[indx] > nexp_change and self.fields.flag[indx] != 1:
-                # print(f"{float(mjd):.3f} {int(self.fields.pk[indx])} c_nexp {cadence.nexp[epoch_idx]} NEXP {nexp_change} MAXEXP {maxExp}")
                 # change between bright/dark, field doesn't fit
                 observable[indx] = False
                 continue
-            # if int(self.fields.pk[indx]) in over:
-            #     print("!?", epoch_idx >= cadence.nepochs, not self.fields.flag[indx] == 1)
-            #     print(int(self.fields.pk[indx]), len(mjd_past), cadence.nexp, exp_epoch, cadence.nepochs, epoch_idx)
-
-            assert epoch_idx == current_epoch, f"measured epoch: {epoch_idx}, counted: {current_epoch}"
-
-            exp_epochs[indx] = exp_epoch
-            epoch_idxs[indx] = epoch_idx
-
             observable[indx], delta_priority[indx] =\
                 cadence.evaluate_next(epoch_idx=epoch_idx,
                                       partial_epoch=partial_epoch,
@@ -1135,12 +1095,6 @@ class Scheduler(Master):
                                       moon_dist=moon_dist[indx],
                                       deltaV=deltav[indx],
                                       airmass=airmass[indx])
-            # if nexp[indx] > 6 and observable[indx]:
-            #     delta_priority[indx] += 1e6
-            # delta_priority[indx] += 2.5**nexp[indx]
-
-            # if not observable[indx] and "bright" in cadence.name:
-            #     print(f"{float(mjd):.3f} {skybrightness} {int(self.fields.pk[indx])} {cadence.name} MAXEXP {maxExp}")
 
             delta_priority[indx] += nExpPrioritize(nexp[indx],
                                                    base=self.nExpPriBase,
@@ -1160,25 +1114,8 @@ class Scheduler(Master):
                 # so override cadence eligibility and bump priority
                 observable[indx] = True
                 delta_priority[indx] += 1e6
-            # if "dark_" in cadence.name: # and observable[indx] and mjd_prev != 0:
-            #     self.check = True
-            #     self.recent.append(f"{float(skybrightness):.1f} {airmass[indx]:.1f} {int(self.fields.pk[indx])} {cadence.name} MAXEXP {maxExp}")
-                # # print(f"F {float(mjd):.3f} {int(self.fields.pk[indx])} {delta_priority[indx]}")
-                # self.recent.append(f"R {int(self.fields.pk[indx])} {epoch_idx} prev {len(mjd_past)} epoch {epoch_idx} tol {tol} partial {partial_epoch}")
-                # self.recent_ids.append(int(self.fields.pk[indx]))
-                # print(nexp[indx], type(nexp[indx]))
-            # elif "x8" in cadence.name and not observable[indx]:
-            #     if skybrightness < 0.36 and moon_dist[indx] < 30 and deltav[indx] < 2 and airmass[indx] < 1.5:
-            #         print(f"F {epoch_idx} {float(mjd):.3f} {int(self.fields.pk[indx])} {mjd-mjd_prev}")
-            #         print(f"sky {skybrightness} moon {moon_dist[indx]} deltav {deltav[indx]} AM {airmass[indx]:}")
-            #         print(nexp[indx], type(nexp[indx]), maxExp)
-        # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
-        iobservable = np.where(observable)[0]
 
-        # if len(iobservable) == 0 and self.check:
-        #     print(f"{float(mjd):.3f} AAAHHH")
-        #     for r in self.recent:
-        #         print(r)
+        iobservable = np.where(observable)[0]
 
         return iobservable, nexp[iobservable], delta_priority[iobservable],\
             exp_epochs[iobservable], epoch_idxs[iobservable]
