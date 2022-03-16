@@ -1074,7 +1074,16 @@ class Scheduler(Master):
                 observable[indx] = False
                 continue
             # how many exp/"designs" since start of last epoch?
-            exp_epoch = np.sum(np.greater_equal(mjd_past, begin_last_epoch))
+            # exp_epoch = np.sum(np.greater_equal(mjd_past, begin_last_epoch))
+
+            expCount = [np.sum(cadence.nexp[:i+1]) for i in range(len(cadence.nexp))]
+            current_epoch = np.where(np.array(expCount) > len(mjd_past))[0][0]
+
+            if current_epoch > 0:
+                exp_epoch = expCount[current_epoch-1] - len(mjd_past)
+            else:
+                exp_epoch = len(mjd_past)
+
             if len(mjd_past):
                 mjd_prev = mjd_past[-1]
             else:
@@ -1111,6 +1120,8 @@ class Scheduler(Master):
             # if int(self.fields.pk[indx]) in over:
             #     print("!?", epoch_idx >= cadence.nepochs, not self.fields.flag[indx] == 1)
             #     print(int(self.fields.pk[indx]), len(mjd_past), cadence.nexp, exp_epoch, cadence.nepochs, epoch_idx)
+
+            assert epoch_idx == current_epoch, f"measured epoch: {epoch_idx}, counted: {current_epoch}"
 
             exp_epochs[indx] = exp_epoch
             epoch_idxs[indx] = epoch_idx
@@ -1311,6 +1322,8 @@ class Scheduler(Master):
         exp_to_do = nexp_next - pick_exp_epoch
 
         designs = list(len(mjd_past) + np.arange(exp_to_do))
+
+        print(self.fields.field_id[fieldidx], len(mjd_past), designs)
 
         return designs
 
