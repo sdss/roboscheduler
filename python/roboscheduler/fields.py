@@ -352,6 +352,9 @@ class Fields(object, metaclass=FieldsSingleton):
         fields["slots_exposures"] = slots_exposures
         fields["cadence"] = cadence
 
+        # we're resetting field hist, so need to re-cache
+        self._hist = None
+
         self.fromarray(fields_array=fields)
 
         self.cadencelist.fromdb(use_label_root=False, version="v1")

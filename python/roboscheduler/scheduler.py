@@ -1059,13 +1059,14 @@ class Scheduler(Master):
 
             mjd_past = self.fields.hist[self.fields.pk[indx]]
             # epoch_idx is the *index* of the *next* epoch
+
             expCount = [np.sum(cadence.nexp[:i+1]) for i in range(len(cadence.nexp))]
 
             if expCount[-1] == len(mjd_past):
+                # there's a chance fields.epoch_idx won't catch close together epochs
+                # with long max_length fields, e.g. dark x2/x4
                 observable[indx] = False
                 continue
-
-            epoch_idx = np.where(np.array(expCount) > len(mjd_past))[0][0]
 
             epoch_idx = np.where(np.array(expCount) > len(mjd_past))[0][0]
 
