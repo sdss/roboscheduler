@@ -6,6 +6,8 @@ import PyAstronomy.pyasl as pyasl
 import astropy.units as units
 import astropy.time as atime
 import pydl.pydlutils.yanny as yanny
+import yaml
+
 import roboscheduler.fields
 import roboscheduler.observations
 import roboscheduler.cadence
@@ -900,7 +902,7 @@ class Scheduler(Master):
     """
     def __init__(self, airmass_limit=2.,
                  schedule='normal', observatory='apo', observatoryfile=None,
-                 exp_time=None, priorities={}):
+                 exp_time=None, priorities=None):
         """Return Scheduler object
         """
         super().__init__(schedule=schedule, observatory=observatory,
@@ -914,15 +916,23 @@ class Scheduler(Master):
         else:
             self.exp_time = exp_time
 
+        if priorities is None:
+            priority_file = os.getenv('RS_PRIORITY_FILE')
+            if priority_file is not None:
+                priorities = yaml.load(open(priority_file), Loader=yaml.FullLoader)
+            else:
+                priorities = {}
+
         # priorities
         self.priorities = priorities  # need it later
-        self.nepochsPri = priorities.get("nepochsPri", 10)
-        self.nExpPriBase = priorities.get("nExpPriBase", 20)
-        self.nExpPriAward = priorities.get("nExpPriAward", 2e6)
-        self.nExpPriPenalty = priorities.get("nExpPriPenalty", -100)
+        self.nepochsPri = priorities.get("nepochsPri", 2)
+        self.nExpPriBase = priorities.get("nExpPriBase", 2)
+        self.nExpPriAward = priorities.get("nExpPriAward", 1e5)
+        self.nExpPriPenalty = priorities.get("nExpPriPenalty", -5)
         self.basePri = priorities.get("basePri", 100)
-        self.lstPri = priorities.get("lstPri", 400)
+        self.lstPri = priorities.get("lstPri", 200)
         self.overheadPri = priorities.get("overheadPri", 40)
+        self.remainAward = priorities.get("remainAward", 100)
 
         return
 
@@ -962,7 +972,12 @@ class Scheduler(Master):
         else:
             # self.cadencelist.fromdb(version="v1")
             # feilds.fromdb calls cadencelist from db
-            self.fields.fromdb()
+            self.fields.fromdb(priorities=self.priorities)
+
+        surveyGoal = np.sum(self.fields.slots)
+        surveyDone = np.sum([len(self.fields.hist[i]) for i in self.fields.pk])
+
+        self.surveyComplete = (surveyGoal - surveyDone) / surveyGoal
 
         self.observations = roboscheduler.observations.Observations(observatory=self.observatory)
         return
@@ -1010,7 +1025,7 @@ class Scheduler(Master):
                                    dec=self.fields.deccen)
 
         # whereRM = np.where(["bhm_rm" in c for c in self.fields.cadence])[0]
-        where_uhoh = np.where(["dark_2x" in c for c in self.fields.cadence])[0]
+        # where_uhoh = np.where(["dark_2x" in c for c in self.fields.cadence])[0]
 
         next_change, next_brightness = self.next_change(mjd)
 
@@ -1103,6 +1118,11 @@ class Scheduler(Master):
                                       moon_dist=moon_dist[indx],
                                       deltaV=deltav[indx],
                                       airmass=airmass[indx])
+
+            percent_remain = (expCount[-1] - len(mjd_past))/expCount[-1]
+
+            if percent_remain > self.surveyComplete:
+                delta_priority[indx] += self.remainAward
 
             delta_priority[indx] += nExpPrioritize(nexp[indx],
                                                    base=self.nExpPriBase,

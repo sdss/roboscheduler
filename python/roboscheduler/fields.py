@@ -157,41 +157,6 @@ class Fields(object, metaclass=FieldsSingleton):
         self.fromarray(self.fields_fits)
         return
 
-    # def add_observations(self, mjd=None, fieldidx=None, iobs=None,
-    #                      lst=None, epoch_idx=None):
-    #     # """Add an observation, used in simulations.
-
-    #     # Parameters:
-    #     # ----------
-
-    #     # mjd : float
-    #     #     MJD of the observation
-    #     # fieldidx : integer
-    #     #     index into Fields of the field observed
-    #     # iobs : integer
-    #     #     index into Scheduler.observations
-    #     # lst : float
-    #     #     lst at time of observation
-    #     # epoch_idx : integer
-    #     #     which epoch was being observed
-    #     # """
-    #     # self._hist[self.field_id[fieldidx]].append(mjd)
-
-    #     self.observations[fieldidx] = np.append(self.observations[fieldidx], iobs)
-    #     self.icadence[fieldidx] = epoch_idx
-    #     cadence = self.cadencelist.cadences[self.cadence[fieldidx]]
-    #     if(self.icadence[fieldidx] < cadence.nepochs):
-    #         self.nextmjd[fieldidx] = (mjd +
-    #                                   cadence.delta_min[self.icadence[fieldidx]])
-    #     else:
-    #         self.nextmjd[fieldidx] = 100000.
-    #         self.icadence[fieldidx] = cadence.nepochs - 1
-    #     int_lst = int(np.round(lst/15, 0))
-    #     if int_lst == 24:
-    #         int_lst = 0
-    #     self.lstObserved[fieldidx][int_lst] += 1
-    #     return
-
     @property
     def validCadence(self):
         if self._validCadance is None:
@@ -280,7 +245,7 @@ class Fields(object, metaclass=FieldsSingleton):
 
         self.checkCompletion(field_idx)
 
-    def fromdb(self, version=None):
+    def fromdb(self, version=None, priorities={}):
         """Load this Fields object with fields from the targetdb
 
         Parameters:
@@ -357,7 +322,8 @@ class Fields(object, metaclass=FieldsSingleton):
 
         self.fromarray(fields_array=fields)
 
-        self.cadencelist.fromdb(use_label_root=False, version="v1")
+        self.cadencelist.fromdb(use_label_root=False, version="v1",
+                                priorities=priorities)
 
     def lstWeight(self, lst, field_idx=None):
         # field id corresponds to indx, so fields is id/indx

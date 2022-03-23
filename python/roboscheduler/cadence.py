@@ -142,11 +142,11 @@ class Cadence(cCadenceCore.CadenceCore):
                          epoch_indx, epochs)
 
         self.partialEpochPri = priorities.get("partialEpochPri", 200)
-        self.brightDurDarkPenalty = priorities.get("brightDurDarkPenalty", -5000)
-        self.deltaMaxPriBump = priorities.get("deltaMaxPriBump", 10)
-        self.deltaNomBump = priorities.get("deltaNomBump", 4)
+        self.brightDurDarkPenalty = priorities.get("brightDurDarkPenalty", -200)
+        self.deltaMaxPriBump = priorities.get("deltaMaxPriBump", 20)
+        self.deltaNomBump = priorities.get("deltaNomBump", 20)
         self.overDeltaMaxBump = priorities.get("overDeltaMaxBump", 100)
-        self.base_priority = priorities.get("base_priority", 50)
+        self.base_priority = priorities.get("base_priority", 100)
 
         return
 
@@ -805,7 +805,8 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                 where(targetdb.Cadence.label == cadence).execute()
         return
 
-    def fromdb(self, use_label_root=True, version='', cadences=None):
+    def fromdb(self, use_label_root=True, version='', cadences=None,
+               priorities={}):
         """Extract cadences into the targetdb
 
         Parameters:
@@ -908,4 +909,5 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                              max_airmass=max_airmass,
                              obsmode_pk=np.array(cadence['obsmode_pk']),
                              label_root=str(cadence['label_root'].strip()),
-                             label_version=str(cadence['label_version'].strip()))
+                             label_version=str(cadence['label_version'].strip()),
+                             priorities=priorities)
