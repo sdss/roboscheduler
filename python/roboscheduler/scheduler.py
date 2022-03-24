@@ -977,7 +977,7 @@ class Scheduler(Master):
         surveyGoal = np.sum(self.fields.slots)
         surveyDone = np.sum([len(self.fields.hist[i]) for i in self.fields.pk])
 
-        self.surveyComplete = (surveyGoal - surveyDone) / surveyGoal
+        self.surveyComplete = surveyDone / surveyGoal
 
         self.observations = roboscheduler.observations.Observations(observatory=self.observatory)
         return
@@ -1119,9 +1119,9 @@ class Scheduler(Master):
                                       deltaV=deltav[indx],
                                       airmass=airmass[indx])
 
-            percent_remain = (expCount[-1] - len(mjd_past))/expCount[-1]
+            percent_done = len(mjd_past) / expCount[-1]
 
-            if percent_remain > self.surveyComplete:
+            if percent_done < self.surveyComplete:
                 delta_priority[indx] += self.remainAward
 
             delta_priority[indx] += nExpPrioritize(nexp[indx],
