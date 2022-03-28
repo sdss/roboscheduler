@@ -141,7 +141,7 @@ class Cadence(cCadenceCore.CadenceCore):
                          min_twilight_ang, max_airmass,
                          epoch_indx, epochs)
 
-        self.partialEpochPri = priorities.get("partialEpochPri", 200)
+        self.partialEpochPri = priorities.get("partialEpochPri", 500)
         self.brightDurDarkPenalty = priorities.get("brightDurDarkPenalty", -200)
         self.deltaMaxPriBump = priorities.get("deltaMaxPriBump", 20)
         self.deltaNomBump = priorities.get("deltaNomBump", 20)
