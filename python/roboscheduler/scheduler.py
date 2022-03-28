@@ -1090,7 +1090,7 @@ class Scheduler(Master):
                 continue
 
             if epoch_idx > 0:
-                exp_epoch = expCount[epoch_idx-1] - len(mjd_past)
+                exp_epoch = len(mjd_past) - expCount[epoch_idx - 1]
             else:
                 exp_epoch = len(mjd_past)
 
