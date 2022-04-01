@@ -231,7 +231,7 @@ class Cadence(cCadenceCore.CadenceCore):
     def evaluate_next(self, epoch_idx=None, partial_epoch=False,
                       mjd_past=None, mjd_next=None,
                       skybrightness_next=None, moon_dist=None, deltaV=None,
-                      airmass=None):
+                      airmass=None, verbose=False):
         """Evaluate next choice of observation
 
            Returns whether cadence is ok AND how long until
@@ -252,13 +252,13 @@ class Cadence(cCadenceCore.CadenceCore):
         valid = self.obsmodeChecks(epoch_idx, moon_dist, deltaV, airmass)
         ok_skybrightness = ok_skybrightness & valid
 
-        # if not ok_skybrightness and "bright" in self.name:
-        #     d_check = 10 * (self.min_deltav_ks91[epoch_idx] <= deltaV)
-        #     # a_check = 10 * (self.max_airmass[epoch_idx] >= airmass)
-        #     m_check = 1 * (self.min_moon_sep[epoch_idx] <= moon_dist)
-        #     total = d_check + m_check
-        #     print(f"use {self.min_deltav_ks91[epoch_idx]:.1f} {self.min_moon_sep[epoch_idx]:.1f} {mjd_past}")
-        #     print(f"{total} {deltaV:.1f}  {moon_dist:.1f} {mjd_past}")
+        if verbose:
+            d_check = 100 * (self.min_deltav_ks91[epoch_idx] <= deltaV)
+            a_check = 10 * (self.max_airmass[epoch_idx] >= airmass)
+            m_check = 1 * (self.min_moon_sep[epoch_idx] <= moon_dist)
+            total = d_check + a_check + m_check
+            print(f"use {self.min_deltav_ks91[epoch_idx]:.1f} {self.min_moon_sep[epoch_idx]:.1f} {self.max_airmass[epoch_idx]:.1f}")
+            print(f"{total} {deltaV:.1f} {airmass:.1f} {moon_dist:.1f}")
 
         if not ok_skybrightness:
             return ok_skybrightness, 0
@@ -291,8 +291,8 @@ class Cadence(cCadenceCore.CadenceCore):
             priority += self.overDeltaMaxBump
         # if ignoreMax:
         #     return(ok_skybrightness & (delta_curr >= dlo), priority)
-        # if "x8" in self.name:
-        #     print("CAD", self.name, ok_skybrightness, delta_curr, dlo, priority)
+        if verbose:
+            print(self.name, ok_skybrightness, delta_curr, dlo, priority)
         return(ok_skybrightness & (delta_curr >= dlo), priority)
 
 
