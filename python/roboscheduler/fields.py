@@ -210,6 +210,8 @@ class Fields(object, metaclass=FieldsSingleton):
                     self._hist[d["pk"]].append(d["mjd"])
 
             for i in range(len(self.pk)):
+                pk = self.pk[i]
+                self._hist[pk].sort()
                 self.checkCompletion(i)
 
         return self._hist

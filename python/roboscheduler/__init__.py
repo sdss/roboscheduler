@@ -43,4 +43,4 @@ if os.path.exists(custom_config_fn):
     except AttributeError:
         config = merge(yaml.load(open(custom_config_fn)), config)
 
-__version__ = '1.2.0'
+__version__ = '1.2.1a'

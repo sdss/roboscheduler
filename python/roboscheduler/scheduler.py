@@ -982,7 +982,7 @@ class Scheduler(Master):
         surveyGoal = np.sum(self.fields.slots)
         surveyDone = np.sum([len(self.fields.hist[i]) for i in self.fields.pk])
 
-        self.surveyComplete = (surveyGoal - surveyDone) / surveyGoal
+        self.surveyComplete = surveyDone / surveyGoal
 
         self.observations = roboscheduler.observations.Observations(observatory=self.observatory)
         return
@@ -1095,9 +1095,12 @@ class Scheduler(Master):
                 continue
 
             if epoch_idx > 0:
-                exp_epoch = expCount[epoch_idx-1] - len(mjd_past)
+                exp_epoch = len(mjd_past) - expCount[epoch_idx - 1]
+                last_idx = expCount[epoch_idx - 1] - 1
+                mjd_prev = mjd_past[last_idx]
             else:
                 exp_epoch = len(mjd_past)
+                mjd_prev = 0
 
             nexp[indx] = cadence.nexp[epoch_idx] - exp_epoch
             partial_epoch = exp_epoch > 0
@@ -1105,15 +1108,11 @@ class Scheduler(Master):
             exp_epochs[indx] = exp_epoch
             epoch_idxs[indx] = epoch_idx
 
-            if len(mjd_past):
-                mjd_prev = mjd_past[-1]
-            else:
-                mjd_prev = 0
-
             if nexp[indx] > nexp_change and self.fields.flag[indx] != 1:
                 # change between bright/dark, field doesn't fit
                 observable[indx] = False
                 continue
+
             observable[indx], delta_priority[indx] =\
                 cadence.evaluate_next(epoch_idx=epoch_idx,
                                       partial_epoch=partial_epoch,
@@ -1122,14 +1121,15 @@ class Scheduler(Master):
                                       skybrightness_next=skybrightness,
                                       moon_dist=moon_dist[indx],
                                       deltaV=deltav[indx],
-                                      airmass=airmass[indx])
+                                      airmass=airmass[indx],
+                                      verbose=False)
 
-            percent_remain = (expCount[-1] - len(mjd_past))/expCount[-1]
+            percent_done = len(mjd_past) / expCount[-1]
 
-            if percent_remain > self.surveyComplete:
+            if percent_done < self.surveyComplete:
                 delta_priority[indx] += self.remainAward
 
-            delta_priority[indx] += nExpPrioritize(nexp[indx],
+            delta_priority[indx] += nExpPrioritize(cadence.nexp[epoch_idx],
                                                    base=self.nExpPriBase,
                                                    award=self.nExpPriAward,
                                                    penalty=self.nExpPriPenalty)
@@ -1293,7 +1293,7 @@ class Scheduler(Master):
 
         designs = list(len(mjd_past) + np.arange(exp_to_do))
 
-        print(self.fields.field_id[fieldidx], len(mjd_past), designs)
+        # print(self.fields.field_id[fieldidx], len(mjd_past), designs)
 
         return designs
 
@@ -1338,13 +1338,7 @@ class Scheduler(Master):
 
         iobservable, nexp, delta_priority, exp_epoch, epoch_idx\
             = self.observable(mjd=mjd, maxExp=maxExp, ignore=ignore)
-        # if(len(iobservable) == 0) and live:
-        #     # in a sim we'll take the dead time, should write something to track this better
-        #     # print("Nothing observable")
-        #     iobservable, nexp, delta_priority, exp_epoch, epoch_idx\
-        #         = self.observable(mjd=mjd, maxExp=maxExp, ignore=ignore)
         if len(iobservable) == 0:
-            # print("!! nothing to observe; {} exp left in the night".format(maxExp))
             if returnAll:
                 return None, -1
             return None, -1
@@ -1355,11 +1349,6 @@ class Scheduler(Master):
         if returnAll:
             # inverse priority, highest first
             sorted_priority = np.argsort(priority)[::-1]
-            # for i in sorted_priority:
-            #     field_idx = iobservable[i]
-            #     print(i, priority[i], nexp[i],
-            #           self.fields.pk[field_idx],
-            #           self.fields.cadence[field_idx])
             sorted_idx = [iobservable[i] for i in sorted_priority]
             sorted_fields = [self.fields.pk[i] for i in sorted_idx]
             sorted_exp = [nexp[i] for i in sorted_priority]
@@ -1370,21 +1359,11 @@ class Scheduler(Master):
 
             return sorted_fields, sorted_exp
 
-        # considered = False
-        # print(observable_fieldid)
-        # print(priority, self.fields.cadence[observable_fieldid])
-        # for p, c, i in zip(priority, np.array(self.fields.cadence)[observable_fieldid], observable_fieldid):
-        #     if "RM" in c.upper():
-        #         print(c, i, p, np.max(priority))
-        #         considered = True
+        observable_fieldpk = self.fields.pk[iobservable]
+        # field_ids = self.fields.field_id[iobservable]
 
-        observable_fieldid = self.fields.pk[iobservable]
-
-        # field_pk, next_exp = self.pick(priority=priority,
-        #                                fieldid=observable_fieldid,
-        #                                nexp=nexp)
         ipick = np.argmax(priority)
-        field_pk = observable_fieldid[ipick]
+        field_pk = observable_fieldpk[ipick]
         next_exp = nexp[ipick]
         pick_exp_epoch = exp_epoch[ipick]
         pick_epoch_idx = epoch_idx[ipick]
