@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+# encoding: utf-8
+
+import argparse
+import os
+import sys
+
+from astropy.time import Time
+
+from roboscheduler.scheduler import Observer
+
+
+def nightLengthHours(mjd, twilight=-15, loc=None):
+    sched = Observer(observatory=loc)
+    length = sched.night_length(mjd=mjd, twilight=twilight)
+    return length*24
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(
+        prog=os.path.basename(sys.argv[0]),
+        description="""create master schedule""")
+
+    parser.add_argument("-m", "--mjd", dest="mjd", type=int,
+                        required=False, help="mjd")
+    parser.add_argument("-l", "--loc", dest="loc", type=str,
+                        required=False, help="location, default apo",
+                        default="apo")
+    parser.add_argument("-t", "--twilight", dest="twilight", type=float,
+                        required=False, help="location, default apo",
+                        default=-15.)
+    parser.add_argument("-c", "--civil", dest="civil", type=str,
+                        required=False, help="civil date at start of night, YYYY-MM-DD")
+
+    args = parser.parse_args()
+    mjd = args.mjd
+    loc = args.loc
+    twilight = args.twilight
+    civil = args.civil
+
+    if twilight > 0:
+        twilight = -1*twilight
+
+    if civil:
+        try:
+            civil = int(Time(civil+"T00:00:00").mjd)
+        except ValueError:
+            sys.exit("ERROR: dates must be in format YYYY-MM-DD")
+        if type(civil) == int:
+            mjd = civil - 1
+
+    assert mjd, "must pass civil date or mjd"
+
+    length = nightLengthHours(mjd, twilight=twilight, loc=loc)
+    print(length)

@@ -595,6 +595,11 @@ class Observer(SchedulerBase):
                               args=twilight)
         return(np.float64(twi))
 
+    def night_length(self, mjd=None, twilight=None):
+        morning = self.morning_twilight(mjd=mjd, twilight=twilight)
+        evening = self.evening_twilight(mjd=mjd, twilight=twilight)
+        return morning - evening
+
     def _moon_rise_set(self, mjd=None):
         """Utility function for root-finding to get moon rise/set times"""
         (alt, az) = self.moon_altaz(mjd=mjd)
