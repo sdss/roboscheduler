@@ -935,9 +935,10 @@ class Scheduler(Master):
         self.nExpPriAward = priorities.get("nExpPriAward", 1e5)
         self.nExpPriPenalty = priorities.get("nExpPriPenalty", -5)
         self.basePri = priorities.get("basePri", 100)
-        self.lstPri = priorities.get("lstPri", 200)
+        self.lstPri = priorities.get("lstPri", 400)
         self.overheadPri = priorities.get("overheadPri", 40)
         self.remainAward = priorities.get("remainAward", 100)
+        self.airmassPri = priorities.get("airmassPri", 20)
 
         return
 
@@ -1206,6 +1207,11 @@ class Scheduler(Master):
         ra = self.fields.racen[iobservable]
         ha = self.ralst2ha(ra=ra, lst=lst)
         dec = self.fields.deccen[iobservable]
+
+        (alt, az) = self.radec2altaz(mjd=mjd, ra=ra, dec=dec)
+        airmass = self.alt2airmass(alt) - 1
+
+        priority += self.airmassPri * np.exp(-(airmass)**2 / (2 * 0.2**2))
 
         # gaussian weight, mean already 0, use 1 hr  std
         priority += self.lstPri * np.exp(-(lstDiffs)**2 / (2 * 0.5**2))
