@@ -1186,13 +1186,6 @@ class Scheduler(Master):
         # priority = self.fields.basePriority[fieldid]
         priority += delta_priority
 
-        # # #################
-        # # #################
-        # # GRRRRRR
-        # # #################
-        # # #################
-        # priority += np.power(2, nexp) * 5  # 1280 for RM
-
         lst = self.lst(mjd)
 
         lstHrs = lst/15
