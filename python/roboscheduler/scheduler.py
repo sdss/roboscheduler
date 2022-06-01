@@ -1114,6 +1114,15 @@ class Scheduler(Master):
                 observable[indx] = False
                 continue
 
+            if nexp[indx] > 4 or airmass[indx] > 1.3:
+                endmjd = mjd + nexp[indx] * self.exp_time
+                (alt, az) = self.radec2altaz(mjd=endmjd,
+                                             ra=self.fields.racen[indx],
+                                             dec=self.fields.deccen[indx])
+                endam = self.alt2airmass(alt)
+                if endam > airmass[indx]:
+                    airmass[indx] = endam
+
             observable[indx], delta_priority[indx] =\
                 cadence.evaluate_next(epoch_idx=epoch_idx,
                                       partial_epoch=partial_epoch,
