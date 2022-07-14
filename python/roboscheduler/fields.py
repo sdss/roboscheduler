@@ -195,12 +195,14 @@ class Fields(object, metaclass=FieldsSingleton):
 
                 Field = targetdb.Field
                 Design = targetdb.Design
+                d2f = targetdb.DesignToField
                 Status = opsdb.CompletionStatus
                 d2s = opsdb.DesignToStatus
                 done = Status.get(label="done")
 
                 dbfields = Field.select(d2s.mjd, Field.pk)\
-                                .join(Design)\
+                                .join(d2f, on=(Field.pk == d2f.field_pk))\
+                                .join(Design, on=(Design.design_id == d2f.design_id))\
                                 .join(d2s, on=(Design.design_id == d2s.design_id))\
                                 .where((Field.version == ver) &
                                        (Field.observatory == obs),
