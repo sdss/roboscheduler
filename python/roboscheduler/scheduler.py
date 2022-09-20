@@ -1030,8 +1030,10 @@ class Scheduler(Master):
         moon_dist = self.moon_dist(mjd=mjd, ra=self.fields.racen,
                                    dec=self.fields.deccen)
 
-        # whereRM = np.where(["bhm_rm" in c for c in self.fields.cadence])[0]
+        whereRM = np.where(["174x" in c for c in self.fields.cadence])[0]
         # where_uhoh = np.where(["dark_2x" in c for c in self.fields.cadence])[0]
+
+        print("\n")
 
         next_change, next_brightness = self.next_change(mjd)
 
@@ -1123,6 +1125,11 @@ class Scheduler(Master):
                 if endam > airmass[indx]:
                     airmass[indx] = endam
 
+            verbose = False
+            if cadence.nexp[epoch_idx] > 4:
+                print(int(self.fields.pk[indx]), observable[indx], f"{airmass[indx]:3.1f}", alt)
+                verbose = True
+
             observable[indx], delta_priority[indx] =\
                 cadence.evaluate_next(epoch_idx=epoch_idx,
                                       partial_epoch=partial_epoch,
@@ -1132,7 +1139,7 @@ class Scheduler(Master):
                                       moon_dist=moon_dist[indx],
                                       deltaV=deltav[indx],
                                       airmass=airmass[indx],
-                                      verbose=False)
+                                      verbose=verbose)
 
             percent_done = len(mjd_past) / expCount[-1]
 
@@ -1148,7 +1155,8 @@ class Scheduler(Master):
             # slight decrement for single epochs
             delta_priority[indx] += (cadence.nepochs - 2)*self.nepochsPri
             if nexp[indx] > maxExp:
-                # print(f"{float(mjd):.3f} {int(self.fields.pk[indx])} c_nexp {cadence.nexp[epoch_idx]} MAXEXP {maxExp}")
+                if cadence.nexp[epoch_idx] > 4:
+                    print(f"{int(self.fields.pk[indx])} c_nexp {cadence.nexp[epoch_idx]} MAXEXP {maxExp}")
                 observable[indx] = False
             if self.fields.flag[indx] == 1:
                 # flagged as top priority
@@ -1157,6 +1165,9 @@ class Scheduler(Master):
                 # so override cadence eligibility and bump priority
                 observable[indx] = True
                 delta_priority[indx] += 1e6
+
+            if cadence.nexp[epoch_idx] > 4:
+                print(int(self.fields.pk[indx]), observable[indx], delta_priority[indx], cadence.name)
 
         iobservable = np.where(observable)[0]
 

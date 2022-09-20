@@ -257,7 +257,7 @@ class Cadence(cCadenceCore.CadenceCore):
             a_check = 10 * (self.max_airmass[epoch_idx] >= airmass)
             m_check = 1 * (self.min_moon_sep[epoch_idx] <= moon_dist)
             total = d_check + a_check + m_check
-            print(f"use {self.min_deltav_ks91[epoch_idx]:.1f} {self.min_moon_sep[epoch_idx]:.1f} {self.max_airmass[epoch_idx]:.1f}")
+            print(f"use {self.min_deltav_ks91[epoch_idx]:.1f} {self.max_airmass[epoch_idx]:.1f} {self.min_moon_sep[epoch_idx]:.1f}")
             print(f"{total} {deltaV:.1f} {airmass:.1f} {moon_dist:.1f}")
 
         if not ok_skybrightness:
