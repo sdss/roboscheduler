@@ -1030,10 +1030,14 @@ class Scheduler(Master):
         moon_dist = self.moon_dist(mjd=mjd, ra=self.fields.racen,
                                    dec=self.fields.deccen)
 
+        # skybrightness in 2 days. Checked at each slot. Gives two chances to
+        # finish partial field if scheduled
+        skybrightness_2days = self.skybrightness(mjd+2)
+
         whereRM = np.where(["174x" in c for c in self.fields.cadence])[0]
         # where_uhoh = np.where(["dark_2x" in c for c in self.fields.cadence])[0]
 
-        print("\n")
+        # print("\n")
 
         next_change, next_brightness = self.next_change(mjd)
 
@@ -1126,9 +1130,9 @@ class Scheduler(Master):
                     airmass[indx] = endam
 
             verbose = False
-            if cadence.nexp[epoch_idx] > 4:
-                print(int(self.fields.pk[indx]), observable[indx], f"{airmass[indx]:3.1f}", alt)
-                verbose = True
+            # if cadence.nexp[epoch_idx] > 4:
+            #     print(int(self.fields.pk[indx]), observable[indx], f"{airmass[indx]:3.1f}", alt)
+            #     verbose = True
 
             observable[indx], delta_priority[indx] =\
                 cadence.evaluate_next(epoch_idx=epoch_idx,
@@ -1154,10 +1158,13 @@ class Scheduler(Master):
             # prioritize nepochs. Huge bump for 8 + epochs
             # slight decrement for single epochs
             delta_priority[indx] += (cadence.nepochs - 2)*self.nepochsPri
-            if nexp[indx] > maxExp:
-                if cadence.nexp[epoch_idx] > 4:
-                    print(f"{int(self.fields.pk[indx])} c_nexp {cadence.nexp[epoch_idx]} MAXEXP {maxExp}")
-                observable[indx] = False
+            if nexp[indx] > maxExp and observable[indx]:
+                if cadence.max_length[epoch_idx] < 1\
+                   or skybrightness_2days > 0.35:
+                    # can't schedule partial epoch
+                    observable[indx] = False
+                else:
+                    nexp[indx] = maxExp
             if self.fields.flag[indx] == 1:
                 # flagged as top priority
                 # if we're in this loop, it's above the horizon
@@ -1166,8 +1173,8 @@ class Scheduler(Master):
                 observable[indx] = True
                 delta_priority[indx] += 1e6
 
-            if cadence.nexp[epoch_idx] > 4:
-                print(int(self.fields.pk[indx]), observable[indx], delta_priority[indx], cadence.name)
+            # if cadence.nexp[epoch_idx] > 4:
+            #     print(int(self.fields.pk[indx]), observable[indx], delta_priority[indx], cadence.name)
 
         iobservable = np.where(observable)[0]
 
