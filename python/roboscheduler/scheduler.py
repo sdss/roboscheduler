@@ -1048,10 +1048,11 @@ class Scheduler(Master):
                 # it's still dark
                 nexp_change = 1e3
             elif nexp_change == 0:
-                # going into dark from bright, don't waste 15 minutes?
-                # delta V check will cover bad cases
-                skybrightness = 0.34
-                nexp_change = maxExp
+                # going into dark from bright, don't waste time
+                # delta V check might cover bad cases, don't chance it
+                # let bright encroach to dark
+                # skybrightness = 0.34
+                nexp_change = 1
         else:
             # next is bright
             if skybrightness > 0.35:
@@ -1065,6 +1066,7 @@ class Scheduler(Master):
         # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
 
         # over = list()
+        (sun_alt, sun_az) = self.sun_altaz(mjd=mjd)
 
         # indxs = np.where(self.fields.nextmjd > mjd)[0]
         # observable[indxs] = False
