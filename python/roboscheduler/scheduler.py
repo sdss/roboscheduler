@@ -702,6 +702,9 @@ class Observer(SchedulerBase):
 
         # print(moon_pos)
 
+        if malt < -5:
+            return np.zeros(len(targ_ra))
+
         deltaV = KS91_deltaV(alpha, moon_targ_dist, zee, zee_m)
 
         # if len(moon_targ_dist) > 1:
