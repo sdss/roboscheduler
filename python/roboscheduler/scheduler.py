@@ -1120,8 +1120,9 @@ class Scheduler(Master):
             exp_epochs[indx] = exp_epoch
             epoch_idxs[indx] = epoch_idx
 
-            if nexp[indx] > nexp_change and self.fields.flag[indx] != 1:
-                # change between bright/dark, field doesn't fit
+            if nexp[indx] > nexp_change and self.fields.flag[indx] != 1\
+               and cadence.max_length[epoch_idx] < 1:
+                # not enough time for one-night epoch
                 observable[indx] = False
                 continue
 
