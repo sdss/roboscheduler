@@ -1068,9 +1068,6 @@ class Scheduler(Master):
 
         # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
 
-        # over = list()
-        (sun_alt, sun_az) = self.sun_altaz(mjd=mjd)
-
         # indxs = np.where(self.fields.nextmjd > mjd)[0]
         # observable[indxs] = False
         indxs = np.where(observable)[0]
@@ -1120,11 +1117,11 @@ class Scheduler(Master):
             exp_epochs[indx] = exp_epoch
             epoch_idxs[indx] = epoch_idx
 
-            if nexp[indx] > nexp_change and self.fields.flag[indx] != 1\
-               and cadence.max_length[epoch_idx] < 1:
-                # not enough time for one-night epoch
-                observable[indx] = False
-                continue
+            if nexp[indx] > nexp_change and self.fields.flag[indx] != 1:
+                if cadence.max_length[epoch_idx] < 1:
+                    # not enough time for one-night epoch
+                    observable[indx] = False
+                    continue
 
             if nexp[indx] > 4 or airmass[indx] > 1.3:
                 endmjd = mjd + nexp[indx] * self.exp_time
@@ -1136,8 +1133,8 @@ class Scheduler(Master):
                     airmass[indx] = endam
 
             verbose = False
-            # if cadence.nexp[epoch_idx] > 4:
-            #     print(int(self.fields.pk[indx]), observable[indx], f"{airmass[indx]:3.1f}", alt)
+            # if cadence.nexp[epoch_idx] == 2:
+            #     print(int(self.fields.pk[indx]), observable[indx], f"{airmass[indx]:3.1f}", alt, cadence.nexp[epoch_idx], cadence.label_root)
             #     verbose = True
 
             observable[indx], delta_priority[indx] =\
