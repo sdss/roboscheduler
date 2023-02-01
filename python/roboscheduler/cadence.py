@@ -129,9 +129,9 @@ class Cadence(cCadenceCore.CadenceCore):
         min_twilight_ang = self._arrayify(min_twilight_ang,
                                           dtype=np.float32)
         max_airmass = self._arrayify(max_airmass, dtype=np.float32)
-        self.obsmode_pk = np.array(obsmode_pk, dtype=np.str)
-        self.label_root = np.str(label_root)
-        self.label_version = np.str(label_version)
+        self.obsmode_pk = np.array(obsmode_pk, dtype=np.str_)
+        self.label_root = np.str_(label_root)
+        self.label_version = np.str_(label_version)
         epoch_indx = np.zeros(nepochs + 1, dtype=np.int32)
         epochs = np.zeros(nexp.sum(), dtype=np.int32)
         super().__init__(name, nepochs,
@@ -165,7 +165,7 @@ class Cadence(cCadenceCore.CadenceCore):
         max_length = np.array(cfg.get(name, 'max_length').split(),
                               dtype=np.float32)
         obsmode_pk = np.array(cfg.get(name, 'obsmode_pk').split(),
-                              dtype=np.str)
+                              dtype=np.str_)
         min_moon_sep = np.array(cfg.get(name, 'min_moon_sep').split(),
                                 dtype=np.float32)
         min_deltav_ks91 = np.array(cfg.get(name, 'min_deltav_ks91').split(),
@@ -174,8 +174,8 @@ class Cadence(cCadenceCore.CadenceCore):
                                     dtype=np.float32)
         max_airmass = np.array(cfg.get(name, 'max_airmass').split(),
                                dtype=np.float32)
-        label_root = np.str(cfg.get(name, 'label_root'))
-        label_version = np.str(cfg.get(name, 'label_version'))
+        label_root = np.str_(cfg.get(name, 'label_root'))
+        label_version = np.str_(cfg.get(name, 'label_version'))
 
         self.__init__(name=name, nepochs=nepochs, skybrightness=skybrightness,
                       delta=delta, delta_min=delta_min, delta_max=delta_max,
