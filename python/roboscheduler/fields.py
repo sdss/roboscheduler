@@ -79,7 +79,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.pk = np.zeros(0, dtype=np.int32)
         # self.nextmjd = np.zeros(0, dtype=np.float64)
         self.epoch_idx = np.zeros(0, dtype=np.int32)
-        self.notDone = np.ones(0, dtype=np.bool)  # true is not done to skip the invert elsewhere
+        self.notDone = np.ones(0, dtype=np.bool_)  # true is not done to skip the invert elsewhere
         self.cadence = []
         self.observations = []
         self.slots = []
@@ -114,7 +114,7 @@ class Fields(object, metaclass=FieldsSingleton):
         # self.nextmjd = np.zeros(self.nfields, dtype=np.float64)
         self.epoch_idx = np.zeros(self.nfields, dtype=np.float64)
         self.basePriority = np.ones(self.nfields) * 200
-        self.notDone = np.ones(self.nfields, dtype=np.bool)
+        self.notDone = np.ones(self.nfields, dtype=np.bool_)
         if "flag" in fields_array.dtype.names:
             self.flag = fields_array["flag"]
         else:
