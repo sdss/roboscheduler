@@ -1428,6 +1428,9 @@ class Scheduler(Master):
         nfilled = self.fields.nfilled[fieldidx]
         nexp_cumul = len(self.fields.observations[fieldidx]) + 1
 
+        design_indx = len(self.fields.hist[fieldidx])
+        design_id = self.fields.designs[design_indx]
+
         (alt, az) = self.radec2altaz(mjd=result['mjd'],
                                      ra=racen,
                                      dec=deccen)
@@ -1447,7 +1450,8 @@ class Scheduler(Master):
                                      deccen=deccen,
                                      cadence=cadence,
                                      nfilled=nfilled,
-                                     nexp_cumul=nexp_cumul)
+                                     nexp_cumul=nexp_cumul,
+                                     design_id=design_id)
 
         # iobservations = self.fields.observations[fieldidx]
         # mjd_past = self.observations.mjd[iobservations]

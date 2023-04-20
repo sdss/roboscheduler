@@ -92,6 +92,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self._lunationPlan = None
         self._hist = None
         self._database = _database
+        self._designs = None
         return
 
     def setPriorities(self):
@@ -121,6 +122,23 @@ class Fields(object, metaclass=FieldsSingleton):
             self.flag = np.zeros(self.nfields)
         self.setPriorities()
         return
+
+    def createDummyDesigns(self):
+        """Create a dict of field pks which points to arrays
+           of dummy design ids
+        """
+        runningNumber = 1e6
+        self._designs = dict()
+        for pk, n in zip(self.pk, self.nfilled):
+            self._designs[pk] = np.arange(n) + runningNumber
+            runningNumber += n
+            assert runningNumber not in self._designs[pk], "bad math"
+
+    @property
+    def designs(self):
+        if self._designs is None:
+            self.createDummyDesigns()
+        return self._designs
 
     def fromfits(self, filename=None):
         """Load a fits file into this Fields object,
@@ -155,6 +173,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.fields_fits["cadence"] = [c[:c.index("_v")] for c in fits_dat["cadence"]]
 
         self.fromarray(self.fields_fits)
+        self.createDummyDesigns()
         return
 
     @property

@@ -85,12 +85,13 @@ class Observations(object):
         self.lst = np.zeros(0, dtype=np.float32)
         self.ha = np.zeros(0, dtype=np.float64)
         self.nexp_cumul = np.zeros(0, dtype=np.int32)
+        self.design_id = np.zeros(0, dtype=np.int32)
         return
 
     def add(self, field_pk=None, mjd=None, duration=None, apgSN2=None,
             rSN2=None, bSN2=None, skybrightness=None, airmass=None,
             lst=None, racen=None, deccen=None, cadence=None, nfilled=None,
-            nexp_cumul=None):
+            nexp_cumul=None, design_id=None):
         self.field_pk = np.append(self.field_pk,
                                  np.array([np.float64(field_pk)]))
         self.mjd = np.append(self.mjd,
@@ -125,6 +126,8 @@ class Observations(object):
                             np.array([np.float64(ha)]))
         self.nexp_cumul = np.append(self.nexp_cumul,
                                     np.array([np.int32(nexp_cumul)]))
+        self.design_id = np.append(self.design_id,
+                                   np.array([np.int32(design_id)]))
 
         return(self.nobservations - 1)
 
@@ -162,7 +165,8 @@ class Observations(object):
                 ('cadence', np.dtype('a20')),
                 ('nfilled', np.int32),
                 ('ha', np.float32),
-                ('nexp_cumul', np.int32)]
+                ('nexp_cumul', np.int32),
+                ('design_id', np.int32)]
         if(indx is None):
             indx = np.arange(self.nobservations)
         nobs = len(indx)
@@ -183,4 +187,5 @@ class Observations(object):
             obs['nfilled'] = self.nfilled[indx]
             obs['ha'] = self.ha[indx]
             obs['nexp_cumul'] = self.nexp_cumul[indx]
+            obs['design_id'] = self.design_id[indx]
         return(obs)
