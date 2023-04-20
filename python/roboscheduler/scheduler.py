@@ -1429,7 +1429,7 @@ class Scheduler(Master):
         nexp_cumul = len(self.fields.observations[fieldidx]) + 1
 
         design_indx = len(self.fields.hist[fieldidx])
-        design_id = self.fields.designs[design_indx]
+        design_id = self.fields.designs[fieldidx][design_indx]
 
         (alt, az) = self.radec2altaz(mjd=result['mjd'],
                                      ra=racen,
