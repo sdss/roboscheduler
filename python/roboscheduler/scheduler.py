@@ -1428,7 +1428,10 @@ class Scheduler(Master):
         nfilled = self.fields.nfilled[fieldidx]
         nexp_cumul = len(self.fields.observations[fieldidx]) + 1
 
-        design_indx = len(self.fields.hist[fieldidx])
+        design_indx = len(self.fields.hist[field_pk])
+        if design_indx == nfilled\
+            and self.fields.hist[field_pk][-1] - result["mjd"] < 0.1:
+            design_indx -= 1
         design_id = self.fields.designs[fieldidx][design_indx]
 
         (alt, az) = self.radec2altaz(mjd=result['mjd'],

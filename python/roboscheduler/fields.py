@@ -124,15 +124,14 @@ class Fields(object, metaclass=FieldsSingleton):
         return
 
     def createDummyDesigns(self):
-        """Create a dict of field pks which points to arrays
-           of dummy design ids
+        """Create a list of arrays of dummy design ids
         """
         runningNumber = 1e6
-        self._designs = dict()
-        for pk, n in zip(self.pk, self.nfilled):
-            self._designs[pk] = np.arange(n) + runningNumber
+        self._designs = list()
+        for n in self.nfilled:
+            self._designs.append(np.arange(n) + runningNumber)
             runningNumber += n
-            assert runningNumber not in self._designs[pk], "bad math"
+            assert runningNumber not in self._designs[-1], "bad math"
 
     @property
     def designs(self):
