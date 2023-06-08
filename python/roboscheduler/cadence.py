@@ -336,10 +336,11 @@ class CadenceList(object, metaclass=CadenceListSingleton):
     This is a singleton, so there can only be one CadenceList defined
     within any session.
     """
-    def __init__(self, skybrightness_only=False):
+    def __init__(self, skybrightness_only=False, observatory="apo"):
         self.reset()
         self.max_nsolns = 100
         self.skybrightness_only = skybrightness_only
+        self.observatory = observatory.lower()
         return
 
     def reset(self):
@@ -835,7 +836,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             curr['min_deltav_ks91'] = obsmode_dict['min_deltav_ks91']
             curr['min_moon_sep'] = obsmode_dict['min_moon_sep']
             curr['min_twilight_ang'] = obsmode_dict['min_twilight_ang']
-            curr['max_airmass'] = obsmode_dict['max_airmass']
+            curr[f'max_airmass_{self.observatory}'] = obsmode_dict[f'max_airmass_{self.observatory}']
             obsmodes[obsmode_dict['label']] = curr
 
         for cadence in cadence_dicts:

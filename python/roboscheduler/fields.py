@@ -85,7 +85,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.slots = []
         self.flag = []
         self.lstObserved = np.zeros(0, dtype=np.int32)
-        self.cadencelist = roboscheduler.cadence.CadenceList()
+        self.cadencelist = roboscheduler.cadence.CadenceList(observatory=observatory)
         self._validCadance = None
         self._obsPlan = None
         self._lstPlan = None

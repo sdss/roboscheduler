@@ -1,4 +1,4 @@
-import os, sys
+import os
 import numpy as np
 import fitsio
 import scipy.optimize as optimize
@@ -942,6 +942,7 @@ class Scheduler(Master):
         self.overheadPri = priorities.get("overheadPri", 40)
         self.remainAward = priorities.get("remainAward", 100)
         self.airmassPri = priorities.get("airmassPri", 20)
+        self.randomPri = priorities.get("randomPri", 0)
 
         return
 
@@ -1028,6 +1029,8 @@ class Scheduler(Master):
         epoch_idxs = np.zeros(len(observable), dtype=np.int32)
         delta_priority = np.zeros(len(observable), dtype=np.float64)
 
+        delta_priority += np.random.randn(len(observable)) * self.randomPri
+
         deltav = self.deltaV_sky_pos(mjd, self.fields.racen, self.fields.deccen)
         airmass = self.alt2airmass(alt)
         moon_dist = self.moon_dist(mjd=mjd, ra=self.fields.racen,
@@ -1035,9 +1038,9 @@ class Scheduler(Master):
 
         # skybrightness in 2 days. Checked at each slot. Gives two chances to
         # finish partial field if scheduled
-        skybrightness_2days = self.skybrightness(mjd+2)
+        skybrightness_2days = self.skybrightness(mjd + 2)
 
-        whereRM = np.where(["174x" in c for c in self.fields.cadence])[0]
+        # whereRM = np.where(["174x" in c for c in self.fields.cadence])[0]
         # where_uhoh = np.where(["dark_2x" in c for c in self.fields.cadence])[0]
 
         # print("\n")
