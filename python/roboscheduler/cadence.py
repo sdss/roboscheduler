@@ -836,7 +836,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             curr['min_deltav_ks91'] = obsmode_dict['min_deltav_ks91']
             curr['min_moon_sep'] = obsmode_dict['min_moon_sep']
             curr['min_twilight_ang'] = obsmode_dict['min_twilight_ang']
-            curr[f'max_airmass_{self.observatory}'] = obsmode_dict[f'max_airmass_{self.observatory}']
+            curr[f'max_airmass'] = obsmode_dict[f'max_airmass_{self.observatory}']
             obsmodes[obsmode_dict['label']] = curr
 
         for cadence in cadence_dicts:
@@ -860,6 +860,8 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                 label = label_root
             else:
                 label = str(cadence['label'])
+
+            cadence["obsmode_pk"] = [o.strip() for o in cadence["obsmode_pk"]]
 
             if(cadence['obsmode_pk'] is not None):
                 min_moon_sep = np.array([obsmodes[x]['min_moon_sep']
