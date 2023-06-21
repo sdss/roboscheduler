@@ -312,8 +312,9 @@ class Fields(object, metaclass=FieldsSingleton):
 
         pri_ver = opsdb.PriorityVersion.get(label="bulge")
 
-        prioritizedFields = opsdb.BasePriority.select().where(version=pri_ver).dicts()
-        priorityDict = {p["field_pk"]: p["priority"] for p in prioritizedFields}
+        bp = opsdb.BasePriority
+        prioritizedFields = bp.select().where(bp.version==pri_ver).dicts()
+        priorityDict = {p["field"]: p["priority"] for p in prioritizedFields}
 
         pk = list()
         field_id = list()

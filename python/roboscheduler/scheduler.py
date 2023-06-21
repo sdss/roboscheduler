@@ -1216,8 +1216,8 @@ class Scheduler(Master):
         """
 
         # priority = np.ones(len(iobservable)) * self.basePri
-        priority = self.fields.basePriority[iobservable] * self.basePri
-        priority += delta_priority
+        priority = self.fields.basePriority[iobservable] * self.basePri + delta_priority
+        # priority += delta_priority
 
         lst = self.lst(mjd)
 
