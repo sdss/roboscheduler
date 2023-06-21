@@ -114,7 +114,10 @@ class Fields(object, metaclass=FieldsSingleton):
         self.icadence = np.zeros(self.nfields, dtype=np.int32)
         # self.nextmjd = np.zeros(self.nfields, dtype=np.float64)
         self.epoch_idx = np.zeros(self.nfields, dtype=np.float64)
-        self.basePriority = np.ones(self.nfields) * 200
+        if "base_priority" in fields_array.dtype.names:
+            self.basePriority = fields_array["base_priority"]
+        else:
+            self.basePriority = np.ones(self.nfields)
         self.notDone = np.ones(self.nfields, dtype=np.bool_)
         if "flag" in fields_array.dtype.names:
             self.flag = fields_array["flag"]
@@ -293,6 +296,7 @@ class Fields(object, metaclass=FieldsSingleton):
                         ('deccen', np.float64),
                         ('nfilled', np.int32),
                         ('flag', np.int32),
+                        ('base_priority', np.int32),
                         ('slots_exposures', np.int32, (24, 2)),
                         ('cadence', np.dtype('a25'))]
 
@@ -306,6 +310,11 @@ class Fields(object, metaclass=FieldsSingleton):
         dbfields = Field.select().where(Field.version == ver,
                                         Field.observatory == obs)
 
+        pri_ver = opsdb.PriorityVersion.get(label="bulge")
+
+        prioritizedFields = opsdb.BasePriority.select().where(version=pri_ver).dicts()
+        priorityDict = {p["field_pk"]: p["priority"] for p in prioritizedFields}
+
         pk = list()
         field_id = list()
         racen = list()
@@ -313,6 +322,7 @@ class Fields(object, metaclass=FieldsSingleton):
         slots_exposures = list()
         cadence = list()
         flags = list()
+        base_priority = list()
 
         for field in dbfields:
             pk.append(field.pk)
@@ -328,6 +338,10 @@ class Fields(object, metaclass=FieldsSingleton):
                     flags.append(-1)
             else:
                 flags.append(0)
+            if field.pk in priorityDict:
+                base_priority.append(priorityDict[field.pk])
+            else:
+                base_priority.append(1)
 
         fields = np.zeros(len(dbfields), dtype=fields_model)
 
@@ -336,6 +350,7 @@ class Fields(object, metaclass=FieldsSingleton):
         fields["racen"] = racen
         fields["deccen"] = deccen
         fields["flag"] = flags
+        fields["base_priority"] = base_priority
         fields["slots_exposures"] = slots_exposures
         fields["cadence"] = cadence
 

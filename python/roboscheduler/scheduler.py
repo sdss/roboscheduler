@@ -1215,8 +1215,8 @@ class Scheduler(Master):
             calculated priority for each field
         """
 
-        priority = np.ones(len(iobservable)) * self.basePri
-        # priority = self.fields.basePriority[fieldid]
+        # priority = np.ones(len(iobservable)) * self.basePri
+        priority = self.fields.basePriority[iobservable] * self.basePri
         priority += delta_priority
 
         lst = self.lst(mjd)
