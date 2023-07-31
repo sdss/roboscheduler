@@ -960,7 +960,7 @@ class Scheduler(Master):
             For simulations we want to use a fits file, which should
             exist in "$OBSERVING_PLAN_DIR" and be named using 'designbase'
         """
-        self.cadencelist = roboscheduler.cadence.CadenceList()
+        self.cadencelist = roboscheduler.cadence.CadenceList(observatory=self.observatory)
         self.fields = roboscheduler.fields.Fields(plan=designbase,
                                                   observatory=self.observatory)
 
