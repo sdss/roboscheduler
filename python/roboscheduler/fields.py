@@ -1,7 +1,7 @@
+import os
 import numpy as np
 import fitsio
 import roboscheduler.cadence
-import sys
 
 try:
     import sdssdb.peewee.sdss5db.opsdb as opsdb
@@ -310,7 +310,11 @@ class Fields(object, metaclass=FieldsSingleton):
         dbfields = Field.select().where(Field.version == ver,
                                         Field.observatory == obs)
 
-        pri_ver = opsdb.PriorityVersion.get(label="bulge")
+        field_pri_ver = os.getenv('FIELD_PRI_VER')
+        if field_pri_ver is None:
+            field_pri_ver = "bulge"
+
+        pri_ver = opsdb.PriorityVersion.get(label=field_pri_ver)
 
         bp = opsdb.BasePriority
         prioritizedFields = bp.select().where(bp.version==pri_ver).dicts()
