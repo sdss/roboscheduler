@@ -946,7 +946,8 @@ class Scheduler(Master):
 
         return
 
-    def initdb(self, designbase='plan-0', fromFits=True):
+    def initdb(self, designbase='plan-0', fromFits=True,
+               fieldsArray=None, realDesigns=None):
         """Initialize Scheduler fields and observation lists.
         Required before fields can be scheduled.
 
@@ -959,6 +960,13 @@ class Scheduler(Master):
         fromFits : boolean
             For simulations we want to use a fits file, which should
             exist in "$OBSERVING_PLAN_DIR" and be named using 'designbase'
+        fieldsArray : np.array or None
+            For simulations, a np array of fields, of the format created in
+            scheduler.fields, created from the DB instead of a flat file.
+            Assumed to be a single observatory-version combination
+        realDesigns: list or None
+            For simulations, real design_ids associated with fieldsArray
+            of length(fieldsArray)
         """
         self.cadencelist = roboscheduler.cadence.CadenceList(observatory=self.observatory)
         self.fields = roboscheduler.fields.Fields(plan=designbase,
@@ -979,6 +987,12 @@ class Scheduler(Master):
             self.cadencelist.fromfits(filename=cadence_file,
                                       priorities=self.priorities)
             self.fields.fromfits(filename=fields_file)
+        elif fieldsArray:
+            assert realDesigns, "must supply designs with fieldsArray"
+            self.fields.fromarray(fieldsArray, designList=realDesigns)
+            self.fields.cadencelist.fromdb(use_label_root=False,
+                                           version="v1",
+                                           priorities=self.priorities)
         else:
             # self.cadencelist.fromdb(version="v1")
             # feilds.fromdb calls cadencelist from db
