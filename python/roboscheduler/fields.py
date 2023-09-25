@@ -100,7 +100,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.basePriority = self.basePriority * np.array(scale)
         return
 
-    def fromarray(self, fields_array=None):
+    def fromarray(self, fields_array=None, designList=None):
         self.nfields = len(fields_array)
         self.racen = fields_array['racen']
         self.deccen = fields_array['deccen']
@@ -124,6 +124,9 @@ class Fields(object, metaclass=FieldsSingleton):
         else:
             self.flag = np.zeros(self.nfields)
         self.setPriorities()
+        if designList:
+            assert len(designList) == len(self.pk), "designList must match fields"
+            self._designs = designList
         return
 
     def createDummyDesigns(self):
