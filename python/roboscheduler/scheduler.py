@@ -993,14 +993,21 @@ class Scheduler(Master):
             self.fields.cadencelist.fromdb(use_label_root=False,
                                            version="v1",
                                            priorities=self.priorities)
+            self.fields._hist = {f: list() for f in self.fields.pk}
+            for i in range(len(self.fields.pk)):
+                pk = self.fields.pk[i]
+                self.fields._hist[pk].sort()
+                self.fields.checkCompletion(i)
         else:
             # self.cadencelist.fromdb(version="v1")
             # feilds.fromdb calls cadencelist from db
             self.fields.fromdb(priorities=self.priorities)
 
         surveyGoal = np.sum(self.fields.slots)
-        surveyDone = np.sum([len(self.fields.hist[i]) for i in self.fields.pk])
-
+        if fieldsArray is None:
+            surveyDone = np.sum([len(self.fields.hist[i]) for i in self.fields.pk])
+        else:
+            surveyDone = 0
         self.surveyComplete = surveyDone / surveyGoal
 
         self.observations = roboscheduler.observations.Observations(observatory=self.observatory)
@@ -1449,6 +1456,7 @@ class Scheduler(Master):
         if design_indx == nfilled\
             and self.fields.hist[field_pk][-1] - result["mjd"] < 0.1:
             design_indx -= 1
+
         design_id = self.fields.designs[fieldidx][design_indx]
 
         (alt, az) = self.radec2altaz(mjd=result['mjd'],
