@@ -987,7 +987,7 @@ class Scheduler(Master):
             self.cadencelist.fromfits(filename=cadence_file,
                                       priorities=self.priorities)
             self.fields.fromfits(filename=fields_file)
-        elif fieldsArray:
+        elif fieldsArray is not None:
             assert realDesigns, "must supply designs with fieldsArray"
             self.fields.fromarray(fieldsArray, designList=realDesigns)
             self.fields.cadencelist.fromdb(use_label_root=False,
