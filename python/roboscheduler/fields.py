@@ -163,7 +163,7 @@ class Fields(object, metaclass=FieldsSingleton):
                         ('nfilled', np.int32),
                         ('flag', np.int32),
                         ('slots_exposures', np.int32, (24, 2)),
-                        ('cadence', np.dtype('a20'))]
+                        ('cadence', np.dtype('a25'))]
 
         fits_dat = fitsio.read(filename)
 
@@ -411,7 +411,7 @@ class Fields(object, metaclass=FieldsSingleton):
                    ('fieldid', np.int32),
                    ('racen', np.float64),
                    ('deccen', np.float64),
-                   ('cadence', np.dtype('a20')),
+                   ('cadence', np.dtype('a25')),
                    ('nobservations', np.int32),
                    ('observations', np.int32, maxn)]
         fields = np.zeros(self.nfields, dtype=fields0)
