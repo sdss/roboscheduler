@@ -34,6 +34,9 @@ class Fields(object, metaclass=FieldsSingleton):
     observatory : string
         APO or LCO, used for db access
 
+    scheduler: roboscheduler.scheduler.Scheduler or None
+        Scheduler object for on sky math
+
     Attributes:
     ----------
 
@@ -69,7 +72,7 @@ class Fields(object, metaclass=FieldsSingleton):
         the cadenceList singleton, for easy access
 
     """
-    def __init__(self, plan=None, observatory=None):
+    def __init__(self, plan=None, observatory=None, scheduler=None):
         self.plan = plan
         self.observatory = observatory
         self.nfields = 0
@@ -86,6 +89,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.flag = []
         self.lstObserved = np.zeros(0, dtype=np.int32)
         self.cadencelist = roboscheduler.cadence.CadenceList(observatory=observatory)
+        self.scheduler = scheduler
         self._validCadance = None
         self._obsPlan = None
         self._lstPlan = None
@@ -240,6 +244,22 @@ class Fields(object, metaclass=FieldsSingleton):
                 self._hist[pk].sort()
                 self.checkCompletion(i)
 
+                if self.scheduler is not None:
+                    skybrightness = [float(self.scheduler.skybrightness(m)) for m in self._hist[pk]]
+                    dark = np.array(skybrightness) <= 0.35
+                    lst = np.round(self.scheduler.lst(self._hist[pk])/15, 0).astype(int)
+                    if 24 in lst:
+                        lst = [i if i != 24 else 0 for i in lst]
+                        lst = np.array(lst)
+                    dark_lsts = lst[np.where(dark)]
+                    unique, counts = np.unique(dark_lsts, return_counts=True)
+                    for l, c in zip(unique, counts):
+                        self.lstObserved[i][l, 0] += c
+                    bright_lsts = lst[np.where(~dark)]
+                    unique, counts = np.unique(bright_lsts, return_counts=True)
+                    for l, c in zip(unique, counts):
+                        self.lstObserved[i][l, 1] += c
+
         return self._hist
 
     def checkCompletion(self, fieldidx):
@@ -387,6 +407,7 @@ class Fields(object, metaclass=FieldsSingleton):
             # lst_obs = self.lstObserved[field_idx]
             # lst_plan = self.lstPlan[field_idx]
             lst_plan = self.slots[field_idx][:, row]
+            lst_obs = self.lstObserved[field_idx][:, row]
         # I don't think this is used, let it break if so
         else:
             assert False, "you called the wrong LST weight!"

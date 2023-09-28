@@ -970,7 +970,8 @@ class Scheduler(Master):
         """
         self.cadencelist = roboscheduler.cadence.CadenceList(observatory=self.observatory)
         self.fields = roboscheduler.fields.Fields(plan=designbase,
-                                                  observatory=self.observatory)
+                                                  observatory=self.observatory,
+                                                  scheduler=self)
 
         self.priorityLogger = priorityLogger()
         if fromFits:
