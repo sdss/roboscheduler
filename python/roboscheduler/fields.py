@@ -62,7 +62,7 @@ class Fields(object, metaclass=FieldsSingleton):
         Nx2x24, corresponding to robostrategy planned LST bright/dark plan
 
     lstObserved : ndarray of np.int32
-        Nx24 observations in each lst per field;
+        Nx24x2 observations in each lst per field;
         respecting robostrategy plan leads to an efficient survey
 
     cadencelist : robostrategy.cadence.CadenceList singleton
@@ -109,7 +109,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.pk = fields_array['pk']
         self.cadence = [c.strip().decode() for c in fields_array['cadence']]
         self.slots = fields_array['slots_exposures']
-        self.lstObserved = np.zeros((len(self.slots), 24), dtype=np.int32)
+        self.lstObserved = np.zeros((len(self.slots), 24, 2), dtype=np.int32)
         self.observations = [np.zeros(0, dtype=np.int32)] * self.nfields
         self.icadence = np.zeros(self.nfields, dtype=np.int32)
         # self.nextmjd = np.zeros(self.nfields, dtype=np.float64)
@@ -257,7 +257,7 @@ class Fields(object, metaclass=FieldsSingleton):
         if obs_epochs >= cadence.nepochs:
             self.notDone[fieldidx] = False
 
-    def completeDesign(self, field_idx, mjd, lst, iobs):
+    def completeDesign(self, field_idx, mjd, lst, iobs, dark=False):
         """Maybe just for sims but need a way to add mjds to _hist[pk]
         """
         self.observations[field_idx] = np.append(self.observations[field_idx], iobs)
@@ -266,10 +266,15 @@ class Fields(object, metaclass=FieldsSingleton):
 
         self._hist[pk].append(mjd)
 
+        if dark:
+            row = 0
+        else:
+            row = 1
+
         int_lst = int(np.round(lst/15, 0))
         if int_lst == 24:
             int_lst = 0
-        self.lstObserved[field_idx][int_lst] += 1
+        self.lstObserved[field_idx][int_lst, row] += 1
 
         self.checkCompletion(field_idx)
 
@@ -370,18 +375,25 @@ class Fields(object, metaclass=FieldsSingleton):
         self.cadencelist.fromdb(use_label_root=False, version="v1",
                                 priorities=priorities)
 
-    def lstWeight(self, lst, field_idx=None):
+    def lstWeight(self, lst, field_idx=None, dark=False):
         # field id corresponds to indx, so fields is id/indx
         # as is everywhere, but just to keep reminding me...
         assert lst > 0 and lst < 24, "lst must be in hours!"
-        diffs = []
-        if field_idx is not None:
-            lst_obs = self.lstObserved[field_idx]
-            lst_plan = self.lstPlan[field_idx]
+        if dark:
+            row = 0
         else:
+            row = 1
+        if field_idx is not None:
+            # lst_obs = self.lstObserved[field_idx]
+            # lst_plan = self.lstPlan[field_idx]
+            lst_plan = self.slots[field_idx][:, row]
+        # I don't think this is used, let it break if so
+        else:
+            assert False, "you called the wrong LST weight!"
             lst_obs = self.lstObserved
             lst_plan = self.lstPlan
 
+        diffs = []
         for o, p in zip(lst_obs, lst_plan):
             done = p - o
             elligible = np.where(done > 0)[0]

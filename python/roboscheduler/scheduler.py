@@ -1050,8 +1050,6 @@ class Scheduler(Master):
         epoch_idxs = np.zeros(len(observable), dtype=np.int32)
         delta_priority = np.zeros(len(observable), dtype=np.float64)
 
-        delta_priority += np.random.randn(len(observable)) * self.randomPri
-
         deltav = self.deltaV_sky_pos(mjd, self.fields.racen, self.fields.deccen)
         airmass = self.alt2airmass(alt)
         moon_dist = self.moon_dist(mjd=mjd, ra=self.fields.racen,
@@ -1113,7 +1111,8 @@ class Scheduler(Master):
             mjd_past = self.fields.hist[self.fields.pk[indx]]
             # epoch_idx is the *index* of the *next* epoch
 
-            expCount = [np.sum(cadence.nexp[:i+1]) for i in range(len(cadence.nexp))]
+            # expCount = [np.sum(cadence.nexp[:i+1]) for i in range(len(cadence.nexp))]
+            expCount = np.cumsum(cadence.nexp)
 
             if expCount[-1] == len(mjd_past):
                 # there's a chance fields.epoch_idx won't catch close together epochs
@@ -1205,6 +1204,8 @@ class Scheduler(Master):
 
         iobservable = np.where(observable)[0]
 
+        delta_priority += np.random.randn(len(observable)) * self.randomPri
+
         return iobservable, nexp[iobservable], delta_priority[iobservable],\
             exp_epochs[iobservable], epoch_idxs[iobservable]
 
@@ -1246,7 +1247,9 @@ class Scheduler(Master):
 
         # lstDiffs = lstDiff(self.fields.lstPlan[fieldid], np.ones(len(fieldid))*lstHrs)
 
-        lstDiffs = self.fields.lstWeight(lstHrs, iobservable)
+        dark = self.skybrightness(mjd) < 0.35
+
+        lstDiffs = self.fields.lstWeight(lstHrs, field_idx=iobservable, dark=dark)
 
         assert len(lstDiffs) == len(iobservable), "lst weight going poorly"
         # assert 0 not in delta_remaining, "some delta remaining not set properly!"
@@ -1443,7 +1446,7 @@ class Scheduler(Master):
             One element, contains 'mjd', 'duration', 'sn2'
 
         """
-
+        
         fieldidx = int(np.where(self.fields.pk == field_pk)[0])
 
         racen = self.fields.racen[fieldidx]
@@ -1487,11 +1490,12 @@ class Scheduler(Master):
         # for 0 indexed arrays, this equivalent to
         # "how many epochs have I done previously"
         # epoch_idx, mjd_prev = epochs_completed(mjd_past, tolerance=45)
+        dark = skybrightness < 0.35
         if finish:
             # if fieldidx == 4906:
             #     print(self.fields.hist[fieldid])
             #     print("UPDATE", float(result['mjd']))
-            self.fields.completeDesign(fieldidx, float(result['mjd']), lst, iobs)
+            self.fields.completeDesign(fieldidx, float(result['mjd']), lst, iobs, dark=dark)
         # self.fields.add_observations(result['mjd'], fieldidx, iobs, lst,
         #                              epoch_idx)
         return
