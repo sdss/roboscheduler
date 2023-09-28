@@ -26,7 +26,8 @@ public:
 	std::string epochText();
 	bool epochsConsistency(CadenceCore target_cadence,
 												 std::vector<int> epochs,
-												 bool skybrightnessOnly);
+												 bool skybrightnessOnly,
+												 bool inorder);
 	std::vector<std::vector<int>> cadenceConsistency(CadenceCore target_cadence,
 																									 bool skybrightnessOnly);
 	std::string name;

@@ -150,11 +150,13 @@ std::string CadenceCore::epochText()
 
 bool CadenceCore::epochsConsistency(CadenceCore target_cadence,
 																		std::vector<int> epochs,
-																		bool skybrightnessOnly) {
+																		bool skybrightnessOnly,
+																		bool inorder) {
 
 	int ok;
 	float dtotmin, dtotmax;
   std::vector<int> nexp_count;
+	std::vector<int> target_epochs;
 
 	nexp_count.resize(nepochs);
 	for(int i = 0; i < nepochs; i++)
@@ -175,46 +177,58 @@ bool CadenceCore::epochsConsistency(CadenceCore target_cadence,
 	float *max_airmass_a = (float *) max_airmass.request().ptr;
 	float *delta_min_a = (float *) delta_min.request().ptr;
 	float *delta_max_a = (float *) delta_max.request().ptr;
+
+	// If we are supposed to sample the target_cadence the same way
+	// as the object cadence.
+	if(inorder) {
+		for(unsigned long i = 0; i < epochs.size(); i++) {
+			target_epochs.push_back(epochs[i]);
+		} // end for 
+	} else {
+		for(unsigned long i = 0; i < epochs.size(); i++) {
+			target_epochs.push_back(i);
+		} // end for 
+	} // end if..else
 	
 	if(skybrightnessOnly)
-		ok = (t_skybrightness_a[0] >= skybrightness_a[epochs[0]]);
+		ok = (t_skybrightness_a[target_epochs[0]] >= skybrightness_a[epochs[0]]);
 	else
-		ok = (t_min_deltav_ks91_a[0] <= min_deltav_ks91_a[epochs[0]]) &
-			(t_max_airmass_a[0] >= max_airmass_a[epochs[0]]);
+		ok = (t_min_deltav_ks91_a[target_epochs[0]] <= min_deltav_ks91_a[epochs[0]]) &
+			(t_max_airmass_a[target_epochs[0]] >= max_airmass_a[epochs[0]]);
 
-	ok = ok & (t_nexp_a[0] <= nexp_a[epochs[0]] - nexp_count[epochs[0]]);
+	ok = ok & (t_nexp_a[target_epochs[0]] <= nexp_a[epochs[0]] - nexp_count[epochs[0]]);
 
 	if(!ok)
 		return(false);
 
-	nexp_count[epochs[0]] += t_nexp_a[0];
+	nexp_count[epochs[0]] += t_nexp_a[target_epochs[0]];
 
 	for(unsigned long i = 1; i < epochs.size(); i++) {
 		if(skybrightnessOnly)
-			ok = (t_skybrightness_a[i] >= skybrightness_a[epochs[i]]);
+			ok = (t_skybrightness_a[target_epochs[i]] >= skybrightness_a[epochs[i]]);
 		else
-			ok = (t_min_deltav_ks91_a[i] <= min_deltav_ks91_a[epochs[i]]) &
-				(t_max_airmass_a[i] >= max_airmass_a[epochs[i]]);
+			ok = (t_min_deltav_ks91_a[target_epochs[i]] <= min_deltav_ks91_a[epochs[i]]) &
+				(t_max_airmass_a[target_epochs[i]] >= max_airmass_a[epochs[i]]);
 		if(!ok)
 			return(false);
 
-		if(t_delta_a[i] >= 0) {
+		if(t_delta_a[target_epochs[i]] >= 0) {
 			dtotmin = 0.;
 			for(auto j = epochs[i - 1] + 1; j <= epochs[i]; j++)
 				dtotmin += delta_min_a[j];
 			dtotmax = 0.;
 			for(auto j = epochs[i - 1] + 1; j <= epochs[i]; j++)
 				dtotmax += delta_max_a[j];
-			ok = ok & (t_delta_min_a[i] <= dtotmin) &
-				(t_delta_max_a[i] >= dtotmax) &
-				(t_nexp_a[i] <= nexp_a[epochs[i]] - nexp_count[epochs[i]]);
+			ok = ok & (t_delta_min_a[target_epochs[i]] <= dtotmin) &
+				(t_delta_max_a[target_epochs[i]] >= dtotmax) &
+				(t_nexp_a[target_epochs[i]] <= nexp_a[epochs[i]] - nexp_count[epochs[i]]);
 		} else {
-			ok = ok & (t_nexp_a[i] <= nexp_a[epochs[i]] - nexp_count[epochs[i]]);
+			ok = ok & (t_nexp_a[target_epochs[i]] <= nexp_a[epochs[i]] - nexp_count[epochs[i]]);
 		}
 		if(!ok)
 			return(false);
 
-		nexp_count[epochs[i]] += t_nexp_a[i];
+		nexp_count[epochs[i]] += t_nexp_a[target_epochs[i]];
 	}
 	return(true);
 }
@@ -233,7 +247,7 @@ std::vector<std::vector<int>> CadenceCore::cadenceConsistency(CadenceCore target
 	for(auto istart = 0; istart < nepochs; istart++) {
 		epochs.clear();
 		epochs.push_back(istart);
-		if(epochsConsistency(target_cadence, epochs, skybrightnessOnly)) {
+		if(epochsConsistency(target_cadence, epochs, skybrightnessOnly, 0)) {
 			// Check number of exposures left total; if the field
 			// doesn't have enough exposures left, no point in continuing
 			// the check
@@ -269,7 +283,7 @@ std::vector<std::vector<int>> CadenceCore::cadenceConsistency(CadenceCore target
 			for(int ifield = ifield_start; ifield < nepochs; ifield++) {
 				epochs = current_epochs_list[i];
 				epochs.push_back(ifield);
-				ok = epochsConsistency(target_cadence, epochs, skybrightnessOnly);
+				ok = epochsConsistency(target_cadence, epochs, skybrightnessOnly, 0);
 				if(ok) {
 					// Check number of exposures left total; if the field
 					// doesn't have enough exposures left, no point in
