@@ -496,7 +496,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         solutions : list of ndarrays of np.int32
             list of solutions, where each solution is an array
 """
-        cache_key = (one, two, return_solutions, tuple(one_epochs), self.skybrightness_only)
+        cache_key = (one, two, return_solutions, tuple(list(one_epochs)), self.skybrightness_only)
         if(cache_key in self._cadence_consistency):
             return(self._cadence_consistency[cache_key])
 
