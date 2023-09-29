@@ -154,9 +154,33 @@ bool CadenceCore::epochsConsistency(CadenceCore target_cadence,
 																		bool inorder) {
 
 	int ok;
+	std::vector<int> target_epochs;
+
+	// If we are supposed to sample the target_cadence the same way
+	// as the object cadence.
+	if(inorder) {
+		for(unsigned long i = 0; i < epochs.size(); i++) {
+			target_epochs.push_back(epochs[i]);
+		} // end for 
+	} else {
+		for(unsigned long i = 0; i < epochs.size(); i++) {
+			target_epochs.push_back(i);
+		} // end for 
+	} // end if..else
+
+	ok = specificEpochsConsistency(target_cadence, epochs, target_epochs, skybrightnessOnly);
+
+	return(ok);
+}
+
+bool CadenceCore::specificEpochsConsistency(CadenceCore target_cadence,
+																						std::vector<int> epochs,
+																						std::vector<int> target_epochs,
+																						bool skybrightnessOnly) {
+
+	int ok;
 	float dtotmin, dtotmax;
   std::vector<int> nexp_count;
-	std::vector<int> target_epochs;
 
 	nexp_count.resize(nepochs);
 	for(int i = 0; i < nepochs; i++)
@@ -178,18 +202,6 @@ bool CadenceCore::epochsConsistency(CadenceCore target_cadence,
 	float *delta_min_a = (float *) delta_min.request().ptr;
 	float *delta_max_a = (float *) delta_max.request().ptr;
 
-	// If we are supposed to sample the target_cadence the same way
-	// as the object cadence.
-	if(inorder) {
-		for(unsigned long i = 0; i < epochs.size(); i++) {
-			target_epochs.push_back(epochs[i]);
-		} // end for 
-	} else {
-		for(unsigned long i = 0; i < epochs.size(); i++) {
-			target_epochs.push_back(i);
-		} // end for 
-	} // end if..else
-	
 	if(skybrightnessOnly)
 		ok = (t_skybrightness_a[target_epochs[0]] >= skybrightness_a[epochs[0]]);
 	else
@@ -233,12 +245,32 @@ bool CadenceCore::epochsConsistency(CadenceCore target_cadence,
 	return(true);
 }
 
+
 std::vector<std::vector<int>> CadenceCore::cadenceConsistency(CadenceCore target_cadence,
 																															bool skybrightnessOnly) {
 	std::vector<std::vector<int>> epochs_list;
+	std::vector<int> target_epochs;
+
+	for(auto i = 0; i < target_cadence.nepochs; i++)
+		target_epochs.push_back(i);
+
+	epochs_list = specificCadenceConsistency(target_cadence, target_epochs,
+																					 skybrightnessOnly);
+
+	return(epochs_list);
+}
+
+
+std::vector<std::vector<int>> CadenceCore::specificCadenceConsistency(CadenceCore target_cadence,
+																																			std::vector<int> target_epochs,
+																																			bool skybrightnessOnly) {
+	std::vector<std::vector<int>> epochs_list;
 	std::vector<std::vector<int>> current_epochs_list;
+	std::vector<int> current_target_epochs;
 	std::vector<int> epochs;
-	int ok, ifield_start, nexp_left_target, nexp_left_field;
+	int ok, ifield_start, nexp_left_target, nexp_left_field, target_nepochs;
+
+	target_nepochs = target_epochs.size();
 
 	int *t_nexp_a = (int *) target_cadence.nexp.request().ptr;
 	int *nexp_a = (int *) nexp.request().ptr;
@@ -247,14 +279,14 @@ std::vector<std::vector<int>> CadenceCore::cadenceConsistency(CadenceCore target
 	for(auto istart = 0; istart < nepochs; istart++) {
 		epochs.clear();
 		epochs.push_back(istart);
-		if(epochsConsistency(target_cadence, epochs, skybrightnessOnly, 0)) {
+		if(specificEpochsConsistency(target_cadence, epochs, target_epochs, skybrightnessOnly)) {
 			// Check number of exposures left total; if the field
 			// doesn't have enough exposures left, no point in continuing
 			// the check
 			nexp_left_target = 0;
-			for(auto j = 1; j < target_cadence.nepochs; j++)
-				nexp_left_target += t_nexp_a[j];
-			nexp_left_field = nexp_a[istart] - t_nexp_a[0];
+			for(auto j = 1; j < target_nepochs; j++)
+				nexp_left_target += t_nexp_a[target_epochs[j]];
+			nexp_left_field = nexp_a[istart] - t_nexp_a[target_epochs[0]];
 			for(auto j = istart + 1; j < nepochs; j++)
 				nexp_left_field += nexp_a[j];
 
@@ -270,7 +302,7 @@ std::vector<std::vector<int>> CadenceCore::cadenceConsistency(CadenceCore target
 	}
 
 	// Successively find solutions through each target epoch
-	for(int itarget = 1; itarget < target_cadence.nepochs; itarget++) {
+	for(int indx = 1; indx < target_nepochs; indx++) {
 		current_epochs_list = epochs_list;
 		epochs_list.clear();
 
@@ -283,7 +315,7 @@ std::vector<std::vector<int>> CadenceCore::cadenceConsistency(CadenceCore target
 			for(int ifield = ifield_start; ifield < nepochs; ifield++) {
 				epochs = current_epochs_list[i];
 				epochs.push_back(ifield);
-				ok = epochsConsistency(target_cadence, epochs, skybrightnessOnly, 0);
+				ok = specificEpochsConsistency(target_cadence, epochs, target_epochs, skybrightnessOnly);
 				if(ok) {
 					// Check number of exposures left total; if the field
 					// doesn't have enough exposures left, no point in
@@ -293,9 +325,9 @@ std::vector<std::vector<int>> CadenceCore::cadenceConsistency(CadenceCore target
 					// a non-viable case through, but the epochConsistency()
 					// check will catch those issues in subsequent target epochs.
 					nexp_left_target = 0;
-					for(int j = epochs.size(); j < target_cadence.nepochs; j++)
-						nexp_left_target += t_nexp_a[j];
-					nexp_left_field = nexp_a[ifield] - t_nexp_a[epochs.size() - 1];
+					for(int j = epochs.size(); j < target_nepochs; j++)
+						nexp_left_target += t_nexp_a[target_epochs[j]];
+					nexp_left_field = nexp_a[ifield] - t_nexp_a[target_epochs[epochs.size() - 1]];
 					for(auto j = ifield + 1; j < nepochs; j++)
 						nexp_left_field += nexp_a[j];
 					if(nexp_left_field >= nexp_left_target)
