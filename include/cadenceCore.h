@@ -26,9 +26,17 @@ public:
 	std::string epochText();
 	bool epochsConsistency(CadenceCore target_cadence,
 												 std::vector<int> epochs,
-												 bool skybrightnessOnly);
+												 bool skybrightnessOnly,
+												 bool inorder);
 	std::vector<std::vector<int>> cadenceConsistency(CadenceCore target_cadence,
 																									 bool skybrightnessOnly);
+	bool specificEpochsConsistency(CadenceCore target_cadence,
+																 std::vector<int> epochs,
+																 std::vector<int> target_epochs,
+																 bool skybrightnessOnly);
+	std::vector<std::vector<int>> specificCadenceConsistency(CadenceCore target_cadence,
+																													 std::vector<int> target_epochs,
+																													 bool skybrightnessOnly);
 	std::string name;
 	int nepochs;
 	int nexp_total;

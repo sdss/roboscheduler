@@ -469,6 +469,50 @@ class CadenceList(object, metaclass=CadenceListSingleton):
 
         return(self._cadence_consistency[cache_key])
 
+    def specific_cadence_consistency(self, one, two, one_epochs, return_solutions=True):
+        """Are a subset of epochs of cadence #1 consistent with cadence #2?
+
+        Parameters:
+        ----------
+
+        one : string
+            name of cadence #1
+
+        two : string
+            name of cadence #2
+
+        one_epochs : ndarray of np.int32
+            epoch list to check for cadence one
+
+        return_solutions: boolean
+            return list of solutions?
+
+        Returns:
+        -------
+
+        ok : int
+            1 if there is a solution, 0 otherwise
+
+        solutions : list of ndarrays of np.int32
+            list of solutions, where each solution is an array
+"""
+        cache_key = (one, two, return_solutions, tuple(list(one_epochs)), self.skybrightness_only)
+        if(cache_key in self._cadence_consistency):
+            return(self._cadence_consistency[cache_key])
+
+        onecc = self.cadences[one].as_cadencecore()
+        possibles = self.cadences[two].specific_cadence_consistency(onecc,
+                                                                    one_epochs,
+                                                                    self.skybrightness_only)
+        success = len(possibles) > 0
+
+        if(return_solutions):
+            self._cadence_consistency[cache_key] = (success, possibles)
+        else:
+            self._cadence_consistency[cache_key] = success
+
+        return(self._cadence_consistency[cache_key])
+
     def exposure_consistency(self, one, two, iexp):
         """Is cadence #1 consistent with a set of exposures in cadence #2?
 

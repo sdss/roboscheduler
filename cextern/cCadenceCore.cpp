@@ -17,9 +17,15 @@ PYBIND11_MODULE(cCadenceCore, m) {
 			.def("epoch_text", &CadenceCore::epochText)
 			.def("__str__", &CadenceCore::__str__)
 			.def("epochs_consistency", &CadenceCore::epochsConsistency,
-					 py::arg("target_cadence"), py::arg("epochs"), py::arg("skybrightness_only"))
+					 py::arg("target_cadence"), py::arg("epochs"), py::arg("skybrightness_only"),
+					 py::arg("inorder"))
 			.def("cadence_consistency", &CadenceCore::cadenceConsistency,
 					 py::arg("target_cadence"), py::arg("skybrightness_only"))
+			.def("specific_epochs_consistency", &CadenceCore::specificEpochsConsistency,
+					 py::arg("target_cadence"), py::arg("epochs"), py::arg("target_epochs"),
+					 py::arg("skybrightness_only"))
+			.def("specific_cadence_consistency", &CadenceCore::specificCadenceConsistency,
+					 py::arg("target_cadence"), py::arg("target_epochs"), py::arg("skybrightness_only"))
 			.def_readwrite("name", &CadenceCore::name)
 			.def_readwrite("nepochs", &CadenceCore::nepochs)
 			.def_readwrite("nexp_total", &CadenceCore::nexp_total)
