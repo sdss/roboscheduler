@@ -1148,7 +1148,10 @@ class Scheduler(Master):
                     continue
 
             if nexp[indx] > 4 or airmass[indx] > 1.3:
-                endmjd = mjd + nexp[indx] * self.exp_time
+                field_time = nexp[indx] * self.exp_time
+                if field_time > 1 / 24:
+                    field_time = 1 / 24
+                endmjd = mjd + field_time
                 (alt, az) = self.radec2altaz(mjd=endmjd,
                                              ra=self.fields.racen[indx],
                                              dec=self.fields.deccen[indx])
