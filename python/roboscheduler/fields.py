@@ -392,7 +392,7 @@ class Fields(object, metaclass=FieldsSingleton):
 
         self.fromarray(fields_array=fields)
 
-        self.cadencelist.fromdb(use_label_root=False, version="v1",
+        self.cadencelist.fromdb(use_label_root=False, version="v2",
                                 priorities=priorities)
 
     def lstWeight(self, lst, field_idx=None, dark=False):
