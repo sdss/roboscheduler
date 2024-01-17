@@ -179,7 +179,8 @@ class Fields(object, metaclass=FieldsSingleton):
         self.fields_fits["deccen"] = fits_dat["deccen"]
         self.fields_fits["nfilled"] = fits_dat["nfilled"]
         self.fields_fits["slots_exposures"] = fits_dat["slots_exposures"]
-        self.fields_fits["cadence"] = [c[:c.index("_v")] for c in fits_dat["cadence"]]
+        self.fields_fits["cadence"] = fits_dat["cadence"]
+        # self.fields_fits["cadence"] = [c[:c.index("_v")] for c in fits_dat["cadence"]]
 
         self.fromarray(self.fields_fits)
         self.createDummyDesigns()

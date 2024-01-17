@@ -947,7 +947,7 @@ class Scheduler(Master):
         return
 
     def initdb(self, designbase='plan-0', fromFits=True,
-               fieldsArray=None, realDesigns=None):
+               fieldsArray=None, realDesigns=None, rsFinal=True):
         """Initialize Scheduler fields and observation lists.
         Required before fields can be scheduled.
 
@@ -978,21 +978,30 @@ class Scheduler(Master):
             filebase = os.path.join(os.getenv('OBSERVING_PLAN_DIR'),
                                     designbase)
             # base = os.getenv('OBSERVING_PLAN_DIR')
-            cadence_file = filebase + "/" + "rsCadences-"\
-                           + designbase + "-"\
+            cadence_file = filebase + "/" 
+            fields_file = filebase + "/"
+            if rsFinal:
+                fields_file +=  "final/rsAllocationFinal-"
+                cadence_file += "final/rsCadencesFinal-"
+            else:
+                fields_file +=  "rsAllocation-"
+                cadence_file += "rsCadences-"
+            fields_file += designbase + "-"\
                            + self.observatory + ".fits"
-            fields_file = filebase + "/" + "final/rsAllocationFinal-"\
-                          + designbase + "-"\
-                          + self.observatory + ".fits"
+            cadence_file += designbase + "-"\
+                           + self.observatory + ".fits"
 
-            self.cadencelist.fromfits(filename=cadence_file,
-                                      priorities=self.priorities)
+            # self.fields.cadencelist.fromdb(use_label_root=False,
+            #                                version="v2",
+            #                                priorities=self.priorities)
+            self.fields.cadencelist.fromfits(filename=cadence_file,
+                                           priorities=self.priorities)
             self.fields.fromfits(filename=fields_file)
         elif fieldsArray is not None:
             assert realDesigns, "must supply designs with fieldsArray"
             self.fields.fromarray(fieldsArray, designList=realDesigns)
             self.fields.cadencelist.fromdb(use_label_root=False,
-                                           version="v1",
+                                           version="v2",
                                            priorities=self.priorities)
             self.fields._hist = {f: list() for f in self.fields.pk}
             for i in range(len(self.fields.pk)):
