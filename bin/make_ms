@@ -53,8 +53,10 @@ def sched_engineering(mjds, sched, apo=True):
             # LCO doesn't want it on Mon->Tue
             if aTime.isoweekday() == 1:
                 nights.append(m+1)
+                last_night = m+1
             else:
                 nights.append(m)
+                last_night = m
 
     return nights
 
