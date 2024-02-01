@@ -34,6 +34,9 @@ class Fields(object, metaclass=FieldsSingleton):
     observatory : string
         APO or LCO, used for db access
 
+    scheduler: roboscheduler.scheduler.Scheduler or None
+        Scheduler object for on sky math
+
     Attributes:
     ----------
 
@@ -62,14 +65,14 @@ class Fields(object, metaclass=FieldsSingleton):
         Nx2x24, corresponding to robostrategy planned LST bright/dark plan
 
     lstObserved : ndarray of np.int32
-        Nx24 observations in each lst per field;
+        Nx24x2 observations in each lst per field;
         respecting robostrategy plan leads to an efficient survey
 
     cadencelist : robostrategy.cadence.CadenceList singleton
         the cadenceList singleton, for easy access
 
     """
-    def __init__(self, plan=None, observatory=None):
+    def __init__(self, plan=None, observatory=None, scheduler=None):
         self.plan = plan
         self.observatory = observatory
         self.nfields = 0
@@ -86,6 +89,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.flag = []
         self.lstObserved = np.zeros(0, dtype=np.int32)
         self.cadencelist = roboscheduler.cadence.CadenceList(observatory=observatory)
+        self.scheduler = scheduler
         self._validCadance = None
         self._obsPlan = None
         self._lstPlan = None
@@ -109,7 +113,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.pk = fields_array['pk']
         self.cadence = [c.strip().decode() for c in fields_array['cadence']]
         self.slots = fields_array['slots_exposures']
-        self.lstObserved = np.zeros((len(self.slots), 24), dtype=np.int32)
+        self.lstObserved = np.zeros((len(self.slots), 24, 2), dtype=np.int32)
         self.observations = [np.zeros(0, dtype=np.int32)] * self.nfields
         self.icadence = np.zeros(self.nfields, dtype=np.int32)
         # self.nextmjd = np.zeros(self.nfields, dtype=np.float64)
@@ -175,7 +179,8 @@ class Fields(object, metaclass=FieldsSingleton):
         self.fields_fits["deccen"] = fits_dat["deccen"]
         self.fields_fits["nfilled"] = fits_dat["nfilled"]
         self.fields_fits["slots_exposures"] = fits_dat["slots_exposures"]
-        self.fields_fits["cadence"] = [c[:c.index("_v")] for c in fits_dat["cadence"]]
+        self.fields_fits["cadence"] = fits_dat["cadence"]
+        # self.fields_fits["cadence"] = [c[:c.index("_v")] for c in fits_dat["cadence"]]
 
         self.fromarray(self.fields_fits)
         self.createDummyDesigns()
@@ -240,6 +245,22 @@ class Fields(object, metaclass=FieldsSingleton):
                 self._hist[pk].sort()
                 self.checkCompletion(i)
 
+                if self.scheduler is not None:
+                    skybrightness = [float(self.scheduler.skybrightness(m)) for m in self._hist[pk]]
+                    dark = np.array(skybrightness) <= 0.35
+                    lst = np.round(self.scheduler.lst(self._hist[pk])/15, 0).astype(int)
+                    if 24 in lst:
+                        lst = [i if i != 24 else 0 for i in lst]
+                        lst = np.array(lst)
+                    dark_lsts = lst[np.where(dark)]
+                    unique, counts = np.unique(dark_lsts, return_counts=True)
+                    for l, c in zip(unique, counts):
+                        self.lstObserved[i][l, 0] += c
+                    bright_lsts = lst[np.where(~dark)]
+                    unique, counts = np.unique(bright_lsts, return_counts=True)
+                    for l, c in zip(unique, counts):
+                        self.lstObserved[i][l, 1] += c
+
         return self._hist
 
     def checkCompletion(self, fieldidx):
@@ -257,7 +278,7 @@ class Fields(object, metaclass=FieldsSingleton):
         if obs_epochs >= cadence.nepochs:
             self.notDone[fieldidx] = False
 
-    def completeDesign(self, field_idx, mjd, lst, iobs):
+    def completeDesign(self, field_idx, mjd, lst, iobs, dark=False):
         """Maybe just for sims but need a way to add mjds to _hist[pk]
         """
         self.observations[field_idx] = np.append(self.observations[field_idx], iobs)
@@ -266,10 +287,15 @@ class Fields(object, metaclass=FieldsSingleton):
 
         self._hist[pk].append(mjd)
 
+        if dark:
+            row = 0
+        else:
+            row = 1
+
         int_lst = int(np.round(lst/15, 0))
         if int_lst == 24:
             int_lst = 0
-        self.lstObserved[field_idx][int_lst] += 1
+        self.lstObserved[field_idx][int_lst, row] += 1
 
         self.checkCompletion(field_idx)
 
@@ -367,21 +393,29 @@ class Fields(object, metaclass=FieldsSingleton):
 
         self.fromarray(fields_array=fields)
 
-        self.cadencelist.fromdb(use_label_root=False, version="v1",
+        self.cadencelist.fromdb(use_label_root=False, version="v2",
                                 priorities=priorities)
 
-    def lstWeight(self, lst, field_idx=None):
+    def lstWeight(self, lst, field_idx=None, dark=False):
         # field id corresponds to indx, so fields is id/indx
         # as is everywhere, but just to keep reminding me...
         assert lst > 0 and lst < 24, "lst must be in hours!"
-        diffs = []
-        if field_idx is not None:
-            lst_obs = self.lstObserved[field_idx]
-            lst_plan = self.lstPlan[field_idx]
+        if dark:
+            row = 0
         else:
+            row = 1
+        if field_idx is not None:
+            # lst_obs = self.lstObserved[field_idx]
+            # lst_plan = self.lstPlan[field_idx]
+            lst_plan = self.slots[field_idx][:, row]
+            lst_obs = self.lstObserved[field_idx][:, row]
+        # I don't think this is used, let it break if so
+        else:
+            assert False, "you called the wrong LST weight!"
             lst_obs = self.lstObserved
             lst_plan = self.lstPlan
 
+        diffs = []
         for o, p in zip(lst_obs, lst_plan):
             done = p - o
             elligible = np.where(done > 0)[0]
