@@ -469,10 +469,11 @@ class CadenceList(object, metaclass=CadenceListSingleton):
 
         return(self._cadence_consistency[cache_key])
 
-    def specific_cadence_consistency(self, one, two, one_epochs, return_solutions=True):
+    def specific_cadence_consistency(self, one, two, one_epochs, return_solutions=True,
+                                     limit=0):
         """Are a subset of epochs of cadence #1 consistent with cadence #2?
 
-        Parameters:
+        Parameters
         ----------
 
         one : string
@@ -487,7 +488,10 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         return_solutions: boolean
             return list of solutions?
 
-        Returns:
+        limit : int
+            upper limit on number of solutions to return (0 for no upper limit)
+
+        Returns
         -------
 
         ok : int
@@ -495,6 +499,13 @@ class CadenceList(object, metaclass=CadenceListSingleton):
 
         solutions : list of ndarrays of np.int32
             list of solutions, where each solution is an array
+
+        Notes
+        -----
+
+        "limit" limits how many solutions it will search for maximum; because it 
+        builds up the solutions epoch-by-epoch, and the limit is applied at each epoch,
+        the total number can be less.
 """
         cache_key = (one, two, return_solutions, tuple(list(one_epochs)), self.skybrightness_only)
         if(cache_key in self._cadence_consistency):
@@ -503,7 +514,8 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         onecc = self.cadences[one].as_cadencecore()
         possibles = self.cadences[two].specific_cadence_consistency(onecc,
                                                                     one_epochs,
-                                                                    self.skybrightness_only)
+                                                                    self.skybrightness_only,
+                                                                    np.uint64(limit))
         success = len(possibles) > 0
 
         if(return_solutions):
