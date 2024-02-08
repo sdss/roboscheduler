@@ -231,7 +231,7 @@ class Cadence(cCadenceCore.CadenceCore):
     def evaluate_next(self, epoch_idx=None, partial_epoch=False,
                       mjd_past=None, mjd_next=None,
                       skybrightness_next=None, moon_dist=None, deltaV=None,
-                      airmass=None, verbose=False):
+                      airmass=None, verbose=False, schedule_bright=False):
         """Evaluate next choice of observation
 
            Returns whether cadence is ok AND how long until
@@ -248,6 +248,10 @@ class Cadence(cCadenceCore.CadenceCore):
 
         ok_skybrightness, down_weight = self.skybrightness_check(epoch_idx,
                                                                  skybrightness_next)
+        
+        if schedule_bright:
+            down_weight = False
+            ok_skybrightness = self.skybrightness[epoch_idx] > 0.35
 
         valid = self.obsmodeChecks(epoch_idx, moon_dist, deltaV, airmass)
         ok_skybrightness = ok_skybrightness & valid
