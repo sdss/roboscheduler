@@ -1073,7 +1073,7 @@ class Scheduler(Master):
         return
 
     def observable(self, mjd=None,  maxExp=None, check_skybrightness=True,
-                   check_cadence=True, ignore=[]):
+                   check_cadence=True, ignore=[], schedule_bright=False):
         """Return array of fields observable
 
         Parameters:
@@ -1086,16 +1086,21 @@ class Scheduler(Master):
             the maximum number of exposures to allow, useful towards
 
         check_skybrightness : boolean
-            passed to cadence check, rarely used
+            passed to cadence check, rarely used, probably deprecated
 
         check_cadence : boolean
             if all else fails, just see if a field is up, don't worry
-            about cadence, rarely used
+            about cadence, rarely used, probably deprecated
 
         ignore : list
             a list of fields to mark unobservable. Mostly used while
             planning a night to avoid rescheduling the same field that
             hasn't been marked done in the database.
+
+        schedule_bright : boolean
+            schedule a bright field right now, ignoring skybrightness.
+            intended to be used to schedule a bright (infrared) field
+            when conditions are poor in dark time
 
         """
 
@@ -1231,7 +1236,8 @@ class Scheduler(Master):
                                       moon_dist=moon_dist[indx],
                                       deltaV=deltav[indx],
                                       airmass=airmass[indx],
-                                      verbose=verbose)
+                                      verbose=verbose,
+                                      schedule_bright=schedule_bright)
 
             percent_done = len(mjd_past) / expCount[-1]
 
