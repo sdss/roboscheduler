@@ -617,6 +617,34 @@ class Observer(SchedulerBase):
         evening = self.evening_twilight(mjd=mjd, twilight=twilight)
         return morning - evening
 
+    def bright_night_length(self, mjd=None, twilight=None):
+        morning = self.morning_twilight(mjd=mjd, twilight=twilight)
+        evening = self.evening_twilight(mjd=mjd, twilight=twilight)
+        nt = 100
+        ts = evening + ((np.arange(nt, dtype=np.float32) + 0.5) / np.float32(nt) *
+                        (morning - evening))
+        nb = 0
+        for t in ts:
+            sb = self.skybrightness(mjd=t)
+            if(sb > 0.35):
+                nb += 1
+        frac = np.float32(nb) / np.float32(nt)
+        return frac * (morning - evening)
+
+    def dark_night_length(self, mjd=None, twilight=None):
+        morning = self.morning_twilight(mjd=mjd, twilight=twilight)
+        evening = self.evening_twilight(mjd=mjd, twilight=twilight)
+        nt = 100
+        ts = evening + ((np.arange(nt, dtype=np.float32) + 0.5) / np.float32(nt) *
+                        (morning - evening))
+        nb = 0
+        for t in ts:
+            sb = self.skybrightness(mjd=t)
+            if(sb <= 0.35):
+                nb += 1
+        frac = np.float32(nb) / np.float32(nt)
+        return frac * (morning - evening)
+
     def _moon_rise_set(self, mjd=None):
         """Utility function for root-finding to get moon rise/set times"""
         (alt, az) = self.moon_altaz(mjd=mjd)
