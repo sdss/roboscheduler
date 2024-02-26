@@ -1373,7 +1373,7 @@ class Scheduler(Master):
         return designs
 
     def nextfield(self, mjd=None, maxExp=None, returnAll=False, live=False,
-                  ignore=[]):
+                  ignore=[], schedule_bright=False):
         """Picks the next field to observe
 
         Parameters:
@@ -1412,7 +1412,8 @@ class Scheduler(Master):
         self.recent_ids = list()
 
         iobservable, nexp, delta_priority, exp_epoch, epoch_idx\
-            = self.observable(mjd=mjd, maxExp=maxExp, ignore=ignore)
+            = self.observable(mjd=mjd, maxExp=maxExp, ignore=ignore,
+                              schedule_bright=schedule_bright)
         if len(iobservable) == 0:
             if returnAll:
                 return None, -1
