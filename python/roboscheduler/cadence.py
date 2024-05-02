@@ -591,6 +591,8 @@ class CadenceList(object, metaclass=CadenceListSingleton):
     def fromarray(self, cadences_array=None, priorities={}):
         """Add cadences to ccadence list from an array
 
+        NOTE: Only used for reading in fits tables!
+
         Parameters:
         -----------
 
@@ -603,7 +605,9 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         for ccadence in cadences_array:
             nepochs = ccadence['NEPOCHS']
 
-            self.add_cadence(name=ccadence['CADENCE'],
+            name = ccadence['CADENCE']
+
+            self.add_cadence(name=name[:name.index("_v")] ,
                              nepochs=ccadence['NEPOCHS'],
                              skybrightness=ccadence['SKYBRIGHTNESS'][0:nepochs],
                              delta=ccadence['DELTA'][0:nepochs],
