@@ -610,8 +610,10 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             nepochs = ccadence['NEPOCHS']
 
             name = ccadence['CADENCE']
+            if "v" in name:
+                name = name[:name.index("_v")]
 
-            self.add_cadence(name=name[:name.index("_v")] ,
+            self.add_cadence(name= name,
                              nepochs=ccadence['NEPOCHS'],
                              skybrightness=ccadence['SKYBRIGHTNESS'][0:nepochs],
                              delta=ccadence['DELTA'][0:nepochs],

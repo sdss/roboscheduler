@@ -187,7 +187,13 @@ class Fields(object, metaclass=FieldsSingleton):
                   np.round(np.sum(np.sum(lco["slots_exposures"], axis=1),
                          axis=1)).astype(int)
         self.fields_fits["slots_exposures"] = fits_dat["slots_exposures"]
-        self.fields_fits["cadence"] = fits_dat["cadence"]
+        formatted_cad = list()
+        for cad in fits_dat["cadence"]:
+            formatted = cad
+            if "v" in cad:
+                formatted = cad[:cad.index("_v")]
+            formatted_cad.append(formatted)
+        self.fields_fits["cadence"] = formatted_cad
         # self.fields_fits["cadence"] = [c[:c.index("_v")] for c in fits_dat["cadence"]]
 
         self.fromarray(self.fields_fits)
