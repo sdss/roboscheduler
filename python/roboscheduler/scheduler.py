@@ -944,6 +944,8 @@ class Scheduler(Master):
         self.airmassPri = priorities.get("airmassPri", 20)
         self.randomPri = priorities.get("randomPri", 0)
 
+        self.invertOverheadCadences = priorities.get("invertOverheadCadences", [])
+
         return
 
     def initdb(self, designbase='plan-0', fromFits=True,
@@ -1021,6 +1023,9 @@ class Scheduler(Master):
         self.surveyComplete = surveyDone / surveyGoal
 
         self.observations = roboscheduler.observations.Observations(observatory=self.observatory)
+
+        invertOverheadPri = [c in self.invertOverheadCadences for c in self.fields.cadence]
+        self.invertOverheadPri = np.array(invertOverheadPri)
         return
 
     def observable(self, mjd=None,  maxExp=None, check_skybrightness=True,
@@ -1287,7 +1292,9 @@ class Scheduler(Master):
         # gaussian weight, mean already 0, use 1 hr = 15 deg std
         # priority += 50 * np.exp(-(ha)**2 / (2 * 15**2))
         # gaussian weight, mean = obs lat, use 20 deg std
-        priority -= self.overheadPri * np.exp(-(dec - self.latitude)**2 / (2 * 20**2))
+        overheadPri = self.overheadPri * np.exp(-(dec - self.latitude)**2 / (2 * 20**2))
+        priority -= np.invert(self.invertOverheadPri) * overheadPri
+        priority += self.invertOverheadPri * overheadPri
 
         pk = self.fields.pk[iobservable]
         field_id = self.fields.field_id[iobservable]
