@@ -1293,8 +1293,9 @@ class Scheduler(Master):
         # priority += 50 * np.exp(-(ha)**2 / (2 * 15**2))
         # gaussian weight, mean = obs lat, use 20 deg std
         overheadPri = self.overheadPri * np.exp(-(dec - self.latitude)**2 / (2 * 20**2))
-        priority -= np.invert(self.invertOverheadPri) * overheadPri
-        priority += self.invertOverheadPri * overheadPri
+        invert = self.invertOverheadPri[iobservable]
+        priority -= np.invert(invert) * overheadPri
+        priority += invert * overheadPri
 
         pk = self.fields.pk[iobservable]
         field_id = self.fields.field_id[iobservable]
