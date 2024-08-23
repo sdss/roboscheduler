@@ -944,6 +944,15 @@ class Scheduler(Master):
         self.airmassPri = priorities.get("airmassPri", 20)
         self.randomPri = priorities.get("randomPri", 0)
 
+        if os.path.isfile(os.path.expanduser("~/.rmToggle.yml")):
+            rmToggleFile = os.path.expanduser("~/.rmToggle.yml")
+        else:
+            print("Local RM toggle not found! Using default")
+            prod_dir = os.path.abspath(__file__).split("/scheduler.py")[0]
+            rmToggleFile = os.path.join(prod_dir, "etc", "rmToggle.yml")
+
+        self.rmToggle = yaml.load(open(rmToggleFile), Loader=yaml.FullLoader)
+
         return
 
     def initdb(self, designbase='plan-0', fromFits=True,
@@ -1074,10 +1083,21 @@ class Scheduler(Master):
         # finish partial field if scheduled
         skybrightness_2days = self.skybrightness(mjd + 2)
 
-        # whereRM = np.where(["174x" in c for c in self.fields.cadence])[0]
-        # where_uhoh = np.where(["dark_2x" in c for c in self.fields.cadence])[0]
+        rm_cadence = dict()
+        for field_id, field_attr in self.rmToggle.items():
+            milestones = field_attr["cadence_milestones"]
+            for d, cad in milestones.items():
+                if d < mjd:
+                    rm_cadence[field_id] = cad
 
-        # print("\n")
+        assert len(rm_cadence) > 0, "RM cadence not found"
+
+        whereRM = np.where(["174x" in c for c in self.fields.cadence])[0]
+        for w in whereRM:
+            f_id = self.fields.field_id[w]
+            if f_id not in rm_cadence:
+                continue
+            self.fields.cadence[w] = rm_cadence[f_id]
 
         next_change, next_brightness = self.next_change(mjd)
 
