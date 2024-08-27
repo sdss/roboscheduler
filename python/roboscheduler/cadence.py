@@ -760,7 +760,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             information on each cadence
         """
         names = self.cadences.keys()
-        with open(filename, 'w', encoding='utf-8-sig', newline='') as csvfile:
+        with open(filename, 'w', encoding='utf-8', newline='') as csvfile:
             for indx, name in enumerate(names):
                 nepochs = self.cadences[name].nepochs
                 label_root = self.cadences[name].label_root
@@ -921,9 +921,9 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             else:
                 label = str(cadence['label'])
 
-            cadence["obsmode_pk"] = [o.strip() for o in cadence["obsmode_pk"]]
-
             if(cadence['obsmode_pk'] is not None):
+                cadence["obsmode_pk"] = [o.strip() for o in cadence["obsmode_pk"]]
+
                 min_moon_sep = np.array([obsmodes[x]['min_moon_sep']
                                          for x in cadence['obsmode_pk']],
                                         dtype=np.float32)
