@@ -177,9 +177,23 @@ class Fields(object, metaclass=FieldsSingleton):
         self.fields_fits["field_id"] = fits_dat["fieldid"]
         self.fields_fits["racen"] = fits_dat["racen"]
         self.fields_fits["deccen"] = fits_dat["deccen"]
-        self.fields_fits["nfilled"] = fits_dat["nfilled"]
+        if "nfilled" in fits_dat.dtype.names:
+            self.fields_fits["nfilled"] = fits_dat["nfilled"]
+        elif "nallocated_full" in fits_dat.dtype.names:
+            self.fields_fits["nfilled"] = fits_dat["nallocated_full"]
+        else:
+            print("WARN: strange rsAllocation format, estimating nfilled")
+            self.fields_fits["nfilled"] =\
+                  np.round(np.sum(np.sum(lco["slots_exposures"], axis=1),
+                         axis=1)).astype(int)
         self.fields_fits["slots_exposures"] = fits_dat["slots_exposures"]
-        self.fields_fits["cadence"] = fits_dat["cadence"]
+        formatted_cad = list()
+        for cad in fits_dat["cadence"]:
+            formatted = cad
+            if "v" in cad:
+                formatted = cad[:cad.index("_v")]
+            formatted_cad.append(formatted)
+        self.fields_fits["cadence"] = formatted_cad
         # self.fields_fits["cadence"] = [c[:c.index("_v")] for c in fits_dat["cadence"]]
 
         self.fromarray(self.fields_fits)
@@ -266,7 +280,8 @@ class Fields(object, metaclass=FieldsSingleton):
     def checkCompletion(self, fieldidx):
         """evaluate field completion
         """
-        if not self.notDone[fieldidx]:
+        if (not self.notDone[fieldidx]
+            or not self.validCadence[fieldidx]):
             # already done
             return
         pk = self.pk[fieldidx]
