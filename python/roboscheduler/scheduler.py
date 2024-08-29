@@ -944,7 +944,11 @@ class Scheduler(Master):
         self.airmassPri = priorities.get("airmassPri", 20)
         self.randomPri = priorities.get("randomPri", 0)
 
-        self.invertOverheadCadences = priorities.get("invertOverheadCadences", [])
+        self.invertOverheadCadences = priorities.get("invertOverheadCadences",
+                                                      ["dark_1x3_v2"])
+
+        if observatory.lower() == "apo":
+            self.invertOverheadCadences = []
 
         return
 
@@ -993,23 +997,9 @@ class Scheduler(Master):
             cadence_file += designbase + "-"\
                            + self.observatory + ".fits"
 
-            # self.fields.cadencelist.fromdb(use_label_root=False,
-            #                                version="v2",
-            #                                priorities=self.priorities)
             self.fields.cadencelist.fromfits(filename=cadence_file,
                                            priorities=self.priorities)
             self.fields.fromfits(filename=fields_file)
-        elif fieldsArray is not None:
-            assert realDesigns, "must supply designs with fieldsArray"
-            self.fields.fromarray(fieldsArray, designList=realDesigns)
-            self.fields.cadencelist.fromdb(use_label_root=False,
-                                           version="v2",
-                                           priorities=self.priorities)
-            self.fields._hist = {f: list() for f in self.fields.pk}
-            for i in range(len(self.fields.pk)):
-                pk = self.fields.pk[i]
-                self.fields._hist[pk].sort()
-                self.fields.checkCompletion(i)
         else:
             # self.cadencelist.fromdb(version="v1")
             # feilds.fromdb calls cadencelist from db
@@ -1026,6 +1016,7 @@ class Scheduler(Master):
 
         invertOverheadPri = [c in self.invertOverheadCadences for c in self.fields.cadence]
         self.invertOverheadPri = np.array(invertOverheadPri)
+        print(f"Found {len(np.where(self.invertOverheadPri)[0])} to invert")
         return
 
     def observable(self, mjd=None,  maxExp=None, check_skybrightness=True,
@@ -1484,11 +1475,16 @@ class Scheduler(Master):
         nexp_cumul = len(self.fields.observations[fieldidx]) + 1
 
         design_indx = len(self.fields.hist[field_pk])
-        if design_indx == nfilled\
-            and self.fields.hist[field_pk][-1] - result["mjd"] < 0.1:
-            design_indx -= 1
 
-        design_id = self.fields.designs[fieldidx][design_indx]
+        try:
+            if design_indx == nfilled:
+                if self.fields.hist[field_pk][-1] - result["mjd"] < 0.1:
+                    design_indx -= 1
+
+            design_id = self.fields.designs[fieldidx][design_indx]
+        except Exception as E:
+            print(E)
+            design_id = 0
 
         (alt, az) = self.radec2altaz(mjd=result['mjd'],
                                      ra=racen,
