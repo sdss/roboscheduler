@@ -277,7 +277,7 @@ class Observer(SchedulerBase):
 
     """
     def __init__(self, observatory='apo', observatoryfile=None,
-                 dark_twilight=-15., bright_twilight=-8.):
+                 dark_twilight=-15., bright_twilight=-8., winter_bright_twilight=-8.):
         """Create Observer object"""
         super().__init__()
         self.observatory = observatory
@@ -295,6 +295,7 @@ class Observer(SchedulerBase):
         self.longitude = self._data['OBSERVATORY']['longitude'][indx]
         self.dark_twilight = np.float32(dark_twilight)
         self.bright_twilight = np.float32(bright_twilight)
+        self.winter_bright_twilight = np.float32(winter_bright_twilight)
         return
 
     def lst(self, mjd=None):
@@ -541,6 +542,22 @@ class Observer(SchedulerBase):
         (alt, az) = self.sun_altaz(mjd=mjd)
         return (alt - twilight)
 
+    def bright_twilight_angle(self, mjd=None):
+        """Return twilight angle for bright time
+
+        Notes
+        -----
+
+        Returns value of bright_twilight, unless Sun is on opposite side
+        of Equator from the observatory, in which case return winter_bright_twilight
+"""
+        (sun_ra, sun_dec) = self.sun_radec(mjd=mjd)
+        if((sun_dec > 0.) == (self.latitude > 0.)):
+            return(self.bright_twilight)
+        else:
+            return(self.winter_bright_twilight)
+        return
+
     def evening_twilight(self, mjd=None, twilight=None):
         """Return MJD (days) of evening twilight for MJD
 
@@ -556,10 +573,10 @@ class Observer(SchedulerBase):
         evening_twilight : np.float64
             time of twilight in MJD (days)
         """
-        if twilight is None:
-            twilight = self.bright_twilight
         if(np.floor(np.float64(mjd)) != np.float64(mjd)):
             raise ValueError("MJD should be an integer")
+        if twilight is None:
+            twilight = self.bright_twilight_angle(mjd=np.float64(mjd))
         noon_ish = (np.float64(mjd) -
                     self.longitude / 15. / 24. - 0.5)
         midnight_ish = noon_ish + 0.5
@@ -583,10 +600,10 @@ class Observer(SchedulerBase):
         morning_twilight : np.float64
             time of twilight in MJD (days)
         """
-        if twilight is None:
-            twilight = self.bright_twilight
         if(np.floor(np.float64(mjd)) != np.float64(mjd)):
             raise ValueError("MJD should be an integer")
+        if twilight is None:
+            twilight = self.bright_twilight_angle(mjd=np.float64(mjd))
         midnight_ish = (np.float64(mjd) -
                         self.longitude / 15. / 24.)
         nextnoon_ish = midnight_ish + 0.5
@@ -599,6 +616,34 @@ class Observer(SchedulerBase):
         morning = self.morning_twilight(mjd=mjd, twilight=twilight)
         evening = self.evening_twilight(mjd=mjd, twilight=twilight)
         return morning - evening
+
+    def bright_night_length(self, mjd=None, twilight=None):
+        morning = self.morning_twilight(mjd=mjd, twilight=twilight)
+        evening = self.evening_twilight(mjd=mjd, twilight=twilight)
+        nt = 100
+        ts = evening + ((np.arange(nt, dtype=np.float32) + 0.5) / np.float32(nt) *
+                        (morning - evening))
+        nb = 0
+        for t in ts:
+            sb = self.skybrightness(mjd=t)
+            if(sb > 0.35):
+                nb += 1
+        frac = np.float32(nb) / np.float32(nt)
+        return frac * (morning - evening)
+
+    def dark_night_length(self, mjd=None, twilight=None):
+        morning = self.morning_twilight(mjd=mjd, twilight=twilight)
+        evening = self.evening_twilight(mjd=mjd, twilight=twilight)
+        nt = 100
+        ts = evening + ((np.arange(nt, dtype=np.float32) + 0.5) / np.float32(nt) *
+                        (morning - evening))
+        nb = 0
+        for t in ts:
+            sb = self.skybrightness(mjd=t)
+            if(sb <= 0.35):
+                nb += 1
+        frac = np.float32(nb) / np.float32(nt)
+        return frac * (morning - evening)
 
     def _moon_rise_set(self, mjd=None):
         """Utility function for root-finding to get moon rise/set times"""
@@ -805,6 +850,10 @@ class Master(Observer):
         self.mjds = self._mjds()
         self.dark_twilight = np.float32(self.schedule['dark_twilight'])
         self.bright_twilight = np.float32(self.schedule['bright_twilight'])
+        if('winter_bright_twilight' in self.schedule):
+            self.winter_bright_twilight = np.float32(self.schedule['winter_bright_twilight'])
+        else:
+            self.winter_bright_twilight = self.bright_twilight
         return
 
     def _dateandtime2mjd(self):

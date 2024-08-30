@@ -255,7 +255,7 @@ std::vector<std::vector<int>> CadenceCore::cadenceConsistency(CadenceCore target
 		target_epochs.push_back(i);
 
 	epochs_list = specificCadenceConsistency(target_cadence, target_epochs,
-																					 skybrightnessOnly);
+																					 skybrightnessOnly, 0);
 
 	return(epochs_list);
 }
@@ -263,7 +263,8 @@ std::vector<std::vector<int>> CadenceCore::cadenceConsistency(CadenceCore target
 
 std::vector<std::vector<int>> CadenceCore::specificCadenceConsistency(CadenceCore target_cadence,
 																																			std::vector<int> target_epochs,
-																																			bool skybrightnessOnly) {
+																																			bool skybrightnessOnly,
+																																			long unsigned int limit) {
 	std::vector<std::vector<int>> epochs_list;
 	std::vector<std::vector<int>> current_epochs_list;
 	std::vector<int> current_target_epochs;
@@ -335,6 +336,13 @@ std::vector<std::vector<int>> CadenceCore::specificCadenceConsistency(CadenceCor
 				}
 			}
 			epochs.clear();
+
+			// If we have set a limit, don't try to get more than that. Note that
+			// this limits how many options there are at any stage, so in the end
+			// there might be fewer than the limit if some of the options do not
+			// pan out.
+			if((limit > 0) && (epochs_list.size() > limit))
+				break;
 		}
 
 	}
