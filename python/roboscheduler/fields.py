@@ -118,6 +118,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.icadence = np.zeros(self.nfields, dtype=np.int32)
         # self.nextmjd = np.zeros(self.nfields, dtype=np.float64)
         self.epoch_idx = np.zeros(self.nfields, dtype=np.float64)
+        self.original_exposures_done = fields_array["original_exposures_done"]
         if "base_priority" in fields_array.dtype.names:
             self.basePriority = fields_array["base_priority"]
         else:
@@ -159,6 +160,13 @@ class Fields(object, metaclass=FieldsSingleton):
         filename : string
             the full path to the fits file to be loaded
         """
+        fits_dat = fitsio.read(filename)
+
+        try:
+            len_exposures = fits_dat["original_exposures_done"].shape[1]
+        except ValueError:
+            len_exposures = 1
+
         self._database = False
         fields_model = [('pk', np.int32),
                         ('field_id', np.int32),
@@ -167,9 +175,8 @@ class Fields(object, metaclass=FieldsSingleton):
                         ('nfilled', np.int32),
                         ('flag', np.int32),
                         ('slots_exposures', np.int32, (24, 2)),
+                        ('original_exposures_done', np.int32, (len_exposures)),
                         ('cadence', np.dtype('a25'))]
-
-        fits_dat = fitsio.read(filename)
 
         self.fields_fits = np.zeros(len(fits_dat["fieldid"]), dtype=fields_model)
 
@@ -195,6 +202,8 @@ class Fields(object, metaclass=FieldsSingleton):
             formatted_cad.append(formatted)
         self.fields_fits["cadence"] = formatted_cad
         # self.fields_fits["cadence"] = [c[:c.index("_v")] for c in fits_dat["cadence"]]
+        if len_exposures > 1:
+            self.fields_fits["original_exposures_done"] = fits_dat["original_exposures_done"]
 
         self.fromarray(self.fields_fits)
         self.createDummyDesigns()
