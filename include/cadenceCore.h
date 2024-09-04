@@ -37,7 +37,8 @@ public:
 	std::vector<std::vector<int>> specificCadenceConsistency(CadenceCore target_cadence,
 																													 std::vector<int> target_epochs,
 																													 bool skybrightnessOnly,
-																													 long unsigned int limit);
+																													 long unsigned int limit,
+																													 bool sequential);
 	std::string name;
 	int nepochs;
 	int nexp_total;

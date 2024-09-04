@@ -26,7 +26,7 @@ PYBIND11_MODULE(cCadenceCore, m) {
 					 py::arg("skybrightness_only"))
 			.def("specific_cadence_consistency", &CadenceCore::specificCadenceConsistency,
 					 py::arg("target_cadence"), py::arg("target_epochs"), py::arg("skybrightness_only"),
-					 py::arg("limit"))
+					 py::arg("limit"), py::arg("sequential"))
 			.def_readwrite("name", &CadenceCore::name)
 			.def_readwrite("nepochs", &CadenceCore::nepochs)
 			.def_readwrite("nexp_total", &CadenceCore::nexp_total)
