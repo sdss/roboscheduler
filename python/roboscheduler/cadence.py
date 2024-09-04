@@ -397,7 +397,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
 
     def cadence_consistency(self, one, two, return_solutions=True,
                             epoch_level=True, merge_epochs=False):
-        """Is cadence #1 consistent with cadence #2?
+        """Is cadence #1 satisfied somehow by cadence #2?
 
         Parameters:
         ----------
@@ -474,8 +474,8 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         return(self._cadence_consistency[cache_key])
 
     def specific_cadence_consistency(self, one, two, one_epochs, return_solutions=True,
-                                     limit=0):
-        """Are a subset of epochs of cadence #1 consistent with cadence #2?
+                                     limit=0, sequential=False):
+        """Are a subset of epochs of cadence #1 satisfied somehow with cadence #2?
 
         Parameters
         ----------
@@ -494,6 +494,9 @@ class CadenceList(object, metaclass=CadenceListSingleton):
 
         limit : int
             upper limit on number of solutions to return (0 for no upper limit)
+
+        sequential : bool
+            keep epochs in #2 sequential unless there is a break in #1
 
         Returns
         -------
@@ -519,7 +522,8 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         possibles = self.cadences[two].specific_cadence_consistency(onecc,
                                                                     one_epochs,
                                                                     self.skybrightness_only,
-                                                                    np.uint64(limit))
+                                                                    np.uint64(limit),
+                                                                    sequential)
         success = len(possibles) > 0
 
         if(return_solutions):
@@ -604,7 +608,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         # If we have gotten here no working solution was found
         return False
 
-    def fromarray(self, cadences_array=None, priorities={}):
+    def fromarray(self, cadences_array=None, priorities={}, trim_version=False):
         """Add cadences to ccadence list from an array
 
         NOTE: Only used for reading in fits tables!
@@ -617,13 +621,17 @@ class CadenceList(object, metaclass=CadenceListSingleton):
             'DELTA_MIN', 'DELTA_MAX', 'NEXP', 'CADENCE',
             'MAX_LENGTH'
 
+        trim_version : bool
+            if True, trim version off name for cadence dictionary key
+
         """
         for ccadence in cadences_array:
             nepochs = ccadence['NEPOCHS']
 
             name = ccadence['CADENCE']
-            if "v" in name:
-                name = name[:name.index("_v")]
+            if(trim_version):
+                if "v" in name:
+                    name = name[:name.index("_v")]
 
             self.add_cadence(name= name,
                              nepochs=ccadence['NEPOCHS'],
