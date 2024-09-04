@@ -201,6 +201,7 @@ bool CadenceCore::specificEpochsConsistency(CadenceCore target_cadence,
 	float *max_airmass_a = (float *) max_airmass.request().ptr;
 	float *delta_min_a = (float *) delta_min.request().ptr;
 	float *delta_max_a = (float *) delta_max.request().ptr;
+	float *delta_a = (float *) delta.request().ptr;
 
 	if(skybrightnessOnly)
 		ok = (t_skybrightness_a[target_epochs[0]] >= skybrightness_a[epochs[0]]);
@@ -224,7 +225,7 @@ bool CadenceCore::specificEpochsConsistency(CadenceCore target_cadence,
 		if(!ok)
 			return(false);
 
-		if(t_delta_a[target_epochs[i]] >= 0) {
+		if(t_delta_a[target_epochs[i]] > 0) {
 			dtotmin = 0.;
 			for(auto j = epochs[i - 1] + 1; j <= epochs[i]; j++)
 				dtotmin += delta_min_a[j];
@@ -255,7 +256,7 @@ std::vector<std::vector<int>> CadenceCore::cadenceConsistency(CadenceCore target
 		target_epochs.push_back(i);
 
 	epochs_list = specificCadenceConsistency(target_cadence, target_epochs,
-																					 skybrightnessOnly, 0);
+																					 skybrightnessOnly, 0, false);
 
 	return(epochs_list);
 }
@@ -264,12 +265,13 @@ std::vector<std::vector<int>> CadenceCore::cadenceConsistency(CadenceCore target
 std::vector<std::vector<int>> CadenceCore::specificCadenceConsistency(CadenceCore target_cadence,
 																																			std::vector<int> target_epochs,
 																																			bool skybrightnessOnly,
-																																			long unsigned int limit) {
+																																			long unsigned int limit,
+																																			bool sequential) {
 	std::vector<std::vector<int>> epochs_list;
 	std::vector<std::vector<int>> current_epochs_list;
 	std::vector<int> current_target_epochs;
-	std::vector<int> epochs;
-	int ok, ifield_start, nexp_left_target, nexp_left_field, target_nepochs;
+	std::vector<int> current_epochs;
+	int ok, ifield_start, ifield_end, nexp_left_target, nexp_left_field, target_nepochs;
 
 	target_nepochs = target_epochs.size();
 
@@ -278,9 +280,10 @@ std::vector<std::vector<int>> CadenceCore::specificCadenceConsistency(CadenceCor
 
 	// Initialize solutions to those to start with
 	for(auto istart = 0; istart < nepochs; istart++) {
-		epochs.clear();
-		epochs.push_back(istart);
-		if(specificEpochsConsistency(target_cadence, epochs, target_epochs, skybrightnessOnly)) {
+		current_epochs.clear();
+		current_epochs.push_back(istart);
+		if(specificEpochsConsistency(target_cadence, current_epochs, target_epochs,
+																 skybrightnessOnly)) {
 			// Check number of exposures left total; if the field
 			// doesn't have enough exposures left, no point in continuing
 			// the check
@@ -292,7 +295,7 @@ std::vector<std::vector<int>> CadenceCore::specificCadenceConsistency(CadenceCor
 				nexp_left_field += nexp_a[j];
 
 			if(nexp_left_field >= nexp_left_target) {
-				epochs_list.push_back(epochs);
+				epochs_list.push_back(current_epochs);
 			}
 		}
 	}
@@ -309,14 +312,24 @@ std::vector<std::vector<int>> CadenceCore::specificCadenceConsistency(CadenceCor
 
 		// Each time, check all previous working solutions
 		for(unsigned long i = 0; i < current_epochs_list.size(); i++) {
-			epochs = current_epochs_list[i];
-			ifield_start = epochs.back(); // allow to repeat the epoch
+			current_epochs = current_epochs_list[i];
+			ifield_start = current_epochs.back(); // allow to repeat the epoch
 
-			// And find all subsequent field epochs that will work for each
-			for(int ifield = ifield_start; ifield < nepochs; ifield++) {
-				epochs = current_epochs_list[i];
-				epochs.push_back(ifield);
-				ok = specificEpochsConsistency(target_cadence, epochs, target_epochs, skybrightnessOnly);
+			// Just check the next one if the input is sequential (and sequential option on)
+			if((sequential) & (target_epochs[indx] <= target_epochs[indx - 1] + 1)) {
+				ifield_end = ifield_start + 1;
+				if(ifield_end > nepochs -1)
+					ifield_end = nepochs - 1;
+			} else {
+				ifield_end = nepochs - 1;
+			}
+
+			// Find subsequent field epochs that will work for each
+			for(int ifield = ifield_start; ifield <= ifield_end; ifield++) {
+				current_epochs = current_epochs_list[i];
+				current_epochs.push_back(ifield);
+				ok = specificEpochsConsistency(target_cadence, current_epochs, target_epochs,
+																			 skybrightnessOnly);
 				if(ok) {
 					// Check number of exposures left total; if the field
 					// doesn't have enough exposures left, no point in
@@ -326,16 +339,16 @@ std::vector<std::vector<int>> CadenceCore::specificCadenceConsistency(CadenceCor
 					// a non-viable case through, but the epochConsistency()
 					// check will catch those issues in subsequent target epochs.
 					nexp_left_target = 0;
-					for(int j = epochs.size(); j < target_nepochs; j++)
+					for(int j = current_epochs.size(); j < target_nepochs; j++)
 						nexp_left_target += t_nexp_a[target_epochs[j]];
-					nexp_left_field = nexp_a[ifield] - t_nexp_a[target_epochs[epochs.size() - 1]];
+					nexp_left_field = nexp_a[ifield] - t_nexp_a[target_epochs[current_epochs.size() - 1]];
 					for(auto j = ifield + 1; j < nepochs; j++)
 						nexp_left_field += nexp_a[j];
 					if(nexp_left_field >= nexp_left_target)
-						epochs_list.push_back(epochs);
+						epochs_list.push_back(current_epochs);
 				}
 			}
-			epochs.clear();
+			current_epochs.clear();
 
 			// If we have set a limit, don't try to get more than that. Note that
 			// this limits how many options there are at any stage, so in the end
