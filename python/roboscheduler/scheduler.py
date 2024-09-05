@@ -277,7 +277,7 @@ class Observer(SchedulerBase):
 
     """
     def __init__(self, observatory='apo', observatoryfile=None,
-                 dark_twilight=-15., bright_twilight=-8.):
+                 dark_twilight=-15., bright_twilight=-8., winter_bright_twilight=-8.):
         """Create Observer object"""
         super().__init__()
         self.observatory = observatory
@@ -295,6 +295,7 @@ class Observer(SchedulerBase):
         self.longitude = self._data['OBSERVATORY']['longitude'][indx]
         self.dark_twilight = np.float32(dark_twilight)
         self.bright_twilight = np.float32(bright_twilight)
+        self.winter_bright_twilight = np.float32(winter_bright_twilight)
         return
 
     def lst(self, mjd=None):
@@ -541,6 +542,22 @@ class Observer(SchedulerBase):
         (alt, az) = self.sun_altaz(mjd=mjd)
         return (alt - twilight)
 
+    def bright_twilight_angle(self, mjd=None):
+        """Return twilight angle for bright time
+
+        Notes
+        -----
+
+        Returns value of bright_twilight, unless Sun is on opposite side
+        of Equator from the observatory, in which case return winter_bright_twilight
+"""
+        (sun_ra, sun_dec) = self.sun_radec(mjd=mjd)
+        if((sun_dec > 0.) == (self.latitude > 0.)):
+            return(self.bright_twilight)
+        else:
+            return(self.winter_bright_twilight)
+        return
+
     def evening_twilight(self, mjd=None, twilight=None):
         """Return MJD (days) of evening twilight for MJD
 
@@ -556,10 +573,10 @@ class Observer(SchedulerBase):
         evening_twilight : np.float64
             time of twilight in MJD (days)
         """
-        if twilight is None:
-            twilight = self.bright_twilight
         if(np.floor(np.float64(mjd)) != np.float64(mjd)):
             raise ValueError("MJD should be an integer")
+        if twilight is None:
+            twilight = self.bright_twilight_angle(mjd=np.float64(mjd))
         noon_ish = (np.float64(mjd) -
                     self.longitude / 15. / 24. - 0.5)
         midnight_ish = noon_ish + 0.5
@@ -583,10 +600,10 @@ class Observer(SchedulerBase):
         morning_twilight : np.float64
             time of twilight in MJD (days)
         """
-        if twilight is None:
-            twilight = self.bright_twilight
         if(np.floor(np.float64(mjd)) != np.float64(mjd)):
             raise ValueError("MJD should be an integer")
+        if twilight is None:
+            twilight = self.bright_twilight_angle(mjd=np.float64(mjd))
         midnight_ish = (np.float64(mjd) -
                         self.longitude / 15. / 24.)
         nextnoon_ish = midnight_ish + 0.5
@@ -599,6 +616,34 @@ class Observer(SchedulerBase):
         morning = self.morning_twilight(mjd=mjd, twilight=twilight)
         evening = self.evening_twilight(mjd=mjd, twilight=twilight)
         return morning - evening
+
+    def bright_night_length(self, mjd=None, twilight=None):
+        morning = self.morning_twilight(mjd=mjd, twilight=twilight)
+        evening = self.evening_twilight(mjd=mjd, twilight=twilight)
+        nt = 100
+        ts = evening + ((np.arange(nt, dtype=np.float32) + 0.5) / np.float32(nt) *
+                        (morning - evening))
+        nb = 0
+        for t in ts:
+            sb = self.skybrightness(mjd=t)
+            if(sb > 0.35):
+                nb += 1
+        frac = np.float32(nb) / np.float32(nt)
+        return frac * (morning - evening)
+
+    def dark_night_length(self, mjd=None, twilight=None):
+        morning = self.morning_twilight(mjd=mjd, twilight=twilight)
+        evening = self.evening_twilight(mjd=mjd, twilight=twilight)
+        nt = 100
+        ts = evening + ((np.arange(nt, dtype=np.float32) + 0.5) / np.float32(nt) *
+                        (morning - evening))
+        nb = 0
+        for t in ts:
+            sb = self.skybrightness(mjd=t)
+            if(sb <= 0.35):
+                nb += 1
+        frac = np.float32(nb) / np.float32(nt)
+        return frac * (morning - evening)
 
     def _moon_rise_set(self, mjd=None):
         """Utility function for root-finding to get moon rise/set times"""
@@ -805,6 +850,10 @@ class Master(Observer):
         self.mjds = self._mjds()
         self.dark_twilight = np.float32(self.schedule['dark_twilight'])
         self.bright_twilight = np.float32(self.schedule['bright_twilight'])
+        if('winter_bright_twilight' in self.schedule):
+            self.winter_bright_twilight = np.float32(self.schedule['winter_bright_twilight'])
+        else:
+            self.winter_bright_twilight = self.bright_twilight
         return
 
     def _dateandtime2mjd(self):
@@ -952,6 +1001,11 @@ class Scheduler(Master):
             rmToggleFile = os.path.join(prod_dir, "etc", "rmToggle.yml")
 
         self.rmToggle = yaml.load(open(rmToggleFile), Loader=yaml.FullLoader)
+        self.invertOverheadCadences = priorities.get("invertOverheadCadences",
+                                                      ["dark_1x3_v2"])
+
+        if observatory.lower() == "apo":
+            self.invertOverheadCadences = []
 
         return
 
@@ -1000,23 +1054,9 @@ class Scheduler(Master):
             cadence_file += designbase + "-"\
                            + self.observatory + ".fits"
 
-            # self.fields.cadencelist.fromdb(use_label_root=False,
-            #                                version="v2",
-            #                                priorities=self.priorities)
             self.fields.cadencelist.fromfits(filename=cadence_file,
                                            priorities=self.priorities)
             self.fields.fromfits(filename=fields_file)
-        elif fieldsArray is not None:
-            assert realDesigns, "must supply designs with fieldsArray"
-            self.fields.fromarray(fieldsArray, designList=realDesigns)
-            self.fields.cadencelist.fromdb(use_label_root=False,
-                                           version="v2",
-                                           priorities=self.priorities)
-            self.fields._hist = {f: list() for f in self.fields.pk}
-            for i in range(len(self.fields.pk)):
-                pk = self.fields.pk[i]
-                self.fields._hist[pk].sort()
-                self.fields.checkCompletion(i)
         else:
             # self.cadencelist.fromdb(version="v1")
             # feilds.fromdb calls cadencelist from db
@@ -1030,6 +1070,10 @@ class Scheduler(Master):
         self.surveyComplete = surveyDone / surveyGoal
 
         self.observations = roboscheduler.observations.Observations(observatory=self.observatory)
+
+        invertOverheadPri = [c in self.invertOverheadCadences for c in self.fields.cadence]
+        self.invertOverheadPri = np.array(invertOverheadPri)
+        print(f"Found {len(np.where(self.invertOverheadPri)[0])} to invert")
         return
 
     def observable(self, mjd=None,  maxExp=None, check_skybrightness=True,
@@ -1307,7 +1351,10 @@ class Scheduler(Master):
         # gaussian weight, mean already 0, use 1 hr = 15 deg std
         # priority += 50 * np.exp(-(ha)**2 / (2 * 15**2))
         # gaussian weight, mean = obs lat, use 20 deg std
-        priority -= self.overheadPri * np.exp(-(dec - self.latitude)**2 / (2 * 20**2))
+        overheadPri = self.overheadPri * np.exp(-(dec - self.latitude)**2 / (2 * 20**2))
+        invert = self.invertOverheadPri[iobservable]
+        priority -= np.invert(invert) * overheadPri
+        priority += invert * overheadPri
 
         pk = self.fields.pk[iobservable]
         field_id = self.fields.field_id[iobservable]
@@ -1496,11 +1543,16 @@ class Scheduler(Master):
         nexp_cumul = len(self.fields.observations[fieldidx]) + 1
 
         design_indx = len(self.fields.hist[field_pk])
-        if design_indx == nfilled\
-            and self.fields.hist[field_pk][-1] - result["mjd"] < 0.1:
-            design_indx -= 1
 
-        design_id = self.fields.designs[fieldidx][design_indx]
+        try:
+            if design_indx == nfilled:
+                if self.fields.hist[field_pk][-1] - result["mjd"] < 0.1:
+                    design_indx -= 1
+
+            design_id = self.fields.designs[fieldidx][design_indx]
+        except Exception as E:
+            print(E)
+            design_id = 0
 
         (alt, az) = self.radec2altaz(mjd=result['mjd'],
                                      ra=racen,
