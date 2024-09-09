@@ -1,0 +1,29 @@
+112359:
+   rm_field_name: 'SDSS-RM'
+   cadence_milestones:
+     59500: 'dark_174x8_v2'
+     60523: 'dark_174x8_10day_v2'
+     60888: 'dark_174x8_30day_v2'
+
+112360:
+   rm_field_name: 'COSMOS'
+   cadence_milestones:
+     59500: 'dark_174x8_v2'
+     60523: 'dark_174x8_10day_v2'
+     60888: 'dark_174x8_3day_v2'
+
+112361:
+   rm_field_name: 'XMM-LSS'
+   cadence_milestones:
+     59500: 'dark_174x8_v2'
+     60523: 'dark_174x8_30day_v2'
+     60888: 'dark_174x8_7day_v2'
+     61253: 'dark_174x8_3day_v2'
+
+112362:
+   rm_field_name: 'CDFS'
+   cadence_milestones:
+     59500: 'dark_174x8_v2'
+     60523: 'dark_174x8_10day_v2'
+     60888: 'dark_174x8_3day_v2'
+     61253: 'dark_174x8_3day_v2'

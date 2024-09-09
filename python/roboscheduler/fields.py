@@ -194,14 +194,7 @@ class Fields(object, metaclass=FieldsSingleton):
                   np.round(np.sum(np.sum(lco["slots_exposures"], axis=1),
                          axis=1)).astype(int)
         self.fields_fits["slots_exposures"] = fits_dat["slots_exposures"]
-        formatted_cad = list()
-        for cad in fits_dat["cadence"]:
-            formatted = cad
-            if "v" in cad:
-                formatted = cad[:cad.index("_v")]
-            formatted_cad.append(formatted)
-        self.fields_fits["cadence"] = formatted_cad
-        # self.fields_fits["cadence"] = [c[:c.index("_v")] for c in fits_dat["cadence"]]
+        self.fields_fits["cadence"] = fits_dat["cadence"]
         if len_exposures > 1:
             self.fields_fits["original_exposures_done"] = fits_dat["original_exposures_done"]
 
@@ -431,13 +424,13 @@ class Fields(object, metaclass=FieldsSingleton):
         if field_idx is not None:
             # lst_obs = self.lstObserved[field_idx]
             # lst_plan = self.lstPlan[field_idx]
-            lst_plan = self.slots[field_idx][:, row]
-            lst_obs = self.lstObserved[field_idx][:, row]
+            lst_plan = self.slots[field_idx][:, :, row]
+            lst_obs = self.lstObserved[field_idx][:, :, row]
         # I don't think this is used, let it break if so
         else:
-            assert False, "you called the wrong LST weight!"
-            lst_obs = self.lstObserved
-            lst_plan = self.lstPlan
+            # assert False, "you called the wrong LST weight!"
+            lst_plan = self.slots[:, :, row]
+            lst_obs = self.lstObserved[:, :, row]
 
         diffs = []
         for o, p in zip(lst_obs, lst_plan):
