@@ -1108,11 +1108,17 @@ class Scheduler(Master):
 
         """
 
+        # dark = self.skybrightness(mjd) < 0.35
+        # lst = self.lst(mjd)
+        # lstHrs = lst/15
+        # lstDiffs = self.fields.lstWeight(lstHrs, dark=dark)
+
         (alt, az) = self.radec2altaz(mjd=mjd, ra=self.fields.racen,
                                      dec=self.fields.deccen)
         skybrightness = self.skybrightness(mjd)
         # valid cadence checks against "none" cadence issue
-        observable = (alt > 30.) & self.fields.validCadence & self.fields.notDone
+        observable = (alt > 30.) & self.fields.validCadence\
+                   & self.fields.notDone # & (lstDiffs < 1.5)
         nexp = np.ones(len(observable), dtype=int)
         exp_epochs = np.zeros(len(observable), dtype=np.int32)
         epoch_idxs = np.zeros(len(observable), dtype=np.int32)
@@ -1169,8 +1175,6 @@ class Scheduler(Master):
 
         # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
 
-        # indxs = np.where(self.fields.nextmjd > mjd)[0]
-        # observable[indxs] = False
         indxs = np.where(observable)[0]
         # print(f"attempting {float(mjd):.2f} with {len(indxs)} fields")
         for indx in indxs:
@@ -1199,11 +1203,19 @@ class Scheduler(Master):
                 observable[indx] = False
                 continue
 
-            epoch_idx = np.where(np.array(expCount) > len(mjd_past))[0][0]
+            epoch_idx = np.where(np.array(expCount) > len(mjd_past))[0]
+            if len(epoch_idx) == 0:
+                epoch_idx = cadence.nepochs
+            else:
+                epoch_idx = epoch_idx[0]
 
             if epoch_idx >= cadence.nepochs and self.fields.flag[indx] != 1:
                 observable[indx] = False
                 continue
+
+            assert np.sum(cadence.nexp) > len(mjd_past),\
+                f"observing outside allocation {self.fields.field_id[indx]} " + \
+                f"{cadence.name}, planned: {np.sum(cadence.nexp)}, done: {len(mjd_past)}"
 
             if epoch_idx > 0:
                 exp_epoch = len(mjd_past) - expCount[epoch_idx - 1]
@@ -1552,6 +1564,7 @@ class Scheduler(Master):
             design_id = self.fields.designs[fieldidx][design_indx]
         except Exception as E:
             print(E)
+            print("failed update", self.fields.field_id[fieldidx])
             design_id = 0
 
         (alt, az) = self.radec2altaz(mjd=result['mjd'],
