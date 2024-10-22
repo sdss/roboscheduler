@@ -1236,6 +1236,9 @@ class Scheduler(Master):
                     # not enough time for one-night epoch
                     observable[indx] = False
                     continue
+                elif nexp[indx] > 4 and nexp_change < 3:
+                    observable[indx] = False
+                    continue
 
             if nexp[indx] > 4 or airmass[indx] > 1.3:
                 field_time = nexp[indx] * self.exp_time
