@@ -730,7 +730,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                     ('DELTA_MIN', np.float32, max_nexp),
                     ('NEXP', np.int32, max_nexp),
                     ('MAX_LENGTH', np.float32, max_nexp),
-                    ('OBSMODE_PK', np.dtype("|S15"), max_nexp),
+                    ('OBSMODE_PK', np.dtype("|S45"), max_nexp),
                     ('MIN_MOON_SEP', np.float32, max_nexp),
                     ('MIN_DELTAV_KS91', np.float32, max_nexp),
                     ('MIN_TWILIGHT_ANG', np.float32, max_nexp),
