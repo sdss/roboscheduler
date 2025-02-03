@@ -176,7 +176,7 @@ class Fields(object, metaclass=FieldsSingleton):
                         ('flag', np.int32),
                         ('slots_exposures', np.int32, (24, 2)),
                         ('original_exposures_done', np.int32, (len_exposures)),
-                        ('cadence', np.dtype('a25'))]
+                        ('cadence', np.dtype('a40'))]
 
         self.fields_fits = np.zeros(len(fits_dat["fieldid"]), dtype=fields_model)
 
