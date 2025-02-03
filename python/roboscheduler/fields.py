@@ -345,7 +345,7 @@ class Fields(object, metaclass=FieldsSingleton):
                         ('base_priority', np.int32),
                         ('slots_exposures', np.int32, (24, 2)),
                         ('original_exposures_done', np.int32, (1)),
-                        ('cadence', np.dtype('a25'))]
+                        ('cadence', np.dtype('a40'))]
 
         versionDB = targetdb.Version()
         ver = versionDB.get(plan=version)
