@@ -463,13 +463,15 @@ class Fields(object, metaclass=FieldsSingleton):
                    ('fieldid', np.int32),
                    ('racen', np.float64),
                    ('deccen', np.float64),
-                   ('cadence', np.dtype('a25')),
+                   ('cadence', np.dtype('a40')),
                    ('nobservations', np.int32),
+                   ('nfilled', np.int32),
                    ('observations', np.int32, maxn)]
         fields = np.zeros(self.nfields, dtype=fields0)
         fields['pk'] = self.pk
         fields['fieldid'] = self.field_id
         fields['racen'] = self.racen
+        fields['nfilled'] = self.nfilled
         fields['deccen'] = self.deccen
         for indx in np.arange(self.nfields):
             fields['cadence'][indx] = self.cadence[indx]
