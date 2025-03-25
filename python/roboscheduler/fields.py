@@ -290,7 +290,8 @@ class Fields(object, metaclass=FieldsSingleton):
         cadence = self.cadencelist.cadences[self.cadence[fieldidx]]
         tol = cadence.max_length[int(self.epoch_idx[fieldidx])]
         obs_epochs, begin_last_epoch = epochs_completed(self.hist[pk],
-                                                        tolerance=tol)
+                                                        tolerance=tol,
+                                                        nexp=cadence.nexp[0])
         self.epoch_idx[fieldidx] = int(obs_epochs)
         if obs_epochs >= cadence.nepochs:
             self.notDone[fieldidx] = False
@@ -540,13 +541,13 @@ def lstDiff(a, b):
     return np.array([lstDiffSingle(i, j) for i, j in zip(a, b)])
 
 
-def epochs_completed(mjd_past, tolerance=0.5):
+def epochs_completed(mjd_past, tolerance=0.5, nexp=1):
     """Calculate # of observed epochs, allowing
     for more exposures than planned.
 
     tolerance HAS CHANGED TO DAYS
     """
-    if len(mjd_past) == 0:
+    if len(mjd_past) < nexp:
         return 0, 0
 
     epoch_idx = 0
