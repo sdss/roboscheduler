@@ -73,7 +73,7 @@ class Observations(object):
         self.field_pk = np.zeros(0, dtype=np.int32)
         self.racen = np.zeros(0, dtype=np.float64)
         self.deccen = np.zeros(0, dtype=np.float64)
-        self.cadence = np.zeros(0, dtype=np.dtype('a20'))
+        self.cadence = np.zeros(0, dtype=np.dtype('a40'))
         self.nfilled = np.zeros(0, dtype=np.int32)
         self.mjd = np.zeros(0, dtype=np.float64)
         self.duration = np.zeros(0, dtype=np.float64)
@@ -162,7 +162,7 @@ class Observations(object):
                 ('lst', np.float32),
                 ('racen', np.float64),
                 ('deccen', np.float64),
-                ('cadence', np.dtype('a20')),
+                ('cadence', np.dtype('a40')),
                 ('nfilled', np.int32),
                 ('ha', np.float32),
                 ('nexp_cumul', np.int32),

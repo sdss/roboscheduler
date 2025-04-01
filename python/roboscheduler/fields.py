@@ -1,4 +1,5 @@
 import os
+
 import numpy as np
 import fitsio
 import roboscheduler.cadence
@@ -99,10 +100,10 @@ class Fields(object, metaclass=FieldsSingleton):
         self._designs = None
         return
 
-    def setPriorities(self):
-        scale = [10 if "bhm_rm" in c else 1 for c in self.cadence]
-        self.basePriority = self.basePriority * np.array(scale)
-        return
+    # def setPriorities(self):
+    #     scale = [10 if "bhm_rm" in c else 1 for c in self.cadence]
+    #     self.basePriority = self.basePriority * np.array(scale)
+    #     return
 
     def fromarray(self, fields_array=None, designList=None):
         self.nfields = len(fields_array)
@@ -128,7 +129,7 @@ class Fields(object, metaclass=FieldsSingleton):
             self.flag = fields_array["flag"]
         else:
             self.flag = np.zeros(self.nfields)
-        self.setPriorities()
+        # self.setPriorities()
         if designList:
             assert len(designList) == len(self.pk), "designList must match fields"
             self._designs = designList
@@ -150,7 +151,7 @@ class Fields(object, metaclass=FieldsSingleton):
             self.createDummyDesigns()
         return self._designs
 
-    def fromfits(self, filename=None):
+    def fromfits(self, filename=None, priority_fields={}):
         """Load a fits file into this Fields object,
            likely an RS-Allocation file.
 
@@ -176,7 +177,8 @@ class Fields(object, metaclass=FieldsSingleton):
                         ('flag', np.int32),
                         ('slots_exposures', np.int32, (24, 2)),
                         ('original_exposures_done', np.int32, (len_exposures)),
-                        ('cadence', np.dtype('a40'))]
+                        ('cadence', np.dtype('a40')),
+                        ('base_priority', np.int32)]
 
         self.fields_fits = np.zeros(len(fits_dat["fieldid"]), dtype=fields_model)
 
@@ -197,6 +199,17 @@ class Fields(object, metaclass=FieldsSingleton):
         self.fields_fits["cadence"] = fits_dat["cadence"]
         if len_exposures > 1:
             self.fields_fits["original_exposures_done"] = fits_dat["original_exposures_done"]
+
+        self.fields_fits["base_priority"] = np.ones(len(fits_dat["fieldid"]))
+
+        for i, f in enumerate(self.fields_fits):
+            if f["field_id"] in priority_fields:
+                if str(f["cadence"].decode()) == str(priority_fields[f["field_id"]]["cadence"]):
+                    self.fields_fits["base_priority"][i] += priority_fields[f["field_id"]]["priority"]
+
+        w_cvz = np.where(["100x8" in c for c in fits_dat["cadence"]])
+
+        self.fields_fits["flag"][w_cvz] = -1
 
         self.fromarray(self.fields_fits)
         self.createDummyDesigns()
@@ -467,13 +480,15 @@ class Fields(object, metaclass=FieldsSingleton):
                    ('cadence', np.dtype('a40')),
                    ('nobservations', np.int32),
                    ('nfilled', np.int32),
-                   ('observations', np.int32, maxn)]
+                   ('observations', np.int32, maxn),
+                   ('base_priority', np.int32)]
         fields = np.zeros(self.nfields, dtype=fields0)
         fields['pk'] = self.pk
         fields['fieldid'] = self.field_id
         fields['racen'] = self.racen
         fields['nfilled'] = self.nfilled
         fields['deccen'] = self.deccen
+        fields['base_priority'] = self.basePriority
         for indx in np.arange(self.nfields):
             fields['cadence'][indx] = self.cadence[indx]
             fields['nobservations'][indx] = len(self.observations[indx])

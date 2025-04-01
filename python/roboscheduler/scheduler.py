@@ -91,7 +91,7 @@ class priorityLogger(object):
                       ('field_id', np.int32),
                       ('ra', np.float64),
                       ('dec', np.float64),
-                      ('cadence', np.dtype('a20')),
+                      ('cadence', np.dtype('a40')),
                       ('cadencePriority', np.float32),
                       ('priority', np.float32)]
 
@@ -1054,9 +1054,17 @@ class Scheduler(Master):
             cadence_file += designbase + "-"\
                            + self.observatory + ".fits"
 
+            out_path = os.getenv('RS_OUTDIR')
+            priority_file = os.path.join(out_path, "priority_fields.yml")
+            if os.path.isfile(priority_file):
+                print(f"found priority fields file, applying: \n {priority_file}")
+                priority_fields = yaml.load(open(priority_file), Loader=yaml.FullLoader)
+            else:
+                priority_fields = dict()
+
             self.fields.cadencelist.fromfits(filename=cadence_file,
-                                           priorities=self.priorities)
-            self.fields.fromfits(filename=fields_file)
+                                             priorities=self.priorities)
+            self.fields.fromfits(filename=fields_file, priority_fields=priority_fields)
         else:
             # self.cadencelist.fromdb(version="v1")
             # feilds.fromdb calls cadencelist from db
@@ -1253,7 +1261,7 @@ class Scheduler(Master):
                     airmass[indx] = endam
 
             verbose = False
-            # if cadence.nexp[epoch_idx] == 2:
+            # if self.fields.field_id[indx] in [104667, 104668]:
             #     print(int(self.fields.pk[indx]), observable[indx], f"{airmass[indx]:3.1f}", alt, cadence.nexp[epoch_idx], cadence.label_root)
             #     verbose = True
 
@@ -1281,7 +1289,7 @@ class Scheduler(Master):
 
             # prioritize nepochs. Huge bump for 8 + epochs
             # slight decrement for single epochs
-            delta_priority[indx] += (cadence.nepochs - 2)*self.nepochsPri
+            delta_priority[indx] += np.clip((cadence.nepochs - 2)*self.nepochsPri, a_min=-10, a_max=None)
             if nexp[indx] > maxExp and observable[indx]:
                 if cadence.max_length[epoch_idx] < 1\
                    or skybrightness_2days > 0.35:

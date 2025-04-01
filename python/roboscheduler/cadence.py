@@ -17,6 +17,15 @@ def basename(cadence):
     return("_".join(cadence.split('-')[0].split('_')[0:-1]))
 
 
+def deltaPriority(delta_curr, dnom):
+    if delta_curr > dnom:
+        return 10
+    else:
+        return np.clip(-5/np.sqrt(delta_curr / dnom) +
+                       10/np.sqrt(np.abs(dnom - delta_curr)),
+                       a_min=None, a_max=10)
+
+
 # Class to define a singleton
 class CadenceListSingleton(type):
     _instances = {}
@@ -288,14 +297,14 @@ class Cadence(cCadenceCore.CadenceCore):
         # 1/sqrt(x) priority; at 1 day +100, at 10 days +30, at 30 days +18
         remain_priority = self.deltaMaxPriBump * np.clip(10/np.sqrt(np.abs(dhi - delta_curr)),
                                                          a_min=None, a_max=10)
-        nom_priority = self.deltaNomBump * np.clip(10/np.sqrt(np.abs(dnom - delta_curr)),
-                                                   a_min=None, a_max=10)
+        nom_priority = self.deltaNomBump* deltaPriority(delta_curr, dnom)
         priority = base_priority + remain_priority + nom_priority
         if delta_curr >= dhi:
             priority += self.overDeltaMaxBump
         # if ignoreMax:
         #     return(ok_skybrightness & (delta_curr >= dlo), priority)
         if verbose:
+            print(epoch_idx, self.delta_min)
             print(self.name, ok_skybrightness, delta_curr, dlo, priority)
         return(ok_skybrightness & (delta_curr >= dlo), priority)
 
