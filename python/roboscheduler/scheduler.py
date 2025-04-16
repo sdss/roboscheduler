@@ -1183,8 +1183,12 @@ class Scheduler(Master):
 
         # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
 
+        # ac = alt > 30.
         indxs = np.where(observable)[0]
         # print(f"attempting {float(mjd):.2f} with {len(indxs)} fields")
+        # print(len(np.where(ac & self.fields.validCadence)[0]))
+        # print(len(np.where(ac & self.fields.notDone)[0]))
+        # print(len(np.where(ac & self.fields.notDone & self.fields.validCadence)[0]))
         for indx in indxs:
             # if(observable[indx]):
             if int(self.fields.pk[indx]) in ignore:

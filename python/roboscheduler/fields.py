@@ -100,11 +100,6 @@ class Fields(object, metaclass=FieldsSingleton):
         self._designs = None
         return
 
-    # def setPriorities(self):
-    #     scale = [10 if "bhm_rm" in c else 1 for c in self.cadence]
-    #     self.basePriority = self.basePriority * np.array(scale)
-    #     return
-
     def fromarray(self, fields_array=None, designList=None):
         self.nfields = len(fields_array)
         self.racen = fields_array['racen']
@@ -114,7 +109,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.pk = fields_array['pk']
         self.cadence = [c.strip().decode() for c in fields_array['cadence']]
         self.slots = fields_array['slots_exposures']
-        self.lstObserved = np.zeros((len(self.slots), 24, 2), dtype=np.int32)
+        self.lstObserved = fields_array["lstObserved"]
         self.observations = [np.zeros(0, dtype=np.int32)] * self.nfields
         self.icadence = np.zeros(self.nfields, dtype=np.int32)
         # self.nextmjd = np.zeros(self.nfields, dtype=np.float64)
@@ -176,6 +171,7 @@ class Fields(object, metaclass=FieldsSingleton):
                         ('nfilled', np.int32),
                         ('flag', np.int32),
                         ('slots_exposures', np.int32, (24, 2)),
+                        ('lstObserved', np.int32, (24, 2)),
                         ('original_exposures_done', np.int32, (len_exposures)),
                         ('cadence', np.dtype('a40')),
                         ('base_priority', np.int32)]
@@ -269,27 +265,6 @@ class Fields(object, metaclass=FieldsSingleton):
                 for d in dbfields:
                     self._hist[d["pk"]].append(d["mjd"])
 
-            for i in range(len(self.pk)):
-                pk = self.pk[i]
-                self._hist[pk].sort()
-                self.checkCompletion(i)
-
-                if self.scheduler is not None:
-                    skybrightness = [float(self.scheduler.skybrightness(m)) for m in self._hist[pk]]
-                    dark = np.array(skybrightness) <= 0.35
-                    lst = np.round(self.scheduler.lst(self._hist[pk])/15, 0).astype(int)
-                    if 24 in lst:
-                        lst = [i if i != 24 else 0 for i in lst]
-                        lst = np.array(lst)
-                    dark_lsts = lst[np.where(dark)]
-                    unique, counts = np.unique(dark_lsts, return_counts=True)
-                    for l, c in zip(unique, counts):
-                        self.lstObserved[i][l, 0] += c
-                    bright_lsts = lst[np.where(~dark)]
-                    unique, counts = np.unique(bright_lsts, return_counts=True)
-                    for l, c in zip(unique, counts):
-                        self.lstObserved[i][l, 1] += c
-
         return self._hist
 
     def checkCompletion(self, fieldidx):
@@ -358,6 +333,7 @@ class Fields(object, metaclass=FieldsSingleton):
                         ('flag', np.int32),
                         ('base_priority', np.int32),
                         ('slots_exposures', np.int32, (24, 2)),
+                        ('lstObserved', np.int32, (24, 2)),
                         ('original_exposures_done', np.int32, (1)),
                         ('cadence', np.dtype('a40'))]
 
@@ -373,7 +349,7 @@ class Fields(object, metaclass=FieldsSingleton):
 
         field_pri_ver = os.getenv('FIELD_PRI_VER')
         if field_pri_ver is None:
-            field_pri_ver = "bulge"
+            field_pri_ver = ver
 
         pri_ver = opsdb.PriorityVersion.get(label=field_pri_ver)
 
@@ -381,11 +357,20 @@ class Fields(object, metaclass=FieldsSingleton):
         prioritizedFields = bp.select().where(bp.version==pri_ver).dicts()
         priorityDict = {p["field"]: p["priority"] for p in prioritizedFields}
 
+        lstHist = opsdb.LstHist
+
+        lstDone = lstHist.select(lstHist.field, lstHist.lst_counts)\
+                         .join(Field)\
+                         .where(Field.version == ver).dicts()
+
+        lstDict = {l["field"]: l["lst_counts"] for l in lstDone}
+
         pk = list()
         field_id = list()
         racen = list()
         deccen = list()
         slots_exposures = list()
+        lstObserved = list()
         cadence = list()
         flags = list()
         base_priority = list()
@@ -396,6 +381,7 @@ class Fields(object, metaclass=FieldsSingleton):
             racen.append(field.racen)
             deccen.append(field.deccen)
             slots_exposures.append(field.slots_exposures)
+            lstObserved.append(lstDict[field.pk])
             cadence.append(field.cadence.label)
             if len(field.priority) > 0:
                 if field.priority[0].label == "top":
@@ -418,6 +404,7 @@ class Fields(object, metaclass=FieldsSingleton):
         fields["flag"] = flags
         fields["base_priority"] = base_priority
         fields["slots_exposures"] = slots_exposures
+        fields["lstObserved"] = lstObserved
         fields["cadence"] = cadence
 
         # we're resetting field hist, so need to re-cache
