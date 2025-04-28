@@ -189,7 +189,7 @@ class Fields(object, metaclass=FieldsSingleton):
         else:
             print("WARN: strange rsAllocation format, estimating nfilled")
             self.fields_fits["nfilled"] =\
-                  np.round(np.sum(np.sum(lco["slots_exposures"], axis=1),
+                  np.round(np.sum(np.sum(fits_dat["slots_exposures"], axis=1),
                          axis=1)).astype(int)
         self.fields_fits["slots_exposures"] = fits_dat["slots_exposures"]
         self.fields_fits["cadence"] = fits_dat["cadence"]
