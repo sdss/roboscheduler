@@ -854,6 +854,7 @@ class Master(Observer):
             self.winter_bright_twilight = np.float32(self.schedule['winter_bright_twilight'])
         else:
             self.winter_bright_twilight = self.bright_twilight
+        self.observatory = observatory.lower()
         return
 
     def _dateandtime2mjd(self):
@@ -1123,10 +1124,14 @@ class Scheduler(Master):
 
         (alt, az) = self.radec2altaz(mjd=mjd, ra=self.fields.racen,
                                      dec=self.fields.deccen)
+        if self.observatory == "apo":
+            enc = [a > 45 or z > 80 or z < 40 for a, z in zip(alt, az)]
+        else:
+            enc = [True for a in alt]
         skybrightness = self.skybrightness(mjd)
         # valid cadence checks against "none" cadence issue
         observable = (alt > 30.) & self.fields.validCadence\
-                   & self.fields.notDone # & (lstDiffs < 1.5)
+                   & self.fields.notDone & enc
         nexp = np.ones(len(observable), dtype=int)
         exp_epochs = np.zeros(len(observable), dtype=np.int32)
         epoch_idxs = np.zeros(len(observable), dtype=np.int32)
@@ -1186,9 +1191,9 @@ class Scheduler(Master):
         # ac = alt > 30.
         indxs = np.where(observable)[0]
         # print(f"attempting {float(mjd):.2f} with {len(indxs)} fields")
-        # print(len(np.where(ac & self.fields.validCadence)[0]))
-        # print(len(np.where(ac & self.fields.notDone)[0]))
-        # print(len(np.where(ac & self.fields.notDone & self.fields.validCadence)[0]))
+        # print(len(np.where(enc & self.fields.validCadence)[0]))
+        # print(len(np.where(enc & self.fields.notDone)[0]))
+        # print(len(np.where(enc & self.fields.notDone & self.fields.validCadence)[0]))
         for indx in indxs:
             # if(observable[indx]):
             if int(self.fields.pk[indx]) in ignore:
@@ -1265,9 +1270,9 @@ class Scheduler(Master):
                     airmass[indx] = endam
 
             verbose = False
-            # if self.fields.field_id[indx] in [104667, 104668]:
-            #     print(int(self.fields.pk[indx]), observable[indx], f"{airmass[indx]:3.1f}", alt, cadence.nexp[epoch_idx], cadence.label_root)
-            #     verbose = True
+            if self.fields.field_id[indx] in [101364]:
+                # print(int(self.fields.pk[indx]), observable[indx], enc[indx], f"{airmass[indx]:3.1f}", alt, cadence.nexp[epoch_idx], cadence.label_root)
+                # verbose = True
 
             observable[indx], delta_priority[indx] =\
                 cadence.evaluate_next(epoch_idx=epoch_idx,
