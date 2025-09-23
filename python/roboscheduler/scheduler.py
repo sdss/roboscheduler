@@ -1270,6 +1270,10 @@ class Scheduler(Master):
                     airmass[indx] = endam
 
             verbose = False
+            # if indx in whereRM:
+            #     # verbose = True
+            #     print(mjd_prev, mjd)
+            #     print(mjd_past[-1], len(mjd_past), last_idx)
             # if self.fields.field_id[indx] in [101364]:
                 # print(int(self.fields.pk[indx]), observable[indx], enc[indx], f"{airmass[indx]:3.1f}", alt, cadence.nexp[epoch_idx], cadence.label_root)
                 # verbose = True

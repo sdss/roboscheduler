@@ -260,7 +260,8 @@ class Fields(object, metaclass=FieldsSingleton):
                                 .join(d2s, on=(Design.design_id == d2s.design_id))\
                                 .where((Field.version == ver) &
                                        (Field.observatory == obs),
-                                       (d2s.status == done)).dicts()
+                                       (d2s.status == done))\
+                                .order_by(d2s.mjd.asc()).dicts()
 
                 for d in dbfields:
                     self._hist[d["pk"]].append(d["mjd"])

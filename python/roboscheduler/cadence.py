@@ -304,7 +304,7 @@ class Cadence(cCadenceCore.CadenceCore):
         # if ignoreMax:
         #     return(ok_skybrightness & (delta_curr >= dlo), priority)
         if verbose:
-            print(epoch_idx, self.delta_min)
+            print(epoch_idx, self.delta_min[epoch_idx])
             print(self.name, ok_skybrightness, delta_curr, dlo, priority)
         return(ok_skybrightness & (delta_curr >= dlo), priority)
 
