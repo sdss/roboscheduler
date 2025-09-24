@@ -59,6 +59,84 @@ def nExpPrioritize(nexp, base=20, award=2e6, penalty=-100):
     else:
         return nexp * base
 
+class IdleLogger(object):
+    """Object to track idle time and write log
+    """
+
+    def __init__(self, path=None):
+        if path is None:
+            path = os.getenv('RS_OUTDIR')
+            if path is None:
+                print("WARN: incorrect output specified \n",
+                      "WARN: creating idle log in current directory")
+                path = ""
+        self.outDir = path
+
+        self.mjd = list()
+        self.field_pk = list()
+        self.field_id = list()
+        self.ra = list()
+        self.dec = list()
+        self.airmass = list()
+        self.deltaV = list()
+        self.moon_dist = list()
+        self.deltaT = list()
+        self.skybrightness = list()
+        self.cadence = list()
+
+        self.model = [('mjd', np.float32),
+                      ('field_pk', np.int32),
+                      ('field_id', np.int32),
+                      ('cadence', np.dtype('a40')),
+                      ('ra', np.float64),
+                      ('dec', np.float64),
+                      ('airmass', np.float32),
+                      ('deltaV', np.float32),
+                      ('moon_dist', np.float32),
+                      ('skybrightness', np.float32),
+                      ('deltaT', np.float32)]
+
+    def add(self, mjd=None, field_pk=None, field_id=None, airmass=None,
+            deltaV=None, moon_dist=None, deltaT=None, ra=None, dec=None,
+            skybrightness=None, cadence=None):
+        print("logging idle at ", mjd, field_pk, field_id)
+        self.mjd.append(mjd)
+        self.field_pk.append(field_pk)
+        self.field_id.append(field_id)
+        self.ra.append(ra)
+        self.dec.append(dec)
+        self.airmass.append(airmass)
+        self.deltaV.append(deltaV)
+        self.moon_dist.append(moon_dist)
+        self.deltaT.append(deltaT)
+        self.skybrightness.append(skybrightness)
+        self.cadence.append(cadence)
+
+    def write(self, name=None):
+        if len(self.field_pk) == 0:
+            print("WARN: no idle data to log")
+            return
+        output = np.zeros(len(self.field_pk), dtype=self.model)
+
+        if name is None:
+            name = "forgot-to-name"
+
+        outfile = self.outDir + f"/idle-{name}.fits"
+
+        output["mjd"] = np.array(self.mjd)
+        output["field_pk"] = np.array(self.field_pk)
+        output["field_id"] = np.array(self.field_id)
+        output["ra"] = np.array(self.ra)
+        output["dec"] = np.array(self.dec)
+        output["airmass"] = np.array(self.airmass)
+        output["deltaV"] = np.array(self.deltaV)
+        output["moon_dist"] = np.array(self.moon_dist)
+        output["deltaT"] = np.array(self.deltaT)
+        output["skybrightness"] = np.array(self.skybrightness)
+        output["cadence"] = np.array(self.cadence)
+
+        fitsio.write(outfile, output, clobber=True)
+
 
 class priorityLogger(object):
     """Object to track priorities and write logs
@@ -1007,6 +1085,8 @@ class Scheduler(Master):
 
         if observatory.lower() == "apo":
             self.invertOverheadCadences = []
+        
+        self.idleLog = IdleLogger()
 
         return
 
@@ -1056,7 +1136,7 @@ class Scheduler(Master):
                            + self.observatory + ".fits"
 
             out_path = os.getenv('RS_OUTDIR')
-            priority_file = os.path.join(out_path, "priority_fields.yml")
+            priority_file = os.path.join(out_path, f"priority_fields_{self.observatory.lower()}.yml")
             if os.path.isfile(priority_file):
                 print(f"found priority fields file, applying: \n {priority_file}")
                 priority_fields = yaml.load(open(priority_file), Loader=yaml.FullLoader)
@@ -1086,7 +1166,8 @@ class Scheduler(Master):
         return
 
     def observable(self, mjd=None,  maxExp=None, check_skybrightness=True,
-                   check_cadence=True, ignore=[], schedule_bright=False):
+                   check_cadence=True, ignore=[], schedule_bright=False,
+                   verbose=False, idle=False):
         """Return array of fields observable
 
         Parameters:
@@ -1188,7 +1269,7 @@ class Scheduler(Master):
 
         # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
 
-        # ac = alt > 30.
+        ac = alt > 30.
         indxs = np.where(observable)[0]
         # print(f"attempting {float(mjd):.2f} with {len(indxs)} fields")
         # print(len(np.where(enc & self.fields.validCadence)[0]))
@@ -1269,7 +1350,6 @@ class Scheduler(Master):
                 if endam > airmass[indx]:
                     airmass[indx] = endam
 
-            verbose = False
             # if indx in whereRM:
             #     # verbose = True
             #     print(mjd_prev, mjd)
@@ -1277,6 +1357,22 @@ class Scheduler(Master):
             # if self.fields.field_id[indx] in [101364]:
                 # print(int(self.fields.pk[indx]), observable[indx], enc[indx], f"{airmass[indx]:3.1f}", alt, cadence.nexp[epoch_idx], cadence.label_root)
                 # verbose = True
+            verbose_sub = verbose
+            # if np.abs(mjd - 60889.42848) < 0.02:
+            #     print("diff \n", np.abs(mjd - 60889.42848))
+            #     verbose_sub = True
+            # if self.fields.field_id[indx] in [104667, 104668]:
+            #     print(int(self.fields.pk[indx]), observable[indx], f"{airmass[indx]:3.1f}", alt, cadence.nexp[epoch_idx], cadence.label_root)
+            #     verbose_sub = True
+
+            if idle:
+                print("logging idle", mjd)
+                self.idleLog.add(self, mjd=mjd, field_pk=self.fields.pk[indx], 
+                                 field_id=self.fields.field_id[indx],
+                                 airmass=airmass[indx], deltaV=deltav[indx], 
+                                 moon_dist=moon_dist[indx], deltaT=mjd-mjd_prev,
+                                 ra=self.fields.racen[indx], dec=self.fields.deccen[indx],
+                                 skybrightness=skybrightness, cadence=cadence.name)
 
             observable[indx], delta_priority[indx] =\
                 cadence.evaluate_next(epoch_idx=epoch_idx,
@@ -1287,7 +1383,7 @@ class Scheduler(Master):
                                       moon_dist=moon_dist[indx],
                                       deltaV=deltav[indx],
                                       airmass=airmass[indx],
-                                      verbose=verbose,
+                                      verbose=verbose_sub,
                                       schedule_bright=schedule_bright)
 
             percent_done = len(mjd_past) / expCount[-1]
@@ -1476,7 +1572,7 @@ class Scheduler(Master):
         return designs
 
     def nextfield(self, mjd=None, maxExp=None, returnAll=False, live=False,
-                  ignore=[], schedule_bright=False):
+                  ignore=[], schedule_bright=False, verbose=False):
         """Picks the next field to observe
 
         Parameters:
@@ -1516,7 +1612,7 @@ class Scheduler(Master):
 
         iobservable, nexp, delta_priority, exp_epoch, epoch_idx\
             = self.observable(mjd=mjd, maxExp=maxExp, ignore=ignore,
-                              schedule_bright=schedule_bright)
+                              schedule_bright=schedule_bright, verbose=verbose)
         if len(iobservable) == 0:
             if returnAll:
                 return None, -1

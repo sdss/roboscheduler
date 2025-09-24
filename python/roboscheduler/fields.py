@@ -80,6 +80,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.racen = np.zeros(0, dtype=np.float64)
         self.deccen = np.zeros(0, dtype=np.float64)
         self.nfilled = np.zeros(0, dtype=np.float64)
+        self.overplan = np.zeros(0, dtype=np.float64)
         self.pk = np.zeros(0, dtype=np.int32)
         # self.nextmjd = np.zeros(0, dtype=np.float64)
         self.epoch_idx = np.zeros(0, dtype=np.int32)
@@ -106,6 +107,8 @@ class Fields(object, metaclass=FieldsSingleton):
         self.deccen = fields_array['deccen']
         self.nfilled = fields_array['nfilled']
         self.field_id = fields_array['field_id']
+        if "overplan" in fields_array.dtype.names:
+            self.overplan = fields_array['overplan']
         self.pk = fields_array['pk']
         self.cadence = [c.strip().decode() for c in fields_array['cadence']]
         self.slots = fields_array['slots_exposures']
@@ -174,7 +177,8 @@ class Fields(object, metaclass=FieldsSingleton):
                         ('lstObserved', np.int32, (24, 2)),
                         ('original_exposures_done', np.int32, (len_exposures)),
                         ('cadence', np.dtype('a40')),
-                        ('base_priority', np.int32)]
+                        ('base_priority', np.int32),
+                        ('overplan', np.int32)]
 
         self.fields_fits = np.zeros(len(fits_dat["fieldid"]), dtype=fields_model)
 
@@ -193,15 +197,22 @@ class Fields(object, metaclass=FieldsSingleton):
                          axis=1)).astype(int)
         self.fields_fits["slots_exposures"] = fits_dat["slots_exposures"]
         self.fields_fits["cadence"] = fits_dat["cadence"]
+        self.fields_fits["overplan"] = fits_dat["overplan"]
         if len_exposures > 1:
             self.fields_fits["original_exposures_done"] = fits_dat["original_exposures_done"]
 
         self.fields_fits["base_priority"] = np.ones(len(fits_dat["fieldid"]))
 
         for i, f in enumerate(self.fields_fits):
-            if f["field_id"] in priority_fields:
-                if str(f["cadence"].decode()) == str(priority_fields[f["field_id"]]["cadence"]):
-                    self.fields_fits["base_priority"][i] += priority_fields[f["field_id"]]["priority"]
+            if f["overplan"]:
+                self.fields_fits["base_priority"][i] = -1
+
+        # for i, f in enumerate(self.fields_fits):
+        #     if i in priority_fields:
+        #         if str(f["cadence"].decode()) == str(priority_fields[i]["cadence"]):
+        #             self.fields_fits["base_priority"][i] += priority_fields[i]["priority"]
+        #         else:
+        #             print(i, f"WARNING: field {f['field_id']} cadence {f['cadence']} doesn't match priority cadence {priority_fields[i]['cadence']}")
 
         w_cvz = np.where(["100x8" in c for c in fits_dat["cadence"]])
 
@@ -468,6 +479,7 @@ class Fields(object, metaclass=FieldsSingleton):
                    ('cadence', np.dtype('a40')),
                    ('nobservations', np.int32),
                    ('nfilled', np.int32),
+                   ('overplan', np.int32),
                    ('observations', np.int32, maxn),
                    ('base_priority', np.int32)]
         fields = np.zeros(self.nfields, dtype=fields0)
@@ -475,6 +487,7 @@ class Fields(object, metaclass=FieldsSingleton):
         fields['fieldid'] = self.field_id
         fields['racen'] = self.racen
         fields['nfilled'] = self.nfilled
+        fields['overplan'] = self.overplan
         fields['deccen'] = self.deccen
         fields['base_priority'] = self.basePriority
         for indx in np.arange(self.nfields):
