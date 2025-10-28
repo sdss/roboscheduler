@@ -99,8 +99,8 @@ class IdleLogger(object):
     def add(self, mjd=None, field_pk=None, field_id=None, airmass=None,
             deltaV=None, moon_dist=None, deltaT=None, ra=None, dec=None,
             skybrightness=None, cadence=None):
-        print("logging idle at ", mjd, field_pk, field_id)
-        self.mjd.append(mjd)
+        # print("logging idle at ", mjd, field_pk, field_id)
+        self.mjd.append(int(mjd))
         self.field_pk.append(field_pk)
         self.field_id.append(field_id)
         self.ra.append(ra)
@@ -175,7 +175,7 @@ class priorityLogger(object):
 
     def add(self, mjd=None, field_pk=None, field_id=None, cadence=None,
             cadencePriority=None, priority=None, ra=None, dec=None):
-        self.mjd.append(mjd)
+        self.mjd.append(float(mjd))
         self.field_pk.append(field_pk)
         self.field_id.append(field_id)
         self.ra.append(ra)
@@ -1091,7 +1091,8 @@ class Scheduler(Master):
         return
 
     def initdb(self, designbase='plan-0', fromFits=True,
-               fieldsArray=None, realDesigns=None, rsFinal=True):
+               fieldsArray=None, realDesigns=None, rsFinal=True,
+               alternate_input=False):
         """Initialize Scheduler fields and observation lists.
         Required before fields can be scheduled.
 
@@ -1121,6 +1122,9 @@ class Scheduler(Master):
         if fromFits:
             filebase = os.path.join(os.getenv('OBSERVING_PLAN_DIR'),
                                     designbase)
+            if alternate_input:
+                altBase = "/uufs/chpc.utah.edu/common/home/u6002067/sas_observesim/alternateInputs"
+                filebase = os.path.join(altBase, designbase)
             # base = os.getenv('OBSERVING_PLAN_DIR')
             cadence_file = filebase + "/" 
             fields_file = filebase + "/"
@@ -1136,7 +1140,7 @@ class Scheduler(Master):
                            + self.observatory + ".fits"
 
             out_path = os.getenv('RS_OUTDIR')
-            priority_file = os.path.join(out_path, f"priority_fields_{self.observatory.lower()}.yml")
+            priority_file = os.path.join(out_path, "priority_fields.yml")
             if os.path.isfile(priority_file):
                 print(f"found priority fields file, applying: \n {priority_file}")
                 priority_fields = yaml.load(open(priority_file), Loader=yaml.FullLoader)
@@ -1242,6 +1246,12 @@ class Scheduler(Master):
             if f_id not in rm_cadence:
                 continue
             self.fields.cadence[w] = rm_cadence[f_id]
+            # for sims, allows me to toggle flag on/off
+            # if rm_cadence[f_id] == "none":
+            #     self.fields.flag[w] = -1
+            # elif self.fields.flag[w] == -1:
+            #     print("re-enabling field", f_id)
+            #     self.fields.flag[w] = 0
 
         next_change, next_brightness = self.next_change(mjd)
 
@@ -1366,11 +1376,12 @@ class Scheduler(Master):
             #     verbose_sub = True
 
             if idle:
-                print("logging idle", mjd)
-                self.idleLog.add(self, mjd=mjd, field_pk=self.fields.pk[indx], 
+                # print("logging idle", mjd)
+                delta = mjd - mjd_prev
+                self.idleLog.add(mjd=mjd, field_pk=self.fields.pk[indx], 
                                  field_id=self.fields.field_id[indx],
                                  airmass=airmass[indx], deltaV=deltav[indx], 
-                                 moon_dist=moon_dist[indx], deltaT=mjd-mjd_prev,
+                                 moon_dist=moon_dist[indx], deltaT=delta,
                                  ra=self.fields.racen[indx], dec=self.fields.deccen[indx],
                                  skybrightness=skybrightness, cadence=cadence.name)
 
@@ -1385,6 +1396,9 @@ class Scheduler(Master):
                                       airmass=airmass[indx],
                                       verbose=verbose_sub,
                                       schedule_bright=schedule_bright)
+
+            if self.fields.basePriority[indx] < 0:
+                delta_priority[indx] += cadence.brightDurDarkPenalty
 
             percent_done = len(mjd_past) / expCount[-1]
 

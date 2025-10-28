@@ -127,6 +127,10 @@ class Fields(object, metaclass=FieldsSingleton):
             self.flag = fields_array["flag"]
         else:
             self.flag = np.zeros(self.nfields)
+        if "nallocated" in fields_array.dtype.names:
+            self.nallocated = fields_array["nallocated"]
+        else:
+            self.nallocated = np.zeros(self.nfields)
         # self.setPriorities()
         if designList:
             assert len(designList) == len(self.pk), "designList must match fields"
@@ -178,7 +182,8 @@ class Fields(object, metaclass=FieldsSingleton):
                         ('original_exposures_done', np.int32, (len_exposures)),
                         ('cadence', np.dtype('a40')),
                         ('base_priority', np.int32),
-                        ('overplan', np.int32)]
+                        ('overplan', np.int32),
+                        ('nallocated', np.int32)]
 
         self.fields_fits = np.zeros(len(fits_dat["fieldid"]), dtype=fields_model)
 
@@ -186,6 +191,7 @@ class Fields(object, metaclass=FieldsSingleton):
         self.fields_fits["field_id"] = fits_dat["fieldid"]
         self.fields_fits["racen"] = fits_dat["racen"]
         self.fields_fits["deccen"] = fits_dat["deccen"]
+        self.fields_fits["nallocated"] = fits_dat["nallocated"]
         if "nfilled" in fits_dat.dtype.names:
             self.fields_fits["nfilled"] = fits_dat["nfilled"]
         elif "nallocated_full" in fits_dat.dtype.names:
@@ -197,7 +203,10 @@ class Fields(object, metaclass=FieldsSingleton):
                          axis=1)).astype(int)
         self.fields_fits["slots_exposures"] = fits_dat["slots_exposures"]
         self.fields_fits["cadence"] = fits_dat["cadence"]
-        self.fields_fits["overplan"] = fits_dat["overplan"]
+        if "overplan" in fits_dat.dtype.names:
+            self.fields_fits["overplan"] = fits_dat["overplan"]
+        else:
+            self.fields_fits["overplan"] = np.zeros(len(fits_dat["fieldid"]), dtype=np.int32)
         if len_exposures > 1:
             self.fields_fits["original_exposures_done"] = fits_dat["original_exposures_done"]
 
@@ -205,14 +214,15 @@ class Fields(object, metaclass=FieldsSingleton):
 
         for i, f in enumerate(self.fields_fits):
             if f["overplan"]:
-                self.fields_fits["base_priority"][i] = -1
+                self.fields_fits["base_priority"][i] = -10
+        for i, f in enumerate(fits_dat):
+            if f["nallocated"] == 0:
+                self.fields_fits["flag"][i] = -1
 
-        # for i, f in enumerate(self.fields_fits):
-        #     if i in priority_fields:
-        #         if str(f["cadence"].decode()) == str(priority_fields[i]["cadence"]):
-        #             self.fields_fits["base_priority"][i] += priority_fields[i]["priority"]
-        #         else:
-        #             print(i, f"WARNING: field {f['field_id']} cadence {f['cadence']} doesn't match priority cadence {priority_fields[i]['cadence']}")
+        for i, f in enumerate(self.fields_fits):
+            if f["field_id"] in priority_fields:
+                if str(f["cadence"].decode()) == str(priority_fields[f["field_id"]]["cadence"]):
+                    self.fields_fits["base_priority"][i] += priority_fields[f["field_id"]]["priority"]
 
         w_cvz = np.where(["100x8" in c for c in fits_dat["cadence"]])
 
@@ -481,7 +491,9 @@ class Fields(object, metaclass=FieldsSingleton):
                    ('nfilled', np.int32),
                    ('overplan', np.int32),
                    ('observations', np.int32, maxn),
-                   ('base_priority', np.int32)]
+                   ('base_priority', np.int32),
+                   ('flag', np.int32),
+                   ('nallocated', np.int32)]
         fields = np.zeros(self.nfields, dtype=fields0)
         fields['pk'] = self.pk
         fields['fieldid'] = self.field_id
@@ -490,6 +502,8 @@ class Fields(object, metaclass=FieldsSingleton):
         fields['overplan'] = self.overplan
         fields['deccen'] = self.deccen
         fields['base_priority'] = self.basePriority
+        fields['flag'] = self.flag
+        fields['nallocated'] = self.nallocated
         for indx in np.arange(self.nfields):
             fields['cadence'][indx] = self.cadence[indx]
             fields['nobservations'][indx] = len(self.observations[indx])
