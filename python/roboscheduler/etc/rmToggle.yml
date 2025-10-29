@@ -11,7 +11,7 @@
    cadence_milestones:
      59500: 'dark_174x8_v2'
      60523: 'dark_174x8_10day_v2'
-     60888: 'dark_174x8_3day_v2'
+     60888: 'dark_174x8_2day_v2'
 
 112361:
    rm_field_name: 'XMM-LSS'
@@ -27,7 +27,7 @@
      59500: 'dark_174x8_v2'
      60523: 'dark_174x8_10day_v2'
      60888: 'dark_174x8_3day_v2'
-     61253: 'dark_174x8_2day_v2'
+     61253: 'dark_174x8_3day_v2'
 
 112380:
     rm_field_name: 'ELIAS-S1'
