@@ -19,7 +19,7 @@
      59500: 'dark_174x8_v2'
      60523: 'dark_174x8_30day_v2'
      60888: 'dark_174x8_7day_v2'
-     61253: 'dark_174x8_2day_v2'
+     61023: 'dark_174x8_2day_v2'
 
 112362:
    rm_field_name: 'CDFS'
