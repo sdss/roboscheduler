@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 
+import argparse
 from collections import defaultdict
 
 import numpy as np
@@ -7,6 +8,99 @@ import scipy.optimize as optimize
 from astropy.time import Time
 
 from roboscheduler import scheduler
+
+def sched_engineering(mjds, sched, apo=True):
+    illum = sched.moon_illumination(mjds)
+
+    full = np.where(illum > 0.98)[0]
+
+    # days = list()
+    nights = list()
+    last_night = 0
+    for i in full:
+        m = int(mjds[i])
+        if m - last_night < 5:
+            continue
+        aTime = Time(m-1, format="mjd").datetime
+        if apo:
+            # apo doesn't want weekends
+            if aTime.isoweekday() == 6:
+                nights.append(m-1)
+                # days.append(m-2)
+                last_night = m
+            elif aTime.isoweekday() == 7:
+                nights.append(m+1)
+                # days.append(m+2)
+                last_night = m
+            elif aTime.isoweekday() == 1:
+                nights.append(m)
+                # days.append(m+1)
+                last_night = m
+            else:
+                nights.append(m)
+                # days.append(m-1)
+                last_night = m
+        else:
+            # LCO doesn't want it on Mon->Tue
+            if aTime.isoweekday() == 1:
+                nights.append(m+1)
+                last_night = m+1
+            else:
+                nights.append(m)
+                last_night = m
+
+    return nights
+
+
+def plannedSkips(start, stop, loc="apo"):
+    sched = scheduler.Observer(observatory=loc)
+
+    apo = loc == "apo"
+
+    mjds = np.arange(start, stop, 1)
+
+    date = Time(mjds[0], format="mjd").datetime
+
+    skipped_mjds = list()
+
+    shutdown_duration = 7 * 6  # 6 weeks
+
+    eng = sched_engineering(mjds, sched, apo)
+    delay = 0
+    for m in mjds[1:]:
+        m = int(m)
+        if m < delay:
+            continue
+        if m in eng:
+            if apo:
+                dur = 1
+            else:
+                dur = 2
+            for i in range(dur):
+                skipped_mjds.append(m)
+            delay = m + dur
+        elif apo:
+            date = Time(m-1, format="mjd").datetime
+            if date.month == 7:
+                if date.isoweekday() == 1:
+                    for i in range(shutdown_duration):
+                        skipped_mjds.append(m+i)
+                    delay = m + shutdown_duration
+        else:
+            # LCO
+            date = Time(m-1, format="mjd").datetime
+            if date.month == 12:
+                if date.day == 24:
+                    if (date.year - 2000) % 3 == 0:
+                        # realuminization
+                        dur = 10
+                    else:
+                        dur = 2
+                    for i in range(dur):
+                        skipped_mjds.append(m+i)
+                    delay = m + dur
+
+    return skipped_mjds
 
 
 def _bright_dark_function(mjd=None, sched=None, switch=0.35):
@@ -38,6 +132,7 @@ def nightSchedule(sched, night_start, night_end):
     Bright_End = 0
     Dark_Start = 0
     Dark_End = 0
+    split = None
 
     if bright_start and bright_end:
         Bright_Start = night_start
@@ -64,31 +159,26 @@ def nightSchedule(sched, night_start, night_end):
     
     dark_time = float(Dark_End - Dark_Start)
     bright_time = float(Bright_End - Bright_Start)
-    return dark_time, bright_time
+    return dark_time, bright_time, split
 
 
 def mjd_dict():
     # we're abusing the ddict default_factory
-    return {"bright": 0, "dark": 0, "twilight": 0}
+    return {"bright": 0, "dark": 0, "twilight": 0, 
+            "lst_start": -1, "lst_end": -1, "lst_split": -1}
 
 
-def computeSched(loc):
-    if loc == "lco":
-        start = 60000
-        end = start + 5.75*365.25
-    else:
-        start = 59640
-        end = start + 5.0*365.25
+def computeSched(loc=None, start=None, end=None):
     mjds = np.arange(start, end, 1)
 
     sched = scheduler.Scheduler(observatory=loc, schedule="v6")
 
     time_avail = defaultdict(mjd_dict)
 
-    for m in mjds:
-        onoff, nextchange_on = sched.on(mjd=m)
+    skipped_mjds = plannedSkips(start, end, loc=loc)
 
-        if onoff != "on":
+    for m in mjds:
+        if m in skipped_mjds:
             print(m)
             continue
 
@@ -113,25 +203,52 @@ def computeSched(loc):
         xtra_morning = mjd_morning_twilight_bright - mjd_morning_twilight
         twilight = xtra_evening + xtra_morning
         
-        dark_time, bright_time = nightSchedule(sched,
-                                               mjd_evening_twilight,
-                                               mjd_morning_twilight)
+        dark_time, bright_time, split = nightSchedule(sched,
+                                                      mjd_evening_twilight,
+                                                      mjd_morning_twilight)
         
         time_avail[m]["bright"] = bright_time * 24
         time_avail[m]["dark"] = dark_time * 24
         time_avail[m]["twilight"] = twilight * 24
+        time_avail[m]["lst_start"] = float(sched.lst(mjd_evening_twilight))
+        time_avail[m]["lst_end"] = float(sched.lst(mjd_morning_twilight))
+        if split is not None:
+            time_avail[m]["lst_split"] = float(sched.lst(split))
 
     with open(f"time_avail_{loc}.csv", "w") as of:
         cum_bright = 0
         cum_dark = 0
         cum_twilight = 0
-        print("mjd, bright, cum_bright, dark, cum_dark, twilight, cum_twilight", file=of)
+        print("mjd, bright, slots_bright, dark, slots_dark, twilight, slots_twilight, lst_start, lst_end, lst_split", file=of)
         for k,v in time_avail.items():
             cum_bright += v['bright']
             cum_dark += v['dark']
             cum_twilight += v['twilight']
-            print(f"{k}, {v['bright']:.2f}, {cum_bright:.2f}, {v['dark']:.2f}, {cum_dark:.2f}, {v['twilight']:.2f}, {cum_twilight:.2f}", file=of)
+            print((
+                  f"{k}, {v['bright']:.2f}, {int(v['bright'] * 3)}, "
+                  f"{v['dark']:.2f}, {int(v['dark'] * 3)}, "
+                  f"{v['twilight']:.2f}, {int(v['twilight'] * 3)}, "
+                  f"{v['lst_start']:.1f}, {v['lst_end']:.1f}, {v['lst_split']:.1f}"
+                  ) , file=of)
 
 if __name__ == "__main__":
-    computeSched("lco")
-    computeSched("apo")
+    usage = "make_figs"
+    description = "Post processing for observesim, make figs and webpage"
+    parser = argparse.ArgumentParser(description=description, usage=usage)
+    parser.add_argument("-l", "--location", dest="location", type=str,
+                        required=False, help="observatory location",
+                        default="lco")
+    parser.add_argument("-s", "--start", dest="start", type=str,
+                        required=False, help="start MJD", default=None)
+    args = parser.parse_args()
+    location = args.location
+    start = args.start
+
+    if start is None:
+        if location == "apo":
+            start = 61406
+        else:
+            start = 61679
+        end = start + 5*365.25
+
+    computeSched(loc=location, start=start, end=end)
