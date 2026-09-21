@@ -2,6 +2,7 @@
 
 import argparse
 from collections import defaultdict
+from modulefinder import test
 
 import numpy as np
 import scipy.optimize as optimize
@@ -159,13 +160,19 @@ def nightSchedule(sched, night_start, night_end):
     
     dark_time = float(Dark_End - Dark_Start)
     bright_time = float(Bright_End - Bright_Start)
-    return dark_time, bright_time, split
+
+    time_dict = {"bright_start": Bright_Start, "bright_end": Bright_End,
+                 "dark_start": Dark_Start, "dark_end": Dark_End}
+
+    return dark_time, bright_time, split, time_dict
 
 
 def mjd_dict():
     # we're abusing the ddict default_factory
     return {"bright": 0, "dark": 0, "twilight": 0, 
-            "lst_start": -1, "lst_end": -1, "lst_split": -1}
+            "lst_start": -1, "lst_end": -1, "lst_split": -1,
+            "bright_start": 0.0, "bright_end": 0.0,
+            "dark_start": 0.0, "dark_end": 0.0, "eng": 0}
 
 
 def computeSched(loc=None, start=None, end=None):
@@ -178,9 +185,9 @@ def computeSched(loc=None, start=None, end=None):
     skipped_mjds = plannedSkips(start, end, loc=loc)
 
     for m in mjds:
-        if m in skipped_mjds:
-            print(m)
-            continue
+        # if m in skipped_mjds:
+        #     print(m)
+        #     continue
 
         mjd_evening_twilight = sched.evening_twilight(m, twilight=-15)
         mjd_morning_twilight = sched.morning_twilight(m, twilight=-15)
@@ -202,24 +209,30 @@ def computeSched(loc=None, start=None, end=None):
         xtra_evening = mjd_evening_twilight - mjd_evening_twilight_bright
         xtra_morning = mjd_morning_twilight_bright - mjd_morning_twilight
         twilight = xtra_evening + xtra_morning
-        
-        dark_time, bright_time, split = nightSchedule(sched,
+
+        dark_time, bright_time, split, time_dict = nightSchedule(sched,
                                                       mjd_evening_twilight,
                                                       mjd_morning_twilight)
-        
+
         time_avail[m]["bright"] = bright_time * 24
         time_avail[m]["dark"] = dark_time * 24
         time_avail[m]["twilight"] = twilight * 24
-        time_avail[m]["lst_start"] = float(sched.lst(mjd_evening_twilight))
-        time_avail[m]["lst_end"] = float(sched.lst(mjd_morning_twilight))
+        time_avail[m]["lst_start"] = float(sched.lst(mjd_evening_twilight)) / 15
+        time_avail[m]["lst_end"] = float(sched.lst(mjd_morning_twilight)) / 15
+        time_avail[m].update(time_dict)
+        if m in skipped_mjds:
+           time_avail[m]["eng"] = 1
         if split is not None:
-            time_avail[m]["lst_split"] = float(sched.lst(split))
+            time_avail[m]["lst_split"] = float(sched.lst(split)) / 15
 
     with open(f"time_avail_{loc}.csv", "w") as of:
         cum_bright = 0
         cum_dark = 0
         cum_twilight = 0
-        print("mjd, bright, slots_bright, dark, slots_dark, twilight, slots_twilight, lst_start, lst_end, lst_split", file=of)
+        print((
+            "mjd, bright, slots_bright, dark, slots_dark, twilight, slots_twilight, lst_start, lst_end, lst_split, "
+            "bright_start, bright_end, dark_start, dark_end, eng"
+               ), file=of)
         for k,v in time_avail.items():
             cum_bright += v['bright']
             cum_dark += v['dark']
@@ -228,8 +241,10 @@ def computeSched(loc=None, start=None, end=None):
                   f"{k}, {v['bright']:.2f}, {int(v['bright'] * 3)}, "
                   f"{v['dark']:.2f}, {int(v['dark'] * 3)}, "
                   f"{v['twilight']:.2f}, {int(v['twilight'] * 3)}, "
-                  f"{v['lst_start']:.1f}, {v['lst_end']:.1f}, {v['lst_split']:.1f}"
-                  ) , file=of)
+                  f"{v['lst_start']:.1f}, {v['lst_end']:.1f}, {v['lst_split']:.1f},"
+                  f"{v['bright_start']:.4f}, {v['bright_end']:.4f}, "
+                  f"{v['dark_start']:.4f}, {v['dark_end']:.4f}, {v['eng']}"
+               ), file=of)
 
 if __name__ == "__main__":
     usage = "make_figs"
@@ -240,15 +255,21 @@ if __name__ == "__main__":
                         default="lco")
     parser.add_argument("-s", "--start", dest="start", type=str,
                         required=False, help="start MJD", default=None)
+    parser.add_argument("-t", "--test", dest="test", action="store_true",
+                        required=False, help="test")
     args = parser.parse_args()
     location = args.location
     start = args.start
+    test = args.test
 
     if start is None:
         if location == "apo":
             start = 61406
         else:
             start = 61679
-        end = start + 5*365.25
+        if test:
+            end = start + 45
+        else:
+            end = start + 5*365.25
 
     computeSched(loc=location, start=start, end=end)
