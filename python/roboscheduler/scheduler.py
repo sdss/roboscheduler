@@ -108,8 +108,8 @@ class IdleLogger(object):
         self.airmass.append(airmass)
         self.deltaV.append(deltaV)
         self.moon_dist.append(moon_dist)
-        self.deltaT.append(deltaT)
-        self.skybrightness.append(skybrightness)
+        self.deltaT.append(float(deltaT))
+        self.skybrightness.append(float(skybrightness))
         self.cadence.append(cadence)
 
     def write(self, name=None):
@@ -913,6 +913,8 @@ class Master(Observer):
         prod_dir = os.path.abspath(__file__).split("/scheduler.py")[0]
         schedulefile = os.path.join(prod_dir,
                                     'etc', masterfile)
+        print(schedulefile)
+        print(os.path.isfile(schedulefile))
         self._schedulefile = schedulefile
         self.schedule = yanny.yanny(self._schedulefile)
         self._validate()
@@ -1279,6 +1281,23 @@ class Scheduler(Master):
 
         # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
 
+        # problems = [101836, 101888, 101898, 101899, 101907, 101912, 101917, 103018, 
+        #             103613, 103622, 103623, 103631, 103640, 103651, 103661, 103662, 
+        #             103663, 103670, 103671, 103672, 103673, 103675, 103677]
+
+        # inproblems = np.isin(self.fields.field_id, problems)
+
+        # w_p = np.where(inproblems)
+
+        # verbose = False
+
+        # if np.any(observable[w_p]):
+        #     idxs = np.where(np.logical_and(inproblems, airmass <= 1.40))[0]
+        #     print(f"{self.lst(mjd)[0] / 15:.1f}", [self.fields.cadence[i] for i in idxs])
+        #     if np.all([airmass[i] > 0 for i in idxs]) and len([airmass[i] for i in idxs]):
+        #         print([airmass[i] for i in idxs])
+        #         verbose = True
+
         ac = alt > 30.
         indxs = np.where(observable)[0]
         # print(f"attempting {float(mjd):.2f} with {len(indxs)} fields")
@@ -1288,14 +1307,20 @@ class Scheduler(Master):
         for indx in indxs:
             # if(observable[indx]):
             if int(self.fields.pk[indx]) in ignore:
+                if verbose:
+                    print("ignored", self.fields.pk[indx], self.fields.field_id[indx])
                 observable[indx] = False
                 continue
             elif self.fields.flag[indx] == -1:
+                if verbose:
+                    print("flagged", self.fields.pk[indx], self.fields.field_id[indx])
                 observable[indx] = False
                 continue
             cadence = self.cadencelist.cadences[self.fields.cadence[indx]]
 
             if int(self.fields.epoch_idx[indx]) >= cadence.nepochs and self.fields.flag[indx] != 1:
+                if verbose:
+                    print("done already?", self.fields.pk[indx], self.fields.field_id[indx])
                 observable[indx] = False
                 continue
 
@@ -1306,6 +1331,8 @@ class Scheduler(Master):
             expCount = np.cumsum(cadence.nexp)
 
             if expCount[-1] == len(mjd_past):
+                if verbose:
+                    print("also done", self.fields.pk[indx], self.fields.field_id[indx])
                 # there's a chance fields.epoch_idx won't catch close together epochs
                 # with long max_length fields, e.g. dark x2/x4
                 observable[indx] = False
@@ -1318,6 +1345,8 @@ class Scheduler(Master):
                 epoch_idx = epoch_idx[0]
 
             if epoch_idx >= cadence.nepochs and self.fields.flag[indx] != 1:
+                if verbose:
+                    print("also also done", self.fields.pk[indx], self.fields.field_id[indx])
                 observable[indx] = False
                 continue
 
@@ -1341,10 +1370,14 @@ class Scheduler(Master):
 
             if nexp[indx] > nexp_change and self.fields.flag[indx] != 1:
                 if cadence.max_length[epoch_idx] < 1:
+                    if verbose:
+                        print("not enough time for one-night epoch", self.fields.pk[indx], self.fields.field_id[indx])
                     # not enough time for one-night epoch
                     observable[indx] = False
                     continue
                 elif nexp[indx] > 4 and nexp_change < 3:
+                    if verbose:
+                        print("not enough time", self.fields.pk[indx], self.fields.field_id[indx])
                     observable[indx] = False
                     continue
 
@@ -1367,7 +1400,9 @@ class Scheduler(Master):
             # if self.fields.field_id[indx] in [101364]:
                 # print(int(self.fields.pk[indx]), observable[indx], enc[indx], f"{airmass[indx]:3.1f}", alt, cadence.nexp[epoch_idx], cadence.label_root)
                 # verbose = True
-            verbose_sub = verbose
+
+            # verbose_sub = verbose
+            verbose_sub = verbose and self.fields.field_id[indx] in problems
             # if np.abs(mjd - 60889.42848) < 0.02:
             #     print("diff \n", np.abs(mjd - 60889.42848))
             #     verbose_sub = True

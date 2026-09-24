@@ -210,11 +210,14 @@ class Fields(object, metaclass=FieldsSingleton):
         if len_exposures > 1:
             self.fields_fits["original_exposures_done"] = fits_dat["original_exposures_done"]
 
-        self.fields_fits["base_priority"] = np.ones(len(fits_dat["fieldid"]))
+        if "base_priority" in fits_dat.dtype.names:
+            self.fields_fits["base_priority"] = fits_dat["base_priority"]
+        else:
+            self.fields_fits["base_priority"] = np.ones(len(fits_dat["fieldid"]))
 
-        for i, f in enumerate(self.fields_fits):
-            if f["overplan"]:
-                self.fields_fits["base_priority"][i] = -10
+            for i, f in enumerate(self.fields_fits):
+                if f["overplan"]:
+                    self.fields_fits["base_priority"][i] = -10
         for i, f in enumerate(fits_dat):
             if f["nallocated"] == 0:
                 self.fields_fits["flag"][i] = -1

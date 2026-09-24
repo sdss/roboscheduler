@@ -800,7 +800,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                 max_length_trim = max_length_string.strip("[] ")
                 x = self.cadences[name].obsmode_pk[0:nepochs]
                 obsmode_pk_string = np.array2string(x, separator='","', formatter={'str_kind': lambda x: x})
-                obsmode_pk_trim = '"'+obsmode_pk_string.strip("[] ")+'"'
+                obsmode_pk_trim = '"'+obsmode_pk_string.strip("[] ")+'"'.strip(" ")
                 #print(obsmode_pk_trim)
                 sky_brightness_string = np.array2string(self.cadences[name].skybrightness[0:nepochs], precision=3, separator=',')
                 sky_brightness_trim = sky_brightness_string.strip("[] ")
