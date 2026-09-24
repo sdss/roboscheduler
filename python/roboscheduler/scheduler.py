@@ -628,7 +628,7 @@ class Observer(SchedulerBase):
 
         Returns value of bright_twilight, unless Sun is on opposite side
         of Equator from the observatory, in which case return winter_bright_twilight
-"""
+        """
         (sun_ra, sun_dec) = self.sun_radec(mjd=mjd)
         if((sun_dec > 0.) == (self.latitude > 0.)):
             return(self.bright_twilight)
@@ -1050,9 +1050,9 @@ class Scheduler(Master):
         self.recent_ids = list()
         self.airmass_limit = airmass_limit
         if exp_time is None:
-            self.exp_time = 18 / 60 / 24
+            self.nom_exp_time = 20 / 60 / 24
         else:
-            self.exp_time = exp_time
+            self.nom_exp_time = exp_time
 
         if priorities is None:
             priority_file = os.getenv('RS_PRIORITY_FILE')
@@ -1074,26 +1074,12 @@ class Scheduler(Master):
         self.airmassPri = priorities.get("airmassPri", 20)
         self.randomPri = priorities.get("randomPri", 0)
 
-        if os.path.isfile(os.path.expanduser("~/.rmToggle.yml")):
-            rmToggleFile = os.path.expanduser("~/.rmToggle.yml")
-        else:
-            print("Local RM toggle not found! Using default")
-            prod_dir = os.path.abspath(__file__).split("/scheduler.py")[0]
-            rmToggleFile = os.path.join(prod_dir, "etc", "rmToggle.yml")
-
-        self.rmToggle = yaml.load(open(rmToggleFile), Loader=yaml.FullLoader)
-        self.invertOverheadCadences = priorities.get("invertOverheadCadences",
-                                                      ["dark_1x3_v2"])
-
-        if observatory.lower() == "apo":
-            self.invertOverheadCadences = []
-        
         self.idleLog = IdleLogger()
 
         return
 
     def initdb(self, designbase='plan-0', fromFits=True,
-               fieldsArray=None, realDesigns=None, rsFinal=True,
+               rsFinal=True,
                alternate_input=False):
         """Initialize Scheduler fields and observation lists.
         Required before fields can be scheduled.
@@ -1107,13 +1093,6 @@ class Scheduler(Master):
         fromFits : boolean
             For simulations we want to use a fits file, which should
             exist in "$OBSERVING_PLAN_DIR" and be named using 'designbase'
-        fieldsArray : np.array or None
-            For simulations, a np array of fields, of the format created in
-            scheduler.fields, created from the DB instead of a flat file.
-            Assumed to be a single observatory-version combination
-        realDesigns: list or None
-            For simulations, real design_ids associated with fieldsArray
-            of length(fieldsArray)
         """
         self.cadencelist = roboscheduler.cadence.CadenceList(observatory=self.observatory)
         self.fields = roboscheduler.fields.Fields(plan=designbase,
@@ -1158,21 +1137,15 @@ class Scheduler(Master):
             self.fields.fromdb(priorities=self.priorities)
 
         surveyGoal = np.sum(self.fields.slots)
-        if fieldsArray is None:
-            surveyDone = np.sum([len(self.fields.hist[i]) for i in self.fields.pk])
-        else:
-            surveyDone = 0
+        surveyDone = 0
         self.surveyComplete = surveyDone / surveyGoal
 
         self.observations = roboscheduler.observations.Observations(observatory=self.observatory)
 
-        invertOverheadPri = [c in self.invertOverheadCadences for c in self.fields.cadence]
-        self.invertOverheadPri = np.array(invertOverheadPri)
-        print(f"Found {len(np.where(self.invertOverheadPri)[0])} to invert")
         return
 
     def observable(self, mjd=None,  maxExp=None, check_skybrightness=True,
-                   check_cadence=True, ignore=[], schedule_bright=False,
+                   check_cadence=True, scheduled=[], schedule_bright=False,
                    verbose=False, idle=False):
         """Return array of fields observable
 
@@ -1192,10 +1165,8 @@ class Scheduler(Master):
             if all else fails, just see if a field is up, don't worry
             about cadence, rarely used, probably deprecated
 
-        ignore : list
-            a list of fields to mark unobservable. Mostly used while
-            planning a night to avoid rescheduling the same field that
-            hasn't been marked done in the database.
+        scheduled : list
+            a list of fields that are already scheduled for the current night.
 
         schedule_bright : boolean
             schedule a bright field right now, ignoring skybrightness.
@@ -1233,31 +1204,9 @@ class Scheduler(Master):
         # finish partial field if scheduled
         skybrightness_2days = self.skybrightness(mjd + 2)
 
-        rm_cadence = dict()
-        for field_id, field_attr in self.rmToggle.items():
-            milestones = field_attr["cadence_milestones"]
-            for d, cad in milestones.items():
-                if d < mjd:
-                    rm_cadence[field_id] = cad
-
-        assert len(rm_cadence) > 0, "RM cadence not found"
-
-        whereRM = np.where(["174x" in c for c in self.fields.cadence])[0]
-        for w in whereRM:
-            f_id = self.fields.field_id[w]
-            if f_id not in rm_cadence:
-                continue
-            self.fields.cadence[w] = rm_cadence[f_id]
-            # for sims, allows me to toggle flag on/off
-            # if rm_cadence[f_id] == "none":
-            #     self.fields.flag[w] = -1
-            # elif self.fields.flag[w] == -1:
-            #     print("re-enabling field", f_id)
-            #     self.fields.flag[w] = 0
-
         next_change, next_brightness = self.next_change(mjd)
 
-        nexp_change = int((next_change - mjd) / self.exp_time)
+        nexp_change = int((next_change - mjd) / self.nom_exp_time)
 
         if next_brightness <= 0.35:
             if skybrightness <= 0.35:
@@ -1278,39 +1227,11 @@ class Scheduler(Master):
                 # don't waste time, make it bright
                 nexp_change = 1
                 skybrightness = next_brightness
-
-        # print(f"{float(mjd):.3f} {float(next_change):.3f} {float(next_brightness):.2f} {nexp_change}", maxExp)
-
-        # problems = [101836, 101888, 101898, 101899, 101907, 101912, 101917, 103018, 
-        #             103613, 103622, 103623, 103631, 103640, 103651, 103661, 103662, 
-        #             103663, 103670, 103671, 103672, 103673, 103675, 103677]
-
-        # inproblems = np.isin(self.fields.field_id, problems)
-
-        # w_p = np.where(inproblems)
-
-        # verbose = False
-
-        # if np.any(observable[w_p]):
-        #     idxs = np.where(np.logical_and(inproblems, airmass <= 1.40))[0]
-        #     print(f"{self.lst(mjd)[0] / 15:.1f}", [self.fields.cadence[i] for i in idxs])
-        #     if np.all([airmass[i] > 0 for i in idxs]) and len([airmass[i] for i in idxs]):
-        #         print([airmass[i] for i in idxs])
-        #         verbose = True
-
-        ac = alt > 30.
+        
+        problems = []
+        # ac = alt > 30.
         indxs = np.where(observable)[0]
-        # print(f"attempting {float(mjd):.2f} with {len(indxs)} fields")
-        # print(len(np.where(enc & self.fields.validCadence)[0]))
-        # print(len(np.where(enc & self.fields.notDone)[0]))
-        # print(len(np.where(enc & self.fields.notDone & self.fields.validCadence)[0]))
-        for indx in indxs:
-            # if(observable[indx]):
-            if int(self.fields.pk[indx]) in ignore:
-                if verbose:
-                    print("ignored", self.fields.pk[indx], self.fields.field_id[indx])
-                observable[indx] = False
-                continue
+        for indx in indxs:                
             elif self.fields.flag[indx] == -1:
                 if verbose:
                     print("flagged", self.fields.pk[indx], self.fields.field_id[indx])
@@ -1344,6 +1265,9 @@ class Scheduler(Master):
             else:
                 epoch_idx = epoch_idx[0]
 
+            if int(self.fields.pk[indx]) in scheduled:
+                epoch_idx += 1
+
             if epoch_idx >= cadence.nepochs and self.fields.flag[indx] != 1:
                 if verbose:
                     print("also also done", self.fields.pk[indx], self.fields.field_id[indx])
@@ -1375,14 +1299,9 @@ class Scheduler(Master):
                     # not enough time for one-night epoch
                     observable[indx] = False
                     continue
-                elif nexp[indx] > 4 and nexp_change < 3:
-                    if verbose:
-                        print("not enough time", self.fields.pk[indx], self.fields.field_id[indx])
-                    observable[indx] = False
-                    continue
 
-            if nexp[indx] > 4 or airmass[indx] > 1.3:
-                field_time = nexp[indx] * self.exp_time
+            if nexp[indx] > 3 or airmass[indx] > 1.3:
+                field_time = nexp[indx] * self.nom_exp_time
                 if field_time > 1 / 24:
                     field_time = 1 / 24
                 endmjd = mjd + field_time
@@ -1393,22 +1312,8 @@ class Scheduler(Master):
                 if endam > airmass[indx]:
                     airmass[indx] = endam
 
-            # if indx in whereRM:
-            #     # verbose = True
-            #     print(mjd_prev, mjd)
-            #     print(mjd_past[-1], len(mjd_past), last_idx)
-            # if self.fields.field_id[indx] in [101364]:
-                # print(int(self.fields.pk[indx]), observable[indx], enc[indx], f"{airmass[indx]:3.1f}", alt, cadence.nexp[epoch_idx], cadence.label_root)
-                # verbose = True
-
             # verbose_sub = verbose
             verbose_sub = verbose and self.fields.field_id[indx] in problems
-            # if np.abs(mjd - 60889.42848) < 0.02:
-            #     print("diff \n", np.abs(mjd - 60889.42848))
-            #     verbose_sub = True
-            # if self.fields.field_id[indx] in [104667, 104668]:
-            #     print(int(self.fields.pk[indx]), observable[indx], f"{airmass[indx]:3.1f}", alt, cadence.nexp[epoch_idx], cadence.label_root)
-            #     verbose_sub = True
 
             if idle:
                 # print("logging idle", mjd)

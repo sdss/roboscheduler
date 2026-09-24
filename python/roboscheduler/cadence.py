@@ -522,7 +522,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         "limit" limits how many solutions it will search for maximum; because it 
         builds up the solutions epoch-by-epoch, and the limit is applied at each epoch,
         the total number can be less.
-"""
+        """
         cache_key = (one, two, return_solutions, tuple(list(one_epochs)), self.skybrightness_only)
         if(cache_key in self._cadence_consistency):
             return(self._cadence_consistency[cache_key])
@@ -906,7 +906,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
 
         use_label_root : bool
             use the label_root as the cadence name (default True)
-"""
+        """
         if(_database is False):
             print("No database available.")
             return()
