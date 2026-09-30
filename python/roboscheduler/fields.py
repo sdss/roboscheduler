@@ -107,17 +107,16 @@ class Fields(object, metaclass=FieldsSingleton):
         self.deccen = fields_array['deccen']
         self.nfilled = fields_array['nfilled']
         self.field_id = fields_array['field_id']
+        self.program = fields_array['program']
         if "overplan" in fields_array.dtype.names:
             self.overplan = fields_array['overplan']
         self.pk = fields_array['pk']
         self.cadence = [c.strip().decode() for c in fields_array['cadence']]
-        self.slots = fields_array['slots_exposures']
-        self.lstObserved = fields_array["lstObserved"]
+        # self.slots = fields_array['slots_exposures']
         self.observations = [np.zeros(0, dtype=np.int32)] * self.nfields
         self.icadence = np.zeros(self.nfields, dtype=np.int32)
         # self.nextmjd = np.zeros(self.nfields, dtype=np.float64)
         self.epoch_idx = np.zeros(self.nfields, dtype=np.float64)
-        self.original_exposures_done = fields_array["original_exposures_done"]
         if "base_priority" in fields_array.dtype.names:
             self.basePriority = fields_array["base_priority"]
         else:
@@ -127,10 +126,6 @@ class Fields(object, metaclass=FieldsSingleton):
             self.flag = fields_array["flag"]
         else:
             self.flag = np.zeros(self.nfields)
-        if "nallocated" in fields_array.dtype.names:
-            self.nallocated = fields_array["nallocated"]
-        else:
-            self.nallocated = np.zeros(self.nfields)
         # self.setPriorities()
         if designList:
             assert len(designList) == len(self.pk), "designList must match fields"
@@ -177,59 +172,32 @@ class Fields(object, metaclass=FieldsSingleton):
                         ('deccen', np.float64),
                         ('nfilled', np.int32),
                         ('flag', np.int32),
-                        ('slots_exposures', np.int32, (24, 2)),
-                        ('lstObserved', np.int32, (24, 2)),
-                        ('original_exposures_done', np.int32, (len_exposures)),
-                        ('cadence', np.dtype('a40')),
+                        ('cadence', np.dtype('S40')),
                         ('base_priority', np.int32),
-                        ('overplan', np.int32),
-                        ('nallocated', np.int32)]
+                        ('program', np.dtype('S20'))]
 
-        self.fields_fits = np.zeros(len(fits_dat["fieldid"]), dtype=fields_model)
+        self.fields_fits = np.zeros(len(fits_dat["field_id"]), dtype=fields_model)
 
-        self.fields_fits["pk"] = np.arange(len(fits_dat["fieldid"]))
-        self.fields_fits["field_id"] = fits_dat["fieldid"]
+        self.fields_fits["pk"] = np.arange(len(fits_dat["field_id"]))
+        self.fields_fits["field_id"] = fits_dat["field_id"]
         self.fields_fits["racen"] = fits_dat["racen"]
         self.fields_fits["deccen"] = fits_dat["deccen"]
-        self.fields_fits["nallocated"] = fits_dat["nallocated"]
-        if "nfilled" in fits_dat.dtype.names:
-            self.fields_fits["nfilled"] = fits_dat["nfilled"]
-        elif "nallocated_full" in fits_dat.dtype.names:
-            self.fields_fits["nfilled"] = fits_dat["nallocated_full"]
-        else:
-            print("WARN: strange rsAllocation format, estimating nfilled")
-            self.fields_fits["nfilled"] =\
-                  np.round(np.sum(np.sum(fits_dat["slots_exposures"], axis=1),
-                         axis=1)).astype(int)
-        self.fields_fits["slots_exposures"] = fits_dat["slots_exposures"]
+        if "ndesigns" in fits_dat.dtype.names:
+            self.fields_fits["nfilled"] = fits_dat["ndesigns"]
         self.fields_fits["cadence"] = fits_dat["cadence"]
-        if "overplan" in fits_dat.dtype.names:
-            self.fields_fits["overplan"] = fits_dat["overplan"]
-        else:
-            self.fields_fits["overplan"] = np.zeros(len(fits_dat["fieldid"]), dtype=np.int32)
+        self.fields_fits["program"] = fits_dat["program"]
         if len_exposures > 1:
             self.fields_fits["original_exposures_done"] = fits_dat["original_exposures_done"]
 
         if "base_priority" in fits_dat.dtype.names:
             self.fields_fits["base_priority"] = fits_dat["base_priority"]
         else:
-            self.fields_fits["base_priority"] = np.ones(len(fits_dat["fieldid"]))
-
-            for i, f in enumerate(self.fields_fits):
-                if f["overplan"]:
-                    self.fields_fits["base_priority"][i] = -10
-        for i, f in enumerate(fits_dat):
-            if f["nallocated"] == 0:
-                self.fields_fits["flag"][i] = -1
+            self.fields_fits["base_priority"] = np.ones(len(fits_dat["field_id"]))
 
         for i, f in enumerate(self.fields_fits):
             if f["field_id"] in priority_fields:
                 if str(f["cadence"].decode()) == str(priority_fields[f["field_id"]]["cadence"]):
                     self.fields_fits["base_priority"][i] += priority_fields[f["field_id"]]["priority"]
-
-        w_cvz = np.where(["100x8" in c for c in fits_dat["cadence"]])
-
-        self.fields_fits["flag"][w_cvz] = -1
 
         self.fromarray(self.fields_fits)
         self.createDummyDesigns()
@@ -306,6 +274,9 @@ class Fields(object, metaclass=FieldsSingleton):
                                                         tolerance=tol,
                                                         nexp=cadence.nexp[0])
         self.epoch_idx[fieldidx] = int(obs_epochs)
+        if self.program[fieldidx].decode() == "hge":
+            print(tol, cadence.nexp[0], self.hist[pk])
+            print(f"field {self.field_id[fieldidx]}: {obs_epochs} epochs, {cadence.nepochs} needed, {len(self.hist[pk])} observations")
         if obs_epochs >= cadence.nepochs:
             self.notDone[fieldidx] = False
 
@@ -318,15 +289,18 @@ class Fields(object, metaclass=FieldsSingleton):
 
         self._hist[pk].append(mjd)
 
-        if dark:
-            row = 0
-        else:
-            row = 1
+        # if self.program[field_idx].decode() == "hge":
+        #     print(len(self.hist[pk]), len(self.observations[field_idx]))
 
-        int_lst = int(np.round(lst/15, 0))
-        if int_lst == 24:
-            int_lst = 0
-        self.lstObserved[field_idx][int_lst, row] += 1
+        # if dark:
+        #     row = 0
+        # else:
+        #     row = 1
+
+        # int_lst = int(np.round(lst/15, 0))
+        # if int_lst == 24:
+        #     int_lst = 0
+        # self.lstObserved[field_idx][int_lst, row] += 1
 
         self.checkCompletion(field_idx)
 
@@ -486,27 +460,28 @@ class Fields(object, metaclass=FieldsSingleton):
         if(maxn == 1):
             maxn = 2
         fields0 = [('pk', np.int32),
-                   ('fieldid', np.int32),
+                   ('field_id', np.int32),
                    ('racen', np.float64),
                    ('deccen', np.float64),
                    ('cadence', np.dtype('a40')),
                    ('nobservations', np.int32),
                    ('nfilled', np.int32),
-                   ('overplan', np.int32),
+                #    ('overplan', np.int32),
                    ('observations', np.int32, maxn),
                    ('base_priority', np.int32),
                    ('flag', np.int32),
-                   ('nallocated', np.int32)]
+                   ('program', np.dtype('a20'))]
         fields = np.zeros(self.nfields, dtype=fields0)
         fields['pk'] = self.pk
-        fields['fieldid'] = self.field_id
+        fields['field_id'] = self.field_id
         fields['racen'] = self.racen
         fields['nfilled'] = self.nfilled
-        fields['overplan'] = self.overplan
+        # fields['overplan'] = self.overplan
         fields['deccen'] = self.deccen
         fields['base_priority'] = self.basePriority
         fields['flag'] = self.flag
-        fields['nallocated'] = self.nallocated
+        fields['program'] = self.program
+        # fields['nallocated'] = self.nallocated
         for indx in np.arange(self.nfields):
             fields['cadence'][indx] = self.cadence[indx]
             fields['nobservations'][indx] = len(self.observations[indx])
@@ -592,14 +567,17 @@ def epochs_completed(mjd_past, tolerance=0.5, nexp=1):
 
     obs_epochs = 1
     prev = begin_last_epoch
+    n_in_epoch = 0
     for m in mjd_past:
         delta = m - prev
-        if delta < tolerance:
+        if delta < tolerance and n_in_epoch < nexp:
+            n_in_epoch += 1
             continue
         else:
             obs_epochs += 1
             begin_last_epoch = m
             epoch_idx += 1
         prev = m
+        n_in_epoch = 0
 
     return obs_epochs, begin_last_epoch

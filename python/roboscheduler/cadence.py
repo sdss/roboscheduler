@@ -731,7 +731,7 @@ class CadenceList(object, metaclass=CadenceListSingleton):
         """
         nepochs = np.array([c.nepochs for c in self.cadences.values()])
         max_nexp = nepochs.max()
-        cadence0 = [('CADENCE', np.unicode_, 40),
+        cadence0 = [('CADENCE', np.dtype('S40')),
                     ('NEPOCHS', np.int32),
                     ('DELTA', np.float64, max_nexp),
                     ('SKYBRIGHTNESS', np.float32, max_nexp),
@@ -744,8 +744,8 @@ class CadenceList(object, metaclass=CadenceListSingleton):
                     ('MIN_DELTAV_KS91', np.float32, max_nexp),
                     ('MIN_TWILIGHT_ANG', np.float32, max_nexp),
                     ('MAX_AIRMASS', np.float32, max_nexp),
-                    ('LABEL_ROOT', np.unicode_, 40),
-                    ('LABEL_VERSION', np.unicode_, 40)]
+                    ('LABEL_ROOT', np.dtype('S40')),
+                    ('LABEL_VERSION', np.dtype('S40'))]
         cads = np.zeros(self.ncadences, dtype=cadence0)
         names = self.cadences.keys()
         for indx, name in enumerate(names):

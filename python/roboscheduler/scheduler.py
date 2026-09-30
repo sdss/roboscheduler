@@ -1109,16 +1109,11 @@ class Scheduler(Master):
             # base = os.getenv('OBSERVING_PLAN_DIR')
             cadence_file = filebase + "/" 
             fields_file = filebase + "/"
-            if rsFinal:
-                fields_file +=  "final/rsAllocationFinal-"
-                cadence_file += "final/rsCadencesFinal-"
-            else:
-                fields_file +=  "rsAllocation-"
-                cadence_file += "rsCadences-"
+            fields_file +=  "fields-"
+            cadence_file += "cadences-"
             fields_file += designbase + "-"\
                            + self.observatory + ".fits"
-            cadence_file += designbase + "-"\
-                           + self.observatory + ".fits"
+            cadence_file += designbase + ".fits"
 
             out_path = os.getenv('RS_OUTDIR')
             priority_file = os.path.join(out_path, "priority_fields.yml")
@@ -1232,7 +1227,7 @@ class Scheduler(Master):
         # ac = alt > 30.
         indxs = np.where(observable)[0]
         for indx in indxs:                
-            elif self.fields.flag[indx] == -1:
+            if self.fields.flag[indx] == -1:
                 if verbose:
                     print("flagged", self.fields.pk[indx], self.fields.field_id[indx])
                 observable[indx] = False
@@ -1410,21 +1405,21 @@ class Scheduler(Master):
         priority = self.fields.basePriority[iobservable] * self.basePri + delta_priority
         # priority += delta_priority
 
-        lst = self.lst(mjd)
+        # lst = self.lst(mjd)
 
-        lstHrs = lst/15
+        # lstHrs = lst/15
 
         # lstDiffs = lstDiff(self.fields.lstPlan[fieldid], np.ones(len(fieldid))*lstHrs)
 
         dark = self.skybrightness(mjd) < 0.35
 
-        lstDiffs = self.fields.lstWeight(lstHrs, field_idx=iobservable, dark=dark)
+        # lstDiffs = self.fields.lstWeight(lstHrs, field_idx=iobservable, dark=dark)
 
-        assert len(lstDiffs) == len(iobservable), "lst weight going poorly"
+        # assert len(lstDiffs) == len(iobservable), "lst weight going poorly"
         # assert 0 not in delta_remaining, "some delta remaining not set properly!"
 
         ra = self.fields.racen[iobservable]
-        ha = self.ralst2ha(ra=ra, lst=lst)
+        # ha = self.ralst2ha(ra=ra, lst=lst)
         dec = self.fields.deccen[iobservable]
 
         (alt, az) = self.radec2altaz(mjd=mjd, ra=ra, dec=dec)
@@ -1433,14 +1428,13 @@ class Scheduler(Master):
         priority += self.airmassPri * np.exp(-(airmass)**2 / (2 * 0.2**2))
 
         # gaussian weight, mean already 0, use 1 hr  std
-        priority += self.lstPri * np.exp(-(lstDiffs)**2 / (2 * 0.5**2))
+        # priority += self.lstPri * np.exp(-(lstDiffs)**2 / (2 * 0.5**2))
         # gaussian weight, mean already 0, use 1 hr = 15 deg std
         # priority += 50 * np.exp(-(ha)**2 / (2 * 15**2))
         # gaussian weight, mean = obs lat, use 20 deg std
         overheadPri = self.overheadPri * np.exp(-(dec - self.latitude)**2 / (2 * 20**2))
-        invert = self.invertOverheadPri[iobservable]
-        priority -= np.invert(invert) * overheadPri
-        priority += invert * overheadPri
+        # invert = self.invertOverheadPri[iobservable]
+        priority -=  overheadPri
 
         pk = self.fields.pk[iobservable]
         field_id = self.fields.field_id[iobservable]
@@ -1526,7 +1520,7 @@ class Scheduler(Master):
         return designs
 
     def nextfield(self, mjd=None, maxExp=None, returnAll=False, live=False,
-                  ignore=[], schedule_bright=False, verbose=False):
+                  scheduled=[], schedule_bright=False, verbose=False):
         """Picks the next field to observe
 
         Parameters:
@@ -1540,9 +1534,12 @@ class Scheduler(Master):
             Return all the fields? For choosing backups
         live : boolean
             Are we live in Kronos? otherwise sim behavior slightly different
-        ignore : list
-            Fields to ignore temporarily, i.e. because they are already
-            scheduled but have no exposures in opsdb
+        scheduled : list
+            Fields that are already scheduled
+        schedule_bright : boolean
+            Whether to schedule bright objects
+        verbose : boolean
+            Whether to print verbose output
 
         Returns:
         --------
@@ -1565,7 +1562,7 @@ class Scheduler(Master):
         self.recent_ids = list()
 
         iobservable, nexp, delta_priority, exp_epoch, epoch_idx\
-            = self.observable(mjd=mjd, maxExp=maxExp, ignore=ignore,
+            = self.observable(mjd=mjd, maxExp=maxExp, scheduled=scheduled,
                               schedule_bright=schedule_bright, verbose=verbose)
         if len(iobservable) == 0:
             if returnAll:
